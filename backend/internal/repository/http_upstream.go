@@ -1533,9 +1533,12 @@ func (d *decompressedBody) Read(p []byte) (int, error) {
 }
 
 func (d *decompressedBody) Close() error {
-	// 如果 reader 本身也是 Closer（如 gzip.Reader），先关闭它
+	// Stop network reads before waiting for the decoder. In particular, zstd's
+	// asynchronous read-ahead can be waiting for another frame after an SSE
+	// completion event; closing the decoder first waits forever for that read.
+	err := d.closer.Close()
 	if rc, ok := d.reader.(io.Closer); ok {
 		_ = rc.Close()
 	}
-	return d.closer.Close()
+	return err
 }

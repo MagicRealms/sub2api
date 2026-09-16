@@ -4,16 +4,81 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
+	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"runtime"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
+
+// A provider can send response.completed while keeping the HTTP body open.
+// The asynchronous zstd decoder may already be waiting for another frame.
+func TestDecompressResponseBodyCloseUnblocksZstdReadAhead(t *testing.T) {
+	previous := runtime.GOMAXPROCS(2)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
+	payload := []byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n\ndata: {\"type\":\"response.completed\"}\n\n")
+	closeErr := errors.New("transport close result")
+	raw := &openEndedCompressedBody{
+		Reader:  bytes.NewReader(compressZstd(t, payload)),
+		blocked: make(chan struct{}), closed: make(chan struct{}), closeErr: closeErr,
+	}
+	t.Cleanup(func() { _ = raw.Close() })
+	resp := &http.Response{Header: http.Header{"Content-Encoding": {"zstd"}}, Body: raw}
+	decompressResponseBody(resp)
+	got := make([]byte, len(payload))
+	_, err := io.ReadFull(resp.Body, got)
+	require.NoError(t, err)
+	require.Equal(t, payload, got, "completed SSE bytes must remain unchanged")
+	select {
+	case <-raw.blocked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("decoder did not read ahead into the open transport")
+	}
+	done := make(chan error, 1)
+	go func() { done <- resp.Body.Close() }()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, closeErr)
+	case <-time.After(2 * time.Second):
+		_ = raw.Close() // Release the decoder even when the regression is present.
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("decoder did not stop after closing its transport")
+		}
+		t.Fatal("closing a completed stream waited for upstream EOF")
+	}
+}
+
+type openEndedCompressedBody struct {
+	*bytes.Reader
+	blocked, closed      chan struct{}
+	blockOnce, closeOnce sync.Once
+	closeErr             error
+}
+
+func (b *openEndedCompressedBody) Read(p []byte) (int, error) {
+	if b.Reader.Len() > 0 {
+		return b.Reader.Read(p)
+	}
+	b.blockOnce.Do(func() { close(b.blocked) })
+	<-b.closed
+	return 0, net.ErrClosed
+}
+
+func (b *openEndedCompressedBody) Close() error {
+	b.closeOnce.Do(func() { close(b.closed) })
+	return b.closeErr
+}
 
 func TestDecompressResponseBodyZstdUsage(t *testing.T) {
 	payload := []byte(`{"usage":{"input_tokens":123,"output_tokens":45,"cache_read_input_tokens":67}}`)

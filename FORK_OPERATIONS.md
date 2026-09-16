@@ -18,6 +18,14 @@ threshold, time window and cooldown settings remain in effect; healthy responses
 do not erase failures that still fall inside the configured window. Proxy passwords
 are omitted from fallback logs.
 
+Compressed response cleanup closes the underlying HTTP body before waiting for
+the decoder. A zstd decoder can read ahead into the next frame even after an SSE
+completion event has been received. Waiting for that decoder before closing its
+network input can otherwise stall response completion and hold request capacity.
+The regression test keeps the upstream open after a valid compressed SSE frame:
+the old close order blocks, while the corrected order releases it without
+changing output bytes or hiding the transport close result.
+
 Production may continue using `gateway.openai_http2.enabled: false` when HTTP/1.1
 has proven more reliable for its route. Fixing the fallback is not a reason to
 re-enable HTTP/2 without a controlled comparison.

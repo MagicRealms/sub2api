@@ -31,7 +31,7 @@ go_args=(--rm --cpus 2 --memory 2304m --memory-swap 2560m
   -v "$repo:/src" -v "$cache/gomod:/go/pkg/mod"
   -v "$cache/gobuild:/root/.cache/go-build" -w /src/backend)
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
-  go test -tags=unit -p 1 -timeout 10m ./internal/repository -run 'TestHTTPUpstream|TestOpenAIHTTP2'
+  go test -tags=unit -p 1 -timeout 10m ./internal/repository -run 'TestHTTPUpstream|TestOpenAIHTTP2|TestDecompressResponseBody'
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
   go test -tags=unit -p 1 -timeout 2m internal/service/update_service.go \
   internal/service/update_service_test.go internal/service/update_service_managed_test.go
