@@ -25,23 +25,26 @@ docker compose exec -T sub2api tar -C /app/data --exclude=logs -czf - . > "$back
 printf '%s\n' "$rollback_image" > "$backup/rollback-image"
 printf '%s\n' "$image" > "$backup/deployed-image"
 
-# Avoid interrupting an active stream at the server's short shutdown deadline.
-admin_key=$(docker compose exec -T postgres psql -X -At -U sub2api -d sub2api -c "SELECT value FROM settings WHERE key='admin_api_key'")
-[[ "$admin_key" =~ ^[A-Za-z0-9_-]{30,200}$ ]] || exit 2
-drained=false
-for ((attempt=0; attempt<60; attempt++)); do
-  if docker compose exec -T sub2api curl --fail --silent --show-error --noproxy '*' --max-time 10 \
-    --header "x-api-key: $admin_key" http://127.0.0.1:8080/api/v1/admin/ops/concurrency |
-    python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["data"]["account"]; sys.exit(0 if d["code"] == 0 and a and all(v["current_in_use"] == 0 and v["waiting_in_queue"] == 0 for v in a.values()) else 1)'; then
-    drained=true
-    break
+# The operator permits immediate restarts. Draining remains an explicit opt-in.
+if [[ ${FORK_DRAIN_BEFORE_RESTART:-false} == true ]]; then
+  # Avoid interrupting an active stream at the server's short shutdown deadline.
+  admin_key=$(docker compose exec -T postgres psql -X -At -U sub2api -d sub2api -c "SELECT value FROM settings WHERE key='admin_api_key'")
+  [[ "$admin_key" =~ ^[A-Za-z0-9_-]{30,200}$ ]] || exit 2
+  drained=false
+  for ((attempt=0; attempt<60; attempt++)); do
+    if docker compose exec -T sub2api curl --fail --silent --show-error --noproxy '*' --max-time 10 \
+      --header "x-api-key: $admin_key" http://127.0.0.1:8080/api/v1/admin/ops/concurrency |
+      python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["data"]["account"]; sys.exit(0 if d["code"] == 0 and a and all(v["current_in_use"] == 0 and v["waiting_in_queue"] == 0 for v in a.values()) else 1)'; then
+      drained=true
+      break
+    fi
+    sleep 5
+  done
+  unset admin_key
+  if [[ "$drained" != true ]]; then
+    echo 'Active traffic did not drain; the deployment was left unchanged.' >&2
+    exit 1
   fi
-  sleep 5
-done
-unset admin_key
-if [[ "$drained" != true ]]; then
-  echo 'Active traffic did not drain; the deployment was left unchanged.' >&2
-  exit 1
 fi
 
 # Change only the application's image; keep the existing limits and mounts.

@@ -37,7 +37,7 @@ else: raise SystemExit('unexpected docker '+str(a))
 
 
 class ForkDeployTest(unittest.TestCase):
-    def run_scenario(self, scenario, legacy=False):
+    def run_scenario(self, scenario, legacy=False, drain=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             old = "weishaw/sub2api:0.1.169" if legacy else "magicrealms/sub2api:old"
@@ -54,15 +54,19 @@ class ForkDeployTest(unittest.TestCase):
             for p in bindir.iterdir(): p.chmod(0o755)
             env = os.environ | {"PATH": str(bindir) + os.pathsep + os.environ["PATH"], "FORK_TEST_STATE": str(state)}
             env.pop("FORK_ROLLBACK_IMAGE", None)
+            env["FORK_DRAIN_BEFORE_RESTART"] = "true" if drain else "false"
             result = subprocess.run(["bash", str(SCRIPT), "magicrealms/sub2api:new", tmp], env=env, capture_output=True, text=True, timeout=60)
             current = (root / "docker-compose.override.yml").read_text()
             self.assertIn("mem_limit: 1536m", current)
             self.assertIn("mem_limit: 256m", current)
             info = json.loads(state.read_text())
-            if scenario == "healthy" and not legacy:
+            if not legacy and (scenario == "healthy" or (scenario == "busy" and not drain)):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(info["deploys"], ["magicrealms/sub2api:new"])
-                self.assertGreaterEqual(info["polls"], 2)
+                if drain:
+                    self.assertGreaterEqual(info["polls"], 2)
+                else:
+                    self.assertEqual(info["polls"], 0)
                 backups = list((root / "backups").glob("*/database.dump"))
                 self.assertEqual(len(backups), 1)
                 self.assertEqual(backups[0].read_text(), "database snapshot\n")
@@ -73,9 +77,11 @@ class ForkDeployTest(unittest.TestCase):
                 expected = ["magicrealms/sub2api:new", old] if scenario == "unhealthy" else []
                 self.assertEqual(info["deploys"], expected)
 
-    def test_backup_drain_and_deploy(self): self.run_scenario("healthy")
+    def test_backup_and_immediate_deploy(self): self.run_scenario("healthy")
+    def test_optional_drain_before_deploy(self): self.run_scenario("healthy", drain=True)
+    def test_busy_requests_do_not_block_default_deploy(self): self.run_scenario("busy")
     def test_failed_health_restores_previous_image(self): self.run_scenario("unhealthy")
-    def test_busy_requests_leave_deployment_unchanged(self): self.run_scenario("busy")
+    def test_busy_requests_leave_deployment_unchanged(self): self.run_scenario("busy", drain=True)
     def test_legacy_online_updated_image_requires_actual_rollback(self): self.run_scenario("healthy", legacy=True)
 
 

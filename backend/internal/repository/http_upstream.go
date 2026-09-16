@@ -218,7 +218,9 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	client = httpClientWithGrokAccessDeniedFallback(client)
 	upstreamCtx, cancelUpstream := context.WithCancel(req.Context())
 	req = req.WithContext(upstreamCtx)
+	req, transportTrace := traceOpenAIUpstream(req, profile)
 	resp, err := servertiming.Do(client, req)
+	transportTrace.log(req, resp, accountID, err != nil)
 	if err != nil {
 		if req.Context().Err() == nil {
 			s.recordOpenAIHTTP2Failure(profile, entry.protocolMode, entry.proxyKey, err)
@@ -290,7 +292,9 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	client = httpClientWithGrokAccessDeniedFallback(client)
 	upstreamCtx, cancelUpstream := context.WithCancel(req.Context())
 	req = req.WithContext(upstreamCtx)
+	req, transportTrace := traceOpenAIUpstream(req, upstreamProfile)
 	resp, err := servertiming.Do(client, req)
+	transportTrace.log(req, resp, accountID, err != nil)
 	if err != nil {
 		cancelUpstream()
 		atomic.AddInt64(&entry.inFlight, -1)

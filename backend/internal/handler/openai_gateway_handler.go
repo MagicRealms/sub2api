@@ -410,7 +410,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// Read request body
+	bodyReadStart := time.Now()
 	body, err := readLenientJSONRequestBodyWithPrealloc(c.Request, h.cfg)
+	service.SetOpsLatencyMs(c, "ops_request_read_ms", time.Since(bodyReadStart).Milliseconds())
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))

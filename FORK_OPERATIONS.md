@@ -57,12 +57,13 @@ traffic window; do not interpret full response duration as first-token latency.
    Compose configuration. Keep a runnable image of the actual current version;
    an image tag can be stale after historical online binary updates.
 4. Pin the new image in the existing Compose override, preserving resource
-   limits, mounts and environment. Wait for active requests and queues to drain.
-   Then run `docker compose up -d --no-deps --pull never sub2api`.
+   limits, mounts and environment. The operator authorizes immediate restarts,
+   including when requests are active. Run `docker compose up -d --no-deps --pull never sub2api`.
    For the standard deployment, `bash deploy/deploy-fork-image.sh IMAGE COMPOSE_DIR`
-   performs the backup, drain check, image-only override change, health check,
-   and image rollback on failure. It requires the existing local admin API key
-   and the `sub2api` PostgreSQL database/user. For a legacy online-updated
+   performs the backup, image-only override change, immediate restart, health check,
+   and image rollback on failure. It requires the `sub2api` PostgreSQL database/user.
+   Optional `FORK_DRAIN_BEFORE_RESTART=true` restores the wait-for-idle behavior
+   and requires the existing local admin API key. For a legacy online-updated
    container, explicitly provide `FORK_ROLLBACK_IMAGE` containing its actual
    running binary; the helper refuses to assume its old image tag is sufficient.
 5. Verify `/health`, runtime version, both account streaming tests, the custom
@@ -81,3 +82,15 @@ above. Do not use the panel updater or the former `update-official-latest.sh`.
 
 Account tests send a short fixed `hi` prompt. Their wall-clock time is neither
 TTFT nor a representative measurement for a long customer conversation.
+
+## Latency diagnostics
+
+Successful gateway access logs include the existing authentication/preparation,
+routing, upstream-header, response and TTFT measurements. Responses requests also
+record body-read time. These spans overlap; do not add them together. TTFT starts
+inside forwarding and does not include the whole client upload/authentication.
+
+OpenAI HTTP attempts record connection acquisition (including proxy negotiation),
+TLS, request writing, first response-header wait, connection reuse and response
+encoding. Header arrival is not first output. These bounded metadata fields never
+include request bodies, tokens, proxy URLs or request/response headers.

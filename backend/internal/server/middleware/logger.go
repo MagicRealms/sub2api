@@ -77,6 +77,18 @@ func Logger() gin.HandlerFunc {
 		if model != "" {
 			fields = append(fields, zap.String("model", model))
 		}
+		// Successful gateway requests need the same phase visibility as errors.
+		// These are existing handler measurements, not additive wall-clock spans.
+		for _, phase := range []string{"request_read_ms", "auth_latency_ms", "routing_latency_ms", "upstream_latency_ms", "response_latency_ms", "time_to_first_token_ms"} {
+			if value, ok := c.Get("ops_" + phase); ok {
+				if ms, ok := value.(int64); ok && ms >= 0 {
+					fields = append(fields, zap.Int64(phase, ms))
+				}
+			}
+		}
+		if hasAccountID && accountID > 0 {
+			fields = append(fields, zap.Int64("request_content_length", c.Request.ContentLength))
+		}
 
 		l := logger.FromContext(c.Request.Context()).With(fields...)
 		l.Info("http request completed", zap.Time("completed_at", endTime))
