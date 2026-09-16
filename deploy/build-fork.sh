@@ -24,7 +24,7 @@ docker run --rm --cpus 1.5 --memory 3072m --memory-swap 3584m \
   -e VITEST_MAX_THREADS=2 -e VITEST_MIN_THREADS=1 \
   -e VITEST_MAX_FORKS=2 -e VITEST_MIN_FORKS=1 \
   -v "$repo:/app" -w /app/frontend node:24-alpine \
-  sh -ec 'corepack enable; corepack prepare pnpm@9.15.9 --activate; pnpm install --frozen-lockfile; pnpm run build'
+  sh -ec 'corepack enable; corepack prepare pnpm@9.15.9 --activate; pnpm install --frozen-lockfile; pnpm exec vitest run src/components/common/__tests__/VersionBadge.spec.ts src/stores/__tests__/app.spec.ts; pnpm run build'
 
 go_args=(--rm --cpus 2 --memory 2304m --memory-swap 2560m
   -e GOMAXPROCS=2 -e GOMEMLIMIT=1536MiB -e CGO_ENABLED=0

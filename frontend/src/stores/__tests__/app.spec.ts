@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import { getPublicSettings } from '@/api/auth'
+import { checkUpdates } from '@/api/admin/system'
 import type { PublicSettings } from '@/types'
 
 function createDeferred<T>() {
@@ -81,6 +82,7 @@ describe('useAppStore', () => {
     vi.useFakeTimers()
     localStorage.clear()
     vi.mocked(getPublicSettings).mockReset()
+    vi.mocked(checkUpdates).mockReset()
     // 清除 window.__APP_CONFIG__
     delete (window as any).__APP_CONFIG__
   })
@@ -91,6 +93,45 @@ describe('useAppStore', () => {
   })
 
   // --- Toast 消息管理 ---
+
+  describe('upstream version checks', () => {
+    it('refreshes cached version information after 20 minutes and supports force', async () => {
+      const store = useAppStore()
+      vi.mocked(checkUpdates).mockResolvedValue({
+        current_version: '0.2.5-mr.1', latest_version: '0.2.5',
+        has_update: false, build_type: 'source', cached: false
+      })
+      await store.fetchVersion()
+      await store.fetchVersion()
+      expect(checkUpdates).toHaveBeenCalledTimes(1)
+      vi.mocked(checkUpdates).mockResolvedValue({
+        current_version: '0.2.5-mr.1', latest_version: '0.2.6',
+        has_update: true, build_type: 'source', cached: false
+      })
+      vi.advanceTimersByTime(20 * 60 * 1000)
+      await store.fetchVersion()
+      expect(checkUpdates).toHaveBeenCalledTimes(2)
+      expect(store.hasUpdate).toBe(true)
+      expect(store.latestVersion).toBe('0.2.6')
+      await store.fetchVersion(true)
+      expect(checkUpdates).toHaveBeenLastCalledWith(true)
+      expect(checkUpdates).toHaveBeenCalledTimes(3)
+    })
+
+    it('preserves check warnings in the cache and clears them on successful refresh', async () => {
+      const store = useAppStore()
+      const result = {
+        current_version: '0.2.5-mr.1', latest_version: '0.2.5',
+        has_update: false, build_type: 'source', cached: false
+      }
+      vi.mocked(checkUpdates).mockResolvedValue({ ...result, warning: 'github unavailable' })
+      await store.fetchVersion()
+      expect((await store.fetchVersion())?.warning).toBe('github unavailable')
+      vi.mocked(checkUpdates).mockResolvedValue(result)
+      await store.fetchVersion(true)
+      expect(store.versionWarning).toBe('')
+    })
+  })
 
   describe('Toast 消息管理', () => {
     it('showSuccess 创建 success 类型 toast', () => {

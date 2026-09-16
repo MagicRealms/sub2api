@@ -10,7 +10,7 @@
             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-800 dark:text-dark-400 dark:hover:bg-dark-700'
         ]"
-        :title="!isReleaseBuild ? t('version.sourceModeHint') : hasUpdate ? t('version.updateAvailable') : t('version.upToDate')"
+        :title="versionWarning ? t('version.checkFailed') : hasUpdate ? t(isReleaseBuild ? 'version.updateAvailable' : 'version.upstreamUpdateAvailable') : t('version.upToDate')"
       >
         <span v-if="currentVersion" class="font-medium">v{{ currentVersion }}</span>
         <span
@@ -89,7 +89,7 @@
                   <span v-else class="text-2xl font-bold text-gray-400 dark:text-dark-500">--</span>
                   <!-- Show check mark when up to date -->
                   <span
-                    v-if="isReleaseBuild && !hasUpdate"
+                    v-if="releaseInfo && !hasUpdate && !versionWarning"
                     class="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
                   >
                     <svg
@@ -107,14 +107,18 @@
                 </div>
                 <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
                   {{
-                    !isReleaseBuild
-                      ? t('version.sourceModeHint')
+                    versionWarning
+                      ? t('version.checkFailed')
                       : hasUpdate
                       ? t('version.latestVersion') + ': v' + latestVersion
                       : t('version.upToDate')
                   }}
                 </p>
               </div>
+
+              <p v-if="!isReleaseBuild" class="mb-3 text-xs text-gray-500 dark:text-dark-400">
+                {{ t('version.sourceModeHint') }}
+              </p>
 
               <!-- Priority 1: Update error (must check before hasUpdate) -->
               <div v-if="updateError" class="space-y-2">
@@ -233,7 +237,7 @@
                 </button>
               </div>
 
-              <!-- Priority 3: Update available for source build - show git pull hint -->
+              <!-- Source builds notify about upstream releases and deploy through the fork. -->
               <div v-else-if="hasUpdate && !isReleaseBuild" class="space-y-2">
                 <a
                   v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'"
@@ -254,7 +258,7 @@
                   </div>
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
-                      {{ t('version.updateAvailable') }}
+                      {{ t('version.upstreamUpdateAvailable') }}
                     </p>
                     <p class="text-xs text-amber-600/70 dark:text-amber-400/70">
                       v{{ latestVersion }}
@@ -288,7 +292,7 @@
                     />
                   </svg>
                   <p class="text-xs text-blue-600 dark:text-blue-400">
-                    {{ t('version.sourceModeHint') }}
+                    {{ t('version.forkUpdateHint') }}
                   </p>
                 </div>
               </div>
@@ -688,6 +692,7 @@ const latestVersion = computed(() => appStore.latestVersion)
 const hasUpdate = computed(() => appStore.hasUpdate)
 const releaseInfo = computed(() => appStore.releaseInfo)
 const buildType = computed(() => appStore.buildType)
+const versionWarning = computed(() => appStore.versionWarning)
 
 // Update process states (local to this component)
 const updating = ref(false)
@@ -740,8 +745,9 @@ const activeManualCommand = computed(() =>
   manualTab.value === 'docker' ? dockerRollbackCommand.value : scriptRollbackCommand.value
 )
 
-// Only show update check for release builds (binary/docker deployment)
+// All builds check upstream; only release builds permit binary replacement.
 const isReleaseBuild = computed(() => buildType.value === 'release')
+let versionCheckInterval: ReturnType<typeof setInterval> | undefined
 
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
@@ -764,7 +770,7 @@ async function refreshVersion(force = true) {
 }
 
 async function handleUpdate() {
-  if (updating.value) return
+  if (!isAdmin.value || !isReleaseBuild.value || updating.value) return
 
   updating.value = true
   updateError.value = ''
@@ -838,7 +844,7 @@ function formatPublishedAt(publishedAt: string): string {
 }
 
 async function handleRollback() {
-  if (!isAdmin.value) return
+  if (!isAdmin.value || !isReleaseBuild.value) return
   if (rollingBack.value || !selectedRollbackVersion.value) return
 
   rollingBack.value = true
@@ -925,11 +931,15 @@ onMounted(() => {
   if (isAdmin.value) {
     // Use cached version if available, otherwise fetch
     appStore.fetchVersion(false)
+    versionCheckInterval = setInterval(() => {
+      if (isAdmin.value) appStore.fetchVersion(false)
+    }, 60 * 1000) // The store limits successful checks to once per 20 minutes.
   }
   document.addEventListener('click', handleClickOutside)
 })
 
 onBeforeUnmount(() => {
+  if (versionCheckInterval) clearInterval(versionCheckInterval)
   document.removeEventListener('click', handleClickOutside)
 })
 </script>

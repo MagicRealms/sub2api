@@ -14,6 +14,8 @@ import {
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
 
+const VERSION_CACHE_TTL_MS = 20 * 60 * 1000
+
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
 
@@ -43,6 +45,8 @@ export const useAppStore = defineStore('app', () => {
   const hasUpdate = ref<boolean>(false)
   const buildType = ref<string>('source')
   const releaseInfo = ref<ReleaseInfo | null>(null)
+  const versionWarning = ref<string>('')
+  let versionCheckedAt = 0
 
   // Auto-incrementing ID for toasts
   let toastIdCounter = 0
@@ -242,14 +246,15 @@ export const useAppStore = defineStore('app', () => {
    */
   async function fetchVersion(force = false): Promise<VersionInfo | null> {
     // Return cached data if available and not forcing refresh
-    if (versionLoaded.value && !force) {
+    if (versionLoaded.value && !force && Date.now() - versionCheckedAt < VERSION_CACHE_TTL_MS) {
       return {
         current_version: currentVersion.value,
         latest_version: latestVersion.value,
         has_update: hasUpdate.value,
         build_type: buildType.value,
         release_info: releaseInfo.value || undefined,
-        cached: true
+        cached: true,
+        warning: versionWarning.value || undefined
       }
     }
 
@@ -266,10 +271,13 @@ export const useAppStore = defineStore('app', () => {
       hasUpdate.value = data.has_update
       buildType.value = data.build_type || 'source'
       releaseInfo.value = data.release_info || null
+      versionWarning.value = data.warning || ''
+      versionCheckedAt = Date.now()
       versionLoaded.value = true
       return data
     } catch (error) {
       console.error('Failed to fetch version:', error)
+      versionWarning.value = 'check_failed'
       return null
     } finally {
       versionLoading.value = false
@@ -462,6 +470,7 @@ export const useAppStore = defineStore('app', () => {
     hasUpdate,
     buildType,
     releaseInfo,
+    versionWarning,
 
     // Computed
     hasActiveToasts,

@@ -2,9 +2,14 @@
 
 Production updates are built from `MagicRealms/sub2api`, with an immutable Git
 commit recorded in the binary and local Docker image. Online binary replacement
-is disabled for source builds, including both rollback endpoints. A source build
-does not read old official-release cache entries or contact GitHub to display its
-version. The admin version panel links to this fork.
+is disabled for source builds, including both rollback endpoints. Update checks
+follow stable releases from `Wei-Shaw/sub2api`, independently of fork releases.
+The admin badge checks on load and every 20 minutes while mounted; its refresh
+button bypasses caches. Newer upstream releases show a notification and release
+notes link, with instructions to merge and test them in this fork before deploying.
+The fork commit suffix does not make the same upstream base version look newer.
+Cached metadata is scoped to the upstream repository; old fork cache entries are
+discarded. A failed check is shown as a warning, not a successful up-to-date check.
 
 ## Transport change
 

@@ -30,8 +30,9 @@ var (
 
 const (
 	updateCacheKey = "update_check_cache"
-	updateCacheTTL = 1200 // 20 minutes
-	githubRepo     = "MagicRealms/sub2api"
+	updateCacheTTL = 1200                  // 20 minutes
+	githubRepo     = "MagicRealms/sub2api" // Binary deployment source for release builds.
+	upstreamRepo   = "Wei-Shaw/sub2api"    // Notifications always follow upstream releases.
 
 	// Security: allowed download domains for updates
 	allowedDownloadHost = "github.com"
@@ -130,13 +131,9 @@ type GitHubAsset struct {
 	Size               int64  `json:"size"`
 }
 
-// CheckUpdate checks for available updates
+// CheckUpdate checks upstream releases, including for externally managed builds.
+// Notification metadata never grants permission to replace the running binary.
 func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInfo, error) {
-	// Source builds are deployed externally. Do not use cached release metadata
-	// from an older official binary or make version display depend on GitHub.
-	if s.buildType != "release" {
-		return &UpdateInfo{CurrentVersion: s.currentVersion, LatestVersion: s.currentVersion, BuildType: s.buildType}, nil
-	}
 	// Try cache first
 	if !force {
 		if cached, err := s.getFromCache(ctx); err == nil && cached != nil {
@@ -145,7 +142,7 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 	}
 
 	// Fetch from GitHub
-	info, err := s.fetchLatestRelease(ctx)
+	info, err := s.fetchLatestRelease(ctx, upstreamRepo)
 	if err != nil {
 		// Return cached on error
 		if cached, cacheErr := s.getFromCache(ctx); cacheErr == nil && cached != nil {
@@ -172,7 +169,8 @@ func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 	if s.buildType != "release" {
 		return ErrManagedDeployment
 	}
-	info, err := s.CheckUpdate(ctx, true)
+	// Do not install assets returned by the upstream notification check.
+	info, err := s.fetchLatestRelease(ctx, githubRepo)
 	if err != nil {
 		return err
 	}
@@ -417,8 +415,8 @@ func (s *UpdateService) fetchRollbackCandidates(ctx context.Context) ([]*GitHubR
 	return candidates, nil
 }
 
-func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, error) {
-	release, err := s.githubClient.FetchLatestRelease(ctx, githubRepo)
+func (s *UpdateService) fetchLatestRelease(ctx context.Context, repo string) (*UpdateInfo, error) {
+	release, err := s.githubClient.FetchLatestRelease(ctx, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -618,6 +616,7 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 	}
 
 	var cached struct {
+		Repo        string       `json:"repo"`
 		Latest      string       `json:"latest"`
 		ReleaseInfo *ReleaseInfo `json:"release_info"`
 		Timestamp   int64        `json:"timestamp"`
@@ -625,8 +624,12 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 	if err := json.Unmarshal([]byte(data), &cached); err != nil {
 		return nil, err
 	}
+	// Discard metadata from the old fork check or entries with unknown provenance.
+	if cached.Repo != upstreamRepo {
+		return nil, fmt.Errorf("cache repository mismatch")
+	}
 
-	if time.Now().Unix()-cached.Timestamp > updateCacheTTL {
+	if time.Now().Unix()-cached.Timestamp >= updateCacheTTL {
 		return nil, fmt.Errorf("cache expired")
 	}
 
@@ -642,10 +645,12 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 
 func (s *UpdateService) saveToCache(ctx context.Context, info *UpdateInfo) {
 	cacheData := struct {
+		Repo        string       `json:"repo"`
 		Latest      string       `json:"latest"`
 		ReleaseInfo *ReleaseInfo `json:"release_info"`
 		Timestamp   int64        `json:"timestamp"`
 	}{
+		Repo:        upstreamRepo,
 		Latest:      info.LatestVersion,
 		ReleaseInfo: info.ReleaseInfo,
 		Timestamp:   time.Now().Unix(),
