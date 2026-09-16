@@ -18,6 +18,14 @@ func Logger() gin.HandlerFunc {
 
 		// 请求路径
 		path := c.Request.URL.Path
+		// Handlers may decode the body and replace ContentLength/Content-Encoding.
+		requestContentLength := c.Request.ContentLength
+		requestEncoding := c.Request.Header.Get("Content-Encoding")
+		switch requestEncoding {
+		case "", "identity", "gzip", "zstd", "deflate":
+		default:
+			requestEncoding = "other"
+		}
 
 		// 处理请求
 		c.Next()
@@ -87,7 +95,7 @@ func Logger() gin.HandlerFunc {
 			}
 		}
 		if hasAccountID && accountID > 0 {
-			fields = append(fields, zap.Int64("request_content_length", c.Request.ContentLength))
+			fields = append(fields, zap.Int64("request_content_length", requestContentLength), zap.String("request_content_encoding", requestEncoding))
 		}
 
 		l := logger.FromContext(c.Request.Context()).With(fields...)

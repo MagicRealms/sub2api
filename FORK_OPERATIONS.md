@@ -94,3 +94,20 @@ OpenAI HTTP attempts record connection acquisition (including proxy negotiation)
 TLS, request writing, first response-header wait, connection reuse and response
 encoding. Header arrival is not first output. These bounded metadata fields never
 include request bodies, tokens, proxy URLs or request/response headers.
+
+## Large OAuth request uploads
+
+`gateway.openai_request_gzip_enabled: true` opts into lossless gzip uploads to
+`https://chatgpt.com/backend-api/codex/responses` only. Both production OAuth
+accounts accepted a compressed smoke request before enabling this. Other
+providers, signed requests, already encoded bodies, small requests and bodies
+without a replay reader are unchanged. The upstream must continue supporting
+gzip; disable this setting and restart if compatibility changes. There is no
+new retry or replay on rejection.
+
+The fast encoder is limited to 2 concurrent operations, 256 KiB–64 MiB inputs,
+and at least 10% size savings. Busy encoders and local compression failures use
+the untouched original body. Decompression must reproduce the exact original
+bytes, including all images, encrypted reasoning and context. The change saves
+only relay-to-upstream upload traffic, not the client's upload to the relay or
+model generation time. Logs record original/wire byte counts and encoding time.
