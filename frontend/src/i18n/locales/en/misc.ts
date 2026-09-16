@@ -30,7 +30,7 @@ export default {
     viewChangelog: 'View Changelog',
     refresh: 'Refresh',
     sourceMode: 'Source Build',
-    sourceModeHint: 'Source build, use git pull to update',
+    sourceModeHint: 'Managed by the MagicRealms fork. Build and deploy from the repository.',
     updateNow: 'Update Now',
     updating: 'Updating...',
     updateComplete: 'Update Complete',

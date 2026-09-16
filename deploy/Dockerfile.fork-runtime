@@ -1,0 +1,23 @@
+# Runtime for the exact binary tested/built by build-fork.sh.
+FROM postgres:18-alpine AS pg-client
+FROM alpine:3.21
+ARG VERSION
+ARG COMMIT
+LABEL org.opencontainers.image.source="https://github.com/MagicRealms/sub2api" \
+      org.opencontainers.image.version="$VERSION" \
+      org.opencontainers.image.revision="$COMMIT"
+RUN apk add --no-cache ca-certificates tzdata su-exec curl libpq zstd-libs lz4-libs krb5-libs libldap libedit
+COPY --from=pg-client /usr/local/bin/pg_dump /usr/local/bin/pg_dump
+COPY --from=pg-client /usr/local/bin/psql /usr/local/bin/psql
+COPY --from=pg-client /usr/local/lib/libpq.so.5* /usr/local/lib/
+RUN addgroup -g 1000 sub2api && adduser -u 1000 -G sub2api -s /bin/sh -D sub2api
+WORKDIR /app
+COPY --chown=sub2api:sub2api sub2api /app/sub2api
+COPY --chown=sub2api:sub2api resources /app/resources
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && mkdir -p /app/data && chown sub2api:sub2api /app/data
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD wget -q -T 5 -O /dev/null http://localhost:${SERVER_PORT:-8080}/health || exit 1
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["/app/sub2api"]
