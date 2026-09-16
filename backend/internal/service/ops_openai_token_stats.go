@@ -51,5 +51,7 @@ func (s *OpsService) GetOpenAITokenStats(ctx context.Context, filter *OpsOpenAIT
 		}
 	}
 
-	return s.opsRepo.GetOpenAITokenStats(ctx, filter)
+	filtered := *filter
+	filtered.StartTime, filtered.EndTime = s.monitoringWindow(filtered.StartTime, filtered.EndTime)
+	return s.opsRepo.GetOpenAITokenStats(ctx, &filtered)
 }

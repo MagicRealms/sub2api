@@ -31,10 +31,14 @@ go_args=(--rm --cpus 2 --memory 2304m --memory-swap 2560m
   -v "$repo:/src" -v "$cache/gomod:/go/pkg/mod"
   -v "$cache/gobuild:/root/.cache/go-build" -w /src/backend)
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
-  go test -tags=unit -p 1 -timeout 10m ./internal/repository -run 'TestHTTPUpstream|TestOpenAIHTTP2|TestDecompressResponseBody'
+  go test -tags=unit -p 1 -timeout 10m ./internal/repository -run 'TestHTTPUpstream|TestOpenAIHTTP2|TestDecompressResponseBody|TestOpsCurrentRatesRespectMonitoringWindow'
+docker run "${go_args[@]}" "golang:$go_version-alpine" \
+  go test -tags=unit -p 1 ./internal/config -run TestOpsMonitoringStartAt
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
   go test -tags=unit -p 1 -timeout 2m internal/service/update_service.go \
   internal/service/update_service_test.go internal/service/update_service_managed_test.go
+docker run "${go_args[@]}" "golang:$go_version-alpine" \
+  go test -tags=unit -p 1 internal/service/ops_monitoring_window.go internal/service/ops_monitoring_window_test.go
 docker run "${go_args[@]}" -v "$artifact:/out" "golang:$go_version-alpine" \
   go build -p 1 -tags embed \
   -ldflags "-s -w -X main.Version=$version -X main.Commit=$commit -X main.Date=$(date -u +%FT%TZ) -X main.BuildType=source" \

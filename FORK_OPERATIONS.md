@@ -90,6 +90,16 @@ TTFT nor a representative measurement for a long customer conversation.
 
 ## Latency diagnostics
 
+For a new monitoring comparison period, set `ops.monitoring_start_at` in the
+deployment configuration to an RFC3339 timestamp and restart. Ops dashboard,
+latency, throughput, token statistics and request-detail queries are restricted
+to that period. User usage records, balances, billing and their queries retain
+their original history. Clearing the setting restores historical usage queries
+in ops; deleted error and system logs require the saved backup.
+Back up the database and export the previous comparison before deleting independent
+ops logs or channel V1 probe histories. Keep channel definitions and alert rules;
+clearing monitor configuration would prevent new samples from being collected.
+
 Successful gateway access logs include the existing authentication/preparation,
 routing, upstream-header, response and TTFT measurements. Responses requests also
 record body-read time. These spans overlap; do not add them together. TTFT starts

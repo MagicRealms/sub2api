@@ -126,6 +126,7 @@ func (s *OpsService) ListRequestDetails(ctx context.Context, filter *OpsRequestD
 	}
 
 	page, pageSize, startTime, endTime := filter.Normalize()
+	startTime, endTime = s.monitoringWindow(startTime, endTime)
 	filterCopy := &OpsRequestDetailFilter{}
 	if filter != nil {
 		*filterCopy = *filter

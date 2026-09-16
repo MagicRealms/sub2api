@@ -904,6 +904,10 @@ FROM ops_error_logs
 
 func (r *opsRepository) queryCurrentRates(ctx context.Context, filter *service.OpsDashboardFilter, end time.Time) (qpsCurrent float64, tpsCurrent float64, err error) {
 	windowStart := end.Add(-1 * time.Minute)
+	// Respect the comparison boundary even in the first minute after a reset.
+	if filter != nil && filter.StartTime.After(windowStart) {
+		windowStart = filter.StartTime
+	}
 
 	successCount1m, token1m, err := r.queryUsageCounts(ctx, filter, windowStart, end)
 	if err != nil {

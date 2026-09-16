@@ -23,6 +23,7 @@ func (s *OpsService) GetLatencyHistogram(ctx context.Context, filter *OpsDashboa
 		return nil, infraerrors.BadRequest("OPS_TIME_RANGE_INVALID", "start_time must be <= end_time")
 	}
 	filter.QueryMode = s.resolveOpsQueryMode(ctx, filter.QueryMode)
+	filter = s.applyOpsMonitoringWindow(filter)
 
 	result, err := s.opsRepo.GetLatencyHistogram(ctx, filter)
 	if err != nil && shouldFallbackOpsPreagg(filter, err) {

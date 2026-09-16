@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -29,6 +30,7 @@ func (s *OpsService) GetDashboardOverview(ctx context.Context, filter *OpsDashbo
 
 	// Resolve query mode (requested via query param, or DB default).
 	filter.QueryMode = s.resolveOpsQueryMode(ctx, filter.QueryMode)
+	filter = s.applyOpsMonitoringWindow(filter)
 
 	overview, err := s.opsRepo.GetDashboardOverview(ctx, filter)
 	if err != nil && shouldFallbackOpsPreagg(filter, err) {
@@ -91,4 +93,19 @@ func (s *OpsService) resolveOpsQueryMode(ctx context.Context, requested OpsQuery
 		return OpsQueryModeRaw
 	}
 	return mode
+}
+
+func (s *OpsService) monitoringWindow(start, end time.Time) (time.Time, time.Time) {
+	if s == nil || s.cfg == nil {
+		return start, end
+	}
+	// Invalid timestamps are rejected when loading the deployment configuration.
+	baseline, _ := time.Parse(time.RFC3339, strings.TrimSpace(s.cfg.Ops.MonitoringStartAt))
+	return clampOpsMonitoringWindow(start, end, baseline)
+}
+
+func (s *OpsService) applyOpsMonitoringWindow(filter *OpsDashboardFilter) *OpsDashboardFilter {
+	copy := *filter
+	copy.StartTime, copy.EndTime = s.monitoringWindow(copy.StartTime, copy.EndTime)
+	return &copy
 }

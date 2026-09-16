@@ -31,6 +31,13 @@ func (s *OpsService) GetRealtimeTrafficSummary(ctx context.Context, filter *OpsD
 
 	// Realtime traffic summary always uses raw logs (minute granularity peaks).
 	filter.QueryMode = OpsQueryModeRaw
+	filter = s.applyOpsMonitoringWindow(filter)
+	if filter.StartTime.Equal(filter.EndTime) {
+		return &OpsRealtimeTrafficSummary{
+			StartTime: filter.StartTime, EndTime: filter.EndTime,
+			Platform: filter.Platform, GroupID: filter.GroupID,
+		}, nil
+	}
 
 	return s.opsRepo.GetRealtimeTrafficSummary(ctx, filter)
 }

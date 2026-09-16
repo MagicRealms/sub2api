@@ -1605,6 +1605,10 @@ type OpsConfig struct {
 	// UsePreaggregatedTables prefers ops_metrics_hourly/daily for long-window dashboard queries.
 	UsePreaggregatedTables bool `mapstructure:"use_preaggregated_tables"`
 
+	// MonitoringStartAt bounds ops comparisons without deleting billing/usage records.
+	// Empty preserves historical queries; otherwise use an RFC3339 timestamp.
+	MonitoringStartAt string `mapstructure:"monitoring_start_at"`
+
 	// Cleanup controls periodic deletion of old ops data to prevent unbounded growth.
 	Cleanup OpsCleanupConfig `mapstructure:"cleanup"`
 
@@ -2254,6 +2258,7 @@ func setDefaults() {
 	// Ops (vNext)
 	viper.SetDefault("ops.enabled", true)
 	viper.SetDefault("ops.use_preaggregated_tables", true)
+	viper.SetDefault("ops.monitoring_start_at", "")
 	viper.SetDefault("ops.cleanup.enabled", true)
 	viper.SetDefault("ops.cleanup.schedule", "0 2 * * *")
 	// Retention days: vNext defaults to 30 days across ops datasets.
@@ -3676,6 +3681,11 @@ func (c *Config) Validate() error {
 		c.Gateway.Scheduling.OutboxLagRebuildSeconds > 0 &&
 		c.Gateway.Scheduling.OutboxLagRebuildSeconds < c.Gateway.Scheduling.OutboxLagWarnSeconds {
 		return fmt.Errorf("gateway.scheduling.outbox_lag_rebuild_seconds must be >= outbox_lag_warn_seconds")
+	}
+	if value := strings.TrimSpace(c.Ops.MonitoringStartAt); value != "" {
+		if _, err := time.Parse(time.RFC3339, value); err != nil {
+			return fmt.Errorf("ops.monitoring_start_at must be an RFC3339 timestamp: %w", err)
+		}
 	}
 	if c.Ops.MetricsCollectorCache.TTL < 0 {
 		return fmt.Errorf("ops.metrics_collector_cache.ttl must be non-negative")

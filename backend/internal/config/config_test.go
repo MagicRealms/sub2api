@@ -1206,6 +1206,26 @@ func TestLoadDefaultOpsCleanupConfig(t *testing.T) {
 	}
 }
 
+func TestOpsMonitoringStartAt(t *testing.T) {
+	for _, value := range []string{"", "2026-09-16T12:30:00Z", "2026-09-16T20:30:00+08:00"} {
+		t.Run(value, func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			t.Setenv("OPS_MONITORING_START_AT", value)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.Ops.MonitoringStartAt != value {
+				t.Fatalf("monitoring start = %q, want %q", cfg.Ops.MonitoringStartAt, value)
+			}
+			cfg.Ops.MonitoringStartAt = "not-a-date"
+			if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "ops.monitoring_start_at") {
+				t.Fatalf("invalid timestamp should fail configuration validation, got %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateUsageCleanupConfigEnabled(t *testing.T) {
 	resetViperWithJWTSecret(t)
 

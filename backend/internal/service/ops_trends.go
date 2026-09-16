@@ -24,6 +24,7 @@ func (s *OpsService) GetThroughputTrend(ctx context.Context, filter *OpsDashboar
 	}
 
 	filter.QueryMode = s.resolveOpsQueryMode(ctx, filter.QueryMode)
+	filter = s.applyOpsMonitoringWindow(filter)
 
 	result, err := s.opsRepo.GetThroughputTrend(ctx, filter, bucketSeconds)
 	if err != nil && shouldFallbackOpsPreagg(filter, err) {
