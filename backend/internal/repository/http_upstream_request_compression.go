@@ -58,21 +58,24 @@ func (s *httpUpstreamService) compressOpenAIRequest(req *http.Request, profile s
 		return req
 	}
 	started := time.Now()
-	source, err := req.GetBody()
-	if err != nil {
-		return req
-	}
-	defer source.Close()
 	// Keep the original body untouched until compression has fully succeeded.
 	// Require at least 10% savings; a bounded writer aborts incompressible input.
 	compressed := &compressionBuffer{limit: int(req.ContentLength * 9 / 10)}
-	writer, err := gzip.NewWriterLevel(compressed, gzip.BestSpeed)
-	if err != nil {
-		return req
+	encoded := false
+	// BestSpeed favors repeated text. Opaque base64 image data has few repeated
+	// strings, but Huffman coding still recovers its approximately 25% expansion.
+	// Go's match-based encoders can choose stored blocks for that workload.
+	for _, level := range []int{gzip.BestSpeed, gzip.HuffmanOnly} {
+		if req.Context().Err() != nil {
+			return req
+		}
+		compressed.Reset()
+		if compressReplayableRequest(req, compressed, level) {
+			encoded = true
+			break
+		}
 	}
-	n, copyErr := io.Copy(writer, io.LimitReader(source, req.ContentLength+1))
-	closeErr := writer.Close()
-	if copyErr != nil || closeErr != nil || n != req.ContentLength {
+	if !encoded {
 		return req
 	}
 	if req.Context().Err() != nil {
@@ -89,8 +92,23 @@ func (s *httpUpstreamService) compressOpenAIRequest(req *http.Request, profile s
 	logger.FromContext(req.Context()).Info("upstream request compressed",
 		zap.String("component", "upstream.request_compression"),
 		zap.Int64("account_id", accountID),
-		zap.Int64("original_bytes", n), zap.Int("wire_bytes", len(wire)),
+		zap.Int64("original_bytes", req.ContentLength), zap.Int("wire_bytes", len(wire)),
 		zap.Int64("compression_ms", time.Since(started).Milliseconds()),
 	)
 	return out
+}
+
+func compressReplayableRequest(req *http.Request, output io.Writer, level int) bool {
+	source, err := req.GetBody()
+	if err != nil || source == nil {
+		return false
+	}
+	defer source.Close()
+	writer, err := gzip.NewWriterLevel(output, level)
+	if err != nil {
+		return false
+	}
+	n, copyErr := io.Copy(writer, io.LimitReader(source, req.ContentLength+1))
+	closeErr := writer.Close()
+	return copyErr == nil && closeErr == nil && n == req.ContentLength
 }

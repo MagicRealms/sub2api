@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"strings"
@@ -87,4 +88,36 @@ func TestHTTPUpstreamRequestCompressionSkipsUnsupportedAndIncompressible(t *test
 	require.Same(t, req, svc.compressOpenAIRequest(req, service.HTTPUpstreamProfileDefault, 1))
 	svc.cfg.Gateway.OpenAIRequestGzipEnabled = false
 	require.Same(t, req, svc.compressOpenAIRequest(req, service.HTTPUpstreamProfileOpenAI, 1))
+}
+
+func TestHTTPUpstreamRequestCompressionHandlesOpaqueBase64AndBusyEncoders(t *testing.T) {
+	svc := NewHTTPUpstream(&config.Config{Gateway: config.GatewayConfig{OpenAIRequestGzipEnabled: true}}).(*httpUpstreamService)
+	noise := make([]byte, 256<<10)
+	_, err := rand.Read(noise)
+	require.NoError(t, err)
+	payload := []byte(`{"input":"data:image/png;base64,` + base64.StdEncoding.EncodeToString(noise) + `"}`)
+	req := compressionTestRequest(t, payload)
+	out := svc.compressOpenAIRequest(req, service.HTTPUpstreamProfileOpenAI, 1)
+	require.NotSame(t, req, out, "base64 must compress even when the image itself is opaque")
+	require.Less(t, out.ContentLength, int64(len(payload)*8/10))
+	decoder, err := gzip.NewReader(out.Body)
+	require.NoError(t, err)
+	decoded, err := io.ReadAll(decoder)
+	require.NoError(t, err)
+	require.Equal(t, payload, decoded)
+	require.NoError(t, decoder.Close())
+	require.NoError(t, out.Body.Close())
+	for i := 0; i < cap(openAIRequestCompressionSlots); i++ {
+		openAIRequestCompressionSlots <- struct{}{}
+	}
+	defer func() {
+		for i := 0; i < cap(openAIRequestCompressionSlots); i++ {
+			<-openAIRequestCompressionSlots
+		}
+	}()
+	req = compressionTestRequest(t, payload)
+	require.Same(t, req, svc.compressOpenAIRequest(req, service.HTTPUpstreamProfileOpenAI, 1), "compression must not add a queue")
+	got, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	require.Equal(t, payload, got)
 }
