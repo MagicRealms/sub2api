@@ -152,3 +152,52 @@ func TestOpenAIHTTP2BodyCountsEachFailedStreamOnlyOnce(t *testing.T) {
 	require.True(t, svc.isOpenAIHTTP2FallbackActive(proxy))
 	require.NoError(t, next.Close())
 }
+
+type contextBoundTestBody struct {
+	io.Reader
+	ctx      context.Context
+	closeErr error
+}
+
+func (b *contextBoundTestBody) Close() error {
+	<-b.ctx.Done()
+	return b.closeErr
+}
+
+func TestHTTPUpstreamCloseCancelsOnlyUpstreamRequest(t *testing.T) {
+	svc := newOpenAIHTTP2CircuitTestService()
+	entry, err := svc.getClientEntry("", 1, 2, service.HTTPUpstreamProfileOpenAI, false, false)
+	require.NoError(t, err)
+	parent, cancelParent := context.WithCancel(t.Context())
+	defer cancelParent()
+	const output = "data: {\"type\":\"response.completed\"}\n\n"
+	closeErr := errors.New("underlying close result")
+	var upstreamCtx context.Context
+	entry.client.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		upstreamCtx = req.Context()
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Request: req,
+			Body: &contextBoundTestBody{Reader: strings.NewReader(output), ctx: req.Context(), closeErr: closeErr}}, nil
+	})
+	req, err := http.NewRequestWithContext(service.WithHTTPUpstreamProfile(parent, service.HTTPUpstreamProfileOpenAI), "POST", "https://chatgpt.com/backend-api/codex/responses", strings.NewReader("{}"))
+	require.NoError(t, err)
+	resp, err := svc.Do(req, "", 1, 2)
+	require.NoError(t, err)
+	require.NoError(t, upstreamCtx.Err(), "an active stream must not be canceled")
+	got := make([]byte, len(output))
+	_, err = io.ReadFull(resp.Body, got)
+	require.NoError(t, err)
+	require.Equal(t, output, string(got))
+	done := make(chan error, 1)
+	go func() { done <- resp.Body.Close() }()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, closeErr)
+	case <-time.After(2 * time.Second):
+		cancelParent()
+		<-done
+		t.Fatal("upstream cancellation waited for response cleanup")
+	}
+	require.ErrorIs(t, upstreamCtx.Err(), context.Canceled)
+	require.NoError(t, parent.Err(), "billing and recovery still need the caller context")
+	require.Zero(t, atomic.LoadInt64(&entry.inFlight))
+}

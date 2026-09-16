@@ -26,6 +26,12 @@ The regression test keeps the upstream open after a valid compressed SSE frame:
 the old close order blocks, while the corrected order releases it without
 changing output bytes or hiding the transport close result.
 
+Each upstream HTTP request also gets its own child context. Closing its response
+actively cancels that child before transport/decoder cleanup, so an outstanding
+network read cannot depend on the downstream client eventually timing out. The
+caller context remains live for billing and account recovery; an active response
+is not canceled, buffered, modified, or replayed.
+
 Production may continue using `gateway.openai_http2.enabled: false` when HTTP/1.1
 has proven more reliable for its route. Fixing the fallback is not a reason to
 re-enable HTTP/2 without a controlled comparison.

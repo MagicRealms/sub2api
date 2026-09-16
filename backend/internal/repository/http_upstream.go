@@ -216,11 +216,14 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	// 执行请求
 	client := s.httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
+	upstreamCtx, cancelUpstream := context.WithCancel(req.Context())
+	req = req.WithContext(upstreamCtx)
 	resp, err := servertiming.Do(client, req)
 	if err != nil {
 		if req.Context().Err() == nil {
 			s.recordOpenAIHTTP2Failure(profile, entry.protocolMode, entry.proxyKey, err)
 		}
+		cancelUpstream()
 		// 请求失败，立即减少计数
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
@@ -228,6 +231,7 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	}
 	// Headers alone do not prove a streaming connection is healthy. Observe the
 	// original body, including errors after partial SSE output, without replaying it.
+	resp.Body = &cancelBeforeCloseBody{ReadCloser: resp.Body, cancel: cancelUpstream}
 	resp.Body = s.observeOpenAIHTTP2Body(req.Context(), resp.Body, profile, entry.protocolMode, entry.proxyKey)
 
 	// 如果上游返回了压缩内容，解压后再交给业务层
@@ -284,14 +288,18 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 
 	client := s.httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
+	upstreamCtx, cancelUpstream := context.WithCancel(req.Context())
+	req = req.WithContext(upstreamCtx)
 	resp, err := servertiming.Do(client, req)
 	if err != nil {
+		cancelUpstream()
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
 		slog.Debug("tls_fingerprint_request_failed", "account_id", accountID, "error", err)
 		return nil, err
 	}
 
+	resp.Body = &cancelBeforeCloseBody{ReadCloser: resp.Body, cancel: cancelUpstream}
 	decompressResponseBody(resp)
 
 	resp.Body = wrapTrackedBody(resp.Body, func() {
