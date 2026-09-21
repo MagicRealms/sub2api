@@ -18,6 +18,13 @@ import (
 // unscheduled after a durable transport failure (matches tokenRefreshTempUnschedDuration).
 const openAITransportErrorTempUnschedDuration = 10 * time.Minute
 
+// openAITransportTransientRetryMax bounds the local recovery attempt for a
+// transport blip that happened before an HTTP response was received. A fresh
+// request on the same account gives the connection pool/proxy a chance to
+// establish a new socket, while the cap prevents a shared proxy outage from
+// turning into a retry storm.
+const openAITransportTransientRetryMax = 1
+
 // openAITransportFailoverBody is the OpenAI-format error body attached to the
 // failover error for a transport-level failure. Kept identical to the legacy
 // inline 502 body so the client-visible payload is unchanged if failover is
@@ -137,13 +144,20 @@ func (s *OpenAIGatewayService) handleOpenAIUpstreamTransportError(ctx context.Co
 		return err
 	}
 
-	if classifyUpstreamTransportError(err).Persistent {
+	transportClass := classifyUpstreamTransportError(err)
+	if transportClass.Persistent {
 		s.tempUnscheduleOpenAITransportError(ctx, account, safeErr)
+	}
+	retryMax := 0
+	if !transportClass.Persistent {
+		retryMax = openAITransportTransientRetryMax
 	}
 
 	return &UpstreamFailoverError{
-		StatusCode:   http.StatusBadGateway,
-		ResponseBody: openAITransportFailoverBody,
+		StatusCode:             http.StatusBadGateway,
+		ResponseBody:           openAITransportFailoverBody,
+		RetryableOnSameAccount: !transportClass.Persistent,
+		SameAccountRetryMax:    retryMax,
 	}
 }
 

@@ -95,6 +95,9 @@ func TestHandleOpenAIUpstreamTransportError_PersistentEvictsAndFailsOver(t *test
 
 	// Immediate in-memory effect so subsequent requests skip it before DB/cache catches up.
 	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	var persistentFailover *UpstreamFailoverError
+	require.True(t, errors.As(retErr, &persistentFailover))
+	require.False(t, persistentFailover.RetryableOnSameAccount, "durable proxy failures must not retry the same account")
 
 	// Must NOT write a response body — the handler owns the (failover) response.
 	require.Equal(t, 0, rec.Body.Len())
@@ -122,6 +125,8 @@ func TestHandleOpenAIUpstreamTransportError_TransientFailsOverWithoutEviction(t 
 	var fo *UpstreamFailoverError
 	require.True(t, errors.As(err, &fo), "transient error must return *UpstreamFailoverError")
 	require.Equal(t, http.StatusBadGateway, fo.StatusCode)
+	require.True(t, fo.RetryableOnSameAccount, "a pre-header transient blip should get one fresh-connection retry")
+	require.Equal(t, openAITransportTransientRetryMax, fo.SameAccountRetryMax)
 
 	// Transient → do NOT evict.
 	require.Empty(t, repo.tempUnschedCalls)
