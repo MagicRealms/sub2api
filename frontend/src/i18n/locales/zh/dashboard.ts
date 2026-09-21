@@ -370,6 +370,7 @@ export default {
     upstreamModel: '上游',
 	  sentUpstreamModel: '发往上游',
 	  upstreamResponseModel: '上游响应',
+	  modelCorrect: '模型正确',
 	  upstreamModelMismatch: '上游响应模型不一致',
 	  modelVariant: '疑似版本变体',
 	  modelMismatch: '模型不一致',

@@ -72,19 +72,29 @@
             </div>
             <span v-else class="font-medium text-gray-900 dark:text-white">{{ row.model }}</span>
             <div
-              v-if="row.upstream_model_mismatch === true && row.upstream_response_model"
+              v-if="row.upstream_response_model?.trim()"
               class="break-all pl-3 text-[11px]"
-              :class="isLikelyModelVariant(row) ? 'text-amber-600 dark:text-amber-400' : 'text-orange-600 dark:text-orange-400'"
+              :class="modelAuditTextClass(row)"
               :title="modelAuditTitle(row)"
             >
               <span class="mr-1">↳ {{ t('usage.upstreamResponseModel') }}:</span>{{ row.upstream_response_model }}
               <span
-                class="ml-1 inline-flex rounded px-1 py-px text-[10px] font-medium ring-1 ring-inset"
-                :class="isLikelyModelVariant(row)
-                  ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30'
-                  : 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/30'"
+                v-if="isModelCorrect(row)"
+                class="ml-1 inline-flex rounded bg-emerald-50 px-1 py-px text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30"
               >
-                {{ isLikelyModelVariant(row) ? t('usage.modelVariant') : t('usage.modelMismatch') }}
+                {{ t('usage.modelCorrect') }}
+              </span>
+              <span
+                v-else-if="isLikelyModelVariant(row)"
+                class="ml-1 inline-flex rounded bg-amber-50 px-1 py-px text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30"
+              >
+                {{ t('usage.modelVariant') }}
+              </span>
+              <span
+                v-else-if="row.upstream_model_mismatch === true"
+                class="ml-1 inline-flex rounded bg-orange-50 px-1 py-px text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/30"
+              >
+                {{ t('usage.modelMismatch') }}
               </span>
             </div>
           </div>
@@ -641,6 +651,22 @@ const isLikelyModelVariant = (row: AdminUsageLog): boolean => {
   const sent = sentUpstreamModel(row)
   const response = row.upstream_response_model?.trim() || ''
   return sent !== '' && response !== '' && normalizeModelVariant(sent) === normalizeModelVariant(response)
+}
+
+const isModelCorrect = (row: AdminUsageLog): boolean => {
+  if (row.upstream_model_mismatch === false) return true
+  if (row.upstream_model_mismatch === true) return false
+
+  const sent = sentUpstreamModel(row)
+  const response = row.upstream_response_model?.trim() || ''
+  return sent !== '' && response !== '' && normalizeModelVariant(sent) === normalizeModelVariant(response)
+}
+
+const modelAuditTextClass = (row: AdminUsageLog): string => {
+  if (isModelCorrect(row)) return 'text-emerald-600 dark:text-emerald-400'
+  if (isLikelyModelVariant(row)) return 'text-amber-600 dark:text-amber-400'
+  if (row.upstream_model_mismatch === true) return 'text-orange-600 dark:text-orange-400'
+  return 'text-gray-500 dark:text-gray-400'
 }
 
 const modelAuditTitle = (row: AdminUsageLog): string => [

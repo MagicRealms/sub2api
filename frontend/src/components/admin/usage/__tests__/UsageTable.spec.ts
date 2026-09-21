@@ -69,6 +69,7 @@ const messages: Record<string, string> = {
 	'usage.requestedModel': 'Requested',
 	'usage.sentUpstreamModel': 'Sent upstream',
 	'usage.upstreamResponseModel': 'Upstream response',
+	'usage.modelCorrect': 'Model correct',
 	'usage.modelVariant': 'Possible version variant',
 	'usage.modelMismatch': 'Different model',
 }
@@ -480,6 +481,34 @@ describe('admin UsageTable tooltip', () => {
 		expect(text).toContain('gpt-5.5')
 		expect(text).toContain(responseModel)
 		expect(text).toContain(expectedBadge)
+	})
+
+	it('always shows a matching upstream response with a green model-correct badge', () => {
+		const wrapper = mount(UsageTable, {
+			props: {
+				data: [{
+					request_id: 'req-matching-upstream-model',
+					model: 'gpt-5.5',
+					upstream_response_model: 'GPT-5.5',
+					upstream_model_mismatch: false,
+				}],
+				loading: false,
+				columns: [],
+			},
+			global: {
+				stubs: {
+					DataTable: DataTableStub,
+					EmptyState: true,
+					Icon: true,
+					Teleport: true,
+				},
+			},
+		})
+
+		expect(wrapper.text()).toContain('Upstream response')
+		expect(wrapper.text()).toContain('GPT-5.5')
+		expect(wrapper.text()).toContain('Model correct')
+		expect(wrapper.find('.text-emerald-600').exists()).toBe(true)
 	})
 
   it.each([
