@@ -101,6 +101,7 @@ func provideCleanup(
 	codexVersionSync *service.OpenAICodexVersionSyncService,
 	claudeCodeVersionSync *service.ClaudeCodeVersionSyncService,
 	proxyExpiry *service.ProxyExpiryService,
+	proxyRecovery *service.ProxyTransportRecoveryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
 	idempotencyCleanup *service.IdempotencyCleanupService,
@@ -278,6 +279,7 @@ func provideCleanup(
 				claudeCodeVersionSync.Stop()
 				return nil
 			}},
+			{"ProxyTransportRecoveryService", func() error { proxyRecovery.Stop(); return nil }},
 			{"ProxyExpiryService", func() error {
 				proxyExpiry.Stop()
 				return nil

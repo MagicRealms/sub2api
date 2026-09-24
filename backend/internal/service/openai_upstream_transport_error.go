@@ -178,7 +178,7 @@ func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportError(ctx context.Co
 		return
 	}
 	until := time.Now().Add(openAITransportErrorTempUnschedDuration)
-	reason := "upstream transport error (proxy/network): " + safeErr
+	reason := ProxyTransportCooldownPrefix + safeErr
 
 	// Immediate in-memory block so this process skips the account until the
 	// persisted cooldown is visible on the scheduling Account. Selection is

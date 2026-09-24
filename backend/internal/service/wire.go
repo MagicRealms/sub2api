@@ -941,6 +941,7 @@ var ProviderSet = wire.NewSet(
 	ProvideOpenAICodexVersionSyncService,
 	ProvideClaudeCodeVersionSyncService,
 	ProvideProxyExpiryService,
+	ProvideProxyTransportRecoveryService,
 	ProvideSubscriptionExpiryService,
 	ProvideTimingWheelService,
 	ProvideDashboardAggregationService,
@@ -1069,4 +1070,12 @@ func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.
 	}
 	aggregator.Start()
 	return aggregator
+}
+
+// ProvideProxyTransportRecoveryService starts proactive proxy cooldown recovery.
+func ProvideProxyTransportRecoveryService(accounts AccountRepository) *ProxyTransportRecoveryService {
+	repo, _ := accounts.(ProxyTransportRecoveryRepository)
+	svc := NewProxyTransportRecoveryService(repo)
+	svc.Start()
+	return svc
 }
