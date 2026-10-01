@@ -1074,9 +1074,9 @@ func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.
 }
 
 // ProvideProxyTransportRecoveryService starts proactive proxy cooldown recovery.
-func ProvideProxyTransportRecoveryService(accounts AccountRepository) *ProxyTransportRecoveryService {
+func ProvideProxyTransportRecoveryService(accounts AccountRepository, cfg *config.Config) *ProxyTransportRecoveryService {
 	repo, _ := accounts.(ProxyTransportRecoveryRepository)
-	svc := NewProxyTransportRecoveryService(repo)
+	svc := NewProxyTransportRecoveryService(repo, cfg)
 	svc.Start()
 	return svc
 }

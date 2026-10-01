@@ -527,6 +527,12 @@ func (r *accountRepository) updateLockedAccount(
 		return nil, err
 	}
 	account.Extra = extra
+	value, requested := extra[service.ProxyTransportFallbackExtraKey]
+	clearTransportFallback := requested && value == nil
+	if clearTransportFallback {
+		delete(extra, service.ProxyTransportFallbackExtraKey)
+		account.ProxyFallbackOriginID = nil
+	}
 
 	schedulable := account.Schedulable
 	if account.Status == service.StatusError {
@@ -560,6 +566,9 @@ func (r *accountRepository) updateLockedAccount(
 		builder.SetProxyID(*account.ProxyID)
 	} else {
 		builder.ClearProxyID()
+	}
+	if clearTransportFallback {
+		builder.ClearProxyFallbackOriginID()
 	}
 	if account.LastUsedAt != nil {
 		builder.SetLastUsedAt(*account.LastUsedAt)
@@ -3021,6 +3030,7 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		idx++
 	}
 	if updates.ProxyID != nil {
+		setClauses = append(setClauses, "proxy_fallback_origin_id = CASE WHEN extra @> '{\"proxy_transport_fallback\":true}'::jsonb THEN NULL ELSE proxy_fallback_origin_id END")
 		// 0 表示清除代理（前端发送 0 而不是 null 来表达清除意图）
 		if *updates.ProxyID == 0 {
 			setClauses = append(setClauses, "proxy_id = NULL")
@@ -3210,6 +3220,9 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		}
 		if updates.EnsureCodexFingerprintSeed {
 			extraExpression = ensureCodexFingerprintSeedSQL(extraExpression)
+		}
+		if updates.ProxyID != nil {
+			extraExpression = "(" + extraExpression + ") - 'proxy_transport_fallback'"
 		}
 		setClauses = append(setClauses, "extra = "+extraExpression)
 	}
@@ -4050,8 +4063,8 @@ func (r *accountRepository) RevertProxyFallback(ctx context.Context, accountID i
 	// Probe snapshots belong to the network identity; invalidate only on a real proxy change.
 	res, err := r.sql.ExecContext(ctx, `
 		UPDATE accounts SET
-			extra=CASE WHEN type='apikey' AND proxy_id IS DISTINCT FROM proxy_fallback_origin_id
-				THEN extra - 'upstream_billing_probe' ELSE extra END,
+			extra=(CASE WHEN type='apikey' AND proxy_id IS DISTINCT FROM proxy_fallback_origin_id
+				THEN extra - 'upstream_billing_probe' ELSE extra END) - 'proxy_transport_fallback',
 			proxy_id=proxy_fallback_origin_id, proxy_fallback_origin_id=NULL, updated_at=NOW()
 		WHERE id=$1 AND proxy_fallback_origin_id IS NOT NULL AND deleted_at IS NULL`, accountID)
 	if err != nil {

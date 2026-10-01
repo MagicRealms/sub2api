@@ -1049,6 +1049,8 @@ type GatewayConfig struct {
 	OpenAIRequestGzipEnabled bool `mapstructure:"openai_request_gzip_enabled"`
 	// OpenAIProxyStreamCircuit: Responses SSE 代理断流熔断策略。
 	OpenAIProxyStreamCircuit GatewayOpenAIProxyStreamCircuitConfig `mapstructure:"openai_proxy_stream_circuit"`
+	// ProxyTransportRecovery: proxy outage detection and optional temporary direct routing.
+	ProxyTransportRecovery GatewayProxyTransportRecoveryConfig `mapstructure:"proxy_transport_recovery"`
 	// ImageConcurrency: 图片生成独立并发限制配置（默认关闭）
 	ImageConcurrency ImageConcurrencyConfig `mapstructure:"image_concurrency"`
 
@@ -1196,6 +1198,12 @@ type GatewayOpenAIHTTP2Config struct {
 	FallbackWindowSeconds int `mapstructure:"fallback_window_seconds"`
 	// FallbackTTLSeconds: 触发后回退 HTTP/1.1 的持续时间（秒）
 	FallbackTTLSeconds int `mapstructure:"fallback_ttl_seconds"`
+}
+
+// GatewayProxyTransportRecoveryConfig opts into persistent direct failover.
+type GatewayProxyTransportRecoveryConfig struct {
+	AllowDirectFallback bool `mapstructure:"allow_direct_fallback"`
+	FailureThreshold    int  `mapstructure:"failure_threshold"`
 }
 
 // GatewayOpenAIProxyStreamCircuitConfig controls the bounded, in-process
@@ -2509,6 +2517,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.openai_proxy_stream_circuit.failure_threshold", 2)
 	viper.SetDefault("gateway.openai_proxy_stream_circuit.window_seconds", 60)
 	viper.SetDefault("gateway.openai_proxy_stream_circuit.ttl_seconds", 600)
+	viper.SetDefault("gateway.proxy_transport_recovery.allow_direct_fallback", false)
+	viper.SetDefault("gateway.proxy_transport_recovery.failure_threshold", 3)
 	// Grok free-tier local soft gate (scheduler-only; admin QueryQuota does not use this).
 	// Enabled by default because free detection requires an explicit free tier marker.
 	viper.SetDefault("gateway.grok.free_quota_soft_gate_enabled", true)
@@ -3595,6 +3605,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.OpenAIProxyStreamCircuit.TTLSeconds < 0 {
 		return fmt.Errorf("gateway.openai_proxy_stream_circuit.ttl_seconds must be non-negative")
+	}
+	if c.Gateway.ProxyTransportRecovery.FailureThreshold < 0 {
+		return fmt.Errorf("gateway.proxy_transport_recovery.failure_threshold must be non-negative")
 	}
 	weights := c.Gateway.OpenAIWS.SchedulerScoreWeights
 	for _, weight := range []float64{

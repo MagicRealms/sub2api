@@ -31,6 +31,33 @@ func (r *openaiTransportAccountRepoStub) SetTempUnschedulable(_ context.Context,
 	return nil
 }
 
+type conditionalOpenAITransportAccountRepoStub struct {
+	openaiTransportAccountRepoStub
+	changed bool
+	calls   int
+}
+
+func (r *conditionalOpenAITransportAccountRepoStub) SetProxyTransportCooldownIfBindingUnchanged(context.Context, *Account, time.Time, string) (bool, error) {
+	r.calls++
+	return r.changed, nil
+}
+
+func TestTempUnscheduleOpenAITransportError_ChangedRouteDoesNotBlockDirect(t *testing.T) {
+	for _, changed := range []bool{false, true} {
+		repo := &conditionalOpenAITransportAccountRepoStub{changed: changed}
+		svc := &OpenAIGatewayService{accountRepo: repo}
+		proxyID := int64(3)
+		account := &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, ProxyID: &proxyID}
+		svc.tempUnscheduleOpenAITransportError(context.Background(), account, "proxy refused")
+		require.Equal(t, 1, repo.calls)
+		require.Empty(t, repo.tempUnschedCalls, "guarded OAuth cooldowns must not use the unconditional writer")
+		// A route mismatch must leave the now-direct account free of a newly
+		// installed local scheduling block as well as a persisted cooldown.
+		_, blocked := svc.openaiAccountRuntimeBlockUntil.Load(account.ID)
+		require.Equal(t, changed, blocked, "only a failure on the current route can install a local block")
+	}
+}
+
 func newOpenAITransportErrTestContext() (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()

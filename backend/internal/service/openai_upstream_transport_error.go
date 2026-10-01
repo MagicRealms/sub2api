@@ -195,7 +195,11 @@ func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportError(ctx context.Co
 	// Immediate in-memory block so this process skips the account until the
 	// persisted cooldown is visible on the scheduling Account. Selection is
 	// fail-open: empty snapshot/DB cooldown fields drop a stale local block.
-	s.BlockAccountScheduling(account, until, "transport_error")
+	cooldownRepo, conditional := s.accountRepo.(ProxyTransportCooldownRepository)
+	conditional = conditional && account.Platform == PlatformOpenAI && account.Type == AccountTypeOAuth
+	if !conditional {
+		s.BlockAccountScheduling(account, until, "transport_error")
+	}
 
 	if s.accountRepo == nil {
 		// No DB configured — block is in-memory only; emit a distinct event so
@@ -213,11 +217,22 @@ func (s *OpenAIGatewayService) tempUnscheduleOpenAITransportError(ctx context.Co
 
 	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), openAIAccountStateUpdateTimeout)
 	defer cancel()
-	if err := s.accountRepo.SetTempUnschedulable(bgCtx, account.ID, until, reason); err != nil {
+	var updateErr error
+	if conditional {
+		var changed bool
+		changed, updateErr = cooldownRepo.SetProxyTransportCooldownIfBindingUnchanged(bgCtx, account, until, reason)
+		if updateErr == nil && !changed {
+			return
+		}
+		s.BlockAccountScheduling(account, until, "transport_error")
+	} else {
+		updateErr = s.accountRepo.SetTempUnschedulable(bgCtx, account.ID, until, reason)
+	}
+	if updateErr != nil {
 		logger.L().With(zap.String("component", "service.openai_gateway")).Warn(
 			"openai.account_temp_unscheduled_transport_failed",
 			zap.Int64("account_id", account.ID),
-			zap.Error(err),
+			zap.Error(updateErr),
 		)
 		return
 	}

@@ -315,12 +315,16 @@ func TestBulkUpdateOpenCodeGoEligiblePredicateIncludesBaseURL(t *testing.T) {
 	query := normalizeSQLWhitespace(exec.execQueries[0])
 	// 第一个 WHEN 分支是 OpenCode 快照失效分支（代理变化），其 eligible 判定必须
 	// 包含 opencode base URL 正则，使 OpenAI+Ollama 行无法命中该分支。
-	caseStart := strings.Index(query, "CASE")
-	firstThen := strings.Index(query, "THEN")
+	// Other assignments can have independent CASE expressions; inspect extra only.
+	extraStart := strings.Index(query, "extra = ")
+	require.NotEqual(t, -1, extraStart)
+	extraQuery := query[extraStart:]
+	caseStart := strings.Index(extraQuery, "CASE")
+	firstThen := strings.Index(extraQuery, "THEN")
 	require.NotEqual(t, -1, caseStart)
 	require.NotEqual(t, -1, firstThen)
 	require.Less(t, caseStart, firstThen)
-	firstWhen := query[caseStart:firstThen]
+	firstWhen := extraQuery[caseStart:firstThen]
 	// 第一个 WHEN 分支是 OpenCode 快照失效分支（代理变化），其 eligible 判定必须
 	// 覆盖 opencode_go 平台与挂载白名单的 opencode 基址，使 Ollama 行无法命中。
 	require.Contains(t, firstWhen, "platform = 'opencode_go'")

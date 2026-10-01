@@ -756,6 +756,13 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	// 影子代理恒继承母账号(由 propagateProxyToShadows 同步),不接受独立编辑——外审 B/P1;
 	// 否则要等母账号下次改 proxy 才被覆盖,期间影子会出现"有时继承、有时独立"的漂移。
 	if input.ProxyID != nil && !account.IsCredentialShadow() {
+		if account.Extra[ProxyTransportFallbackExtraKey] == true {
+			// An explicit proxy choice also cancels automatic restoration, even
+			// when the user selects direct while already in direct fallback.
+			account.Extra[ProxyTransportFallbackExtraKey] = nil
+			account.ProxyFallbackOriginID = nil
+			account.ProxyFallbackOriginName = nil
+		}
 		// 0 表示清除代理（前端发送 0 而不是 null 来表达清除意图）
 		if *input.ProxyID == 0 {
 			account.ProxyID = nil
