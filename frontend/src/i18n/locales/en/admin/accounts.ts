@@ -549,6 +549,8 @@ export default {
       recoverStateFailed: 'Failed to recover account state',
       fallbackActive: 'Fallback',
       fallbackActiveTip: 'Origin proxy {origin} expired',
+      transportFallbackDirect: 'Direct (temporary)',
+      transportFallbackActiveTip: 'Proxy {origin} is unavailable. Temporarily connecting directly; the proxy will be restored after recovery.',
       revertProxy: 'Revert proxy',
       revertProxySuccess: 'Successfully reverted to original proxy',
       revertProxyFailed: 'Failed to revert proxy',

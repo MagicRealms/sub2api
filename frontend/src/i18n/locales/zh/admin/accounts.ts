@@ -668,6 +668,8 @@ export default {
       recoverStateFailed: '恢复账号状态失败',
       fallbackActive: '已回退',
       fallbackActiveTip: '原代理 {origin} 已到期，当前使用备用代理',
+      transportFallbackDirect: '临时直连（无代理）',
+      transportFallbackActiveTip: '原代理 {origin} 故障，已临时直连；恢复稳定后自动接回',
       revertProxy: '切回原代理',
       revertProxySuccess: '已成功切回原代理',
       revertProxyFailed: '切回原代理失败',
