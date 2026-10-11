@@ -1366,6 +1366,27 @@ func normalizeGPT6ResponsesSampling(body []byte, model string) ([]byte, bool, er
 	return out, changed, nil
 }
 
+// normalizeOpenAIAstraUltraEffort maps Codex's Ultra workflow level to the
+// upstream effort it actually uses. Astra's model catalog advertises `ultra`
+// as a workflow choice, while the ChatGPT OAuth Responses endpoint accepts
+// `xhigh` on the wire (the catalog carries multi_agent_reasoning_effort=xhigh).
+// Keep this scoped to Astra OAuth requests; API-key routes may expose a
+// different upstream capability contract.
+func normalizeOpenAIAstraUltraEffort(body []byte, account *Account) ([]byte, bool, error) {
+	if account == nil || !account.IsOpenAIOAuthLike() {
+		return body, false, nil
+	}
+	model := account.GetMappedModel(strings.TrimSpace(gjson.GetBytes(body, "model").String()))
+	if !isOpenAIGPT6AstraModel(model) || !strings.EqualFold(strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()), "ultra") {
+		return body, false, nil
+	}
+	updated, err := sjson.SetBytes(body, "reasoning.effort", "xhigh")
+	if err != nil {
+		return body, false, fmt.Errorf("normalize Astra ultra reasoning effort: %w", err)
+	}
+	return updated, true, nil
+}
+
 func normalizeOpenAIResponsesReasoningMode(body []byte, model string) ([]byte, bool, error) {
 	if len(body) == 0 {
 		return body, false, nil

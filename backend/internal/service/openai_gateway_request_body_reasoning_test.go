@@ -1,12 +1,37 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
+
+func TestNormalizeOpenAIAstraUltraEffortForOAuthMapsToXHigh(t *testing.T) {
+	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	body := []byte(`{"model":"gpt-6-astra","reasoning":{"effort":"ultra"}}`)
+
+	got, changed, err := normalizeOpenAIAstraUltraEffort(body, account)
+	require.NoError(t, err)
+	require.True(t, changed)
+	assert.Equal(t, "xhigh", gjson.GetBytes(got, "reasoning.effort").String())
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(got, &decoded))
+	assert.Equal(t, "gpt-6-astra", decoded["model"])
+}
+
+func TestNormalizeOpenAIAstraUltraEffortDoesNotRewriteAPIKey(t *testing.T) {
+	account := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	body := []byte(`{"model":"gpt-6-astra","reasoning":{"effort":"ultra"}}`)
+
+	got, changed, err := normalizeOpenAIAstraUltraEffort(body, account)
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, "ultra", gjson.GetBytes(got, "reasoning.effort").String())
+}
 
 func TestTrimOpenAIEncryptedReasoningItems_ContentNull(t *testing.T) {
 	reqBody := map[string]any{
