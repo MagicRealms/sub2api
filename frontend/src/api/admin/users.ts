@@ -56,6 +56,55 @@ export interface BatchUpdateUserLimitsResponse {
   affected: number
 }
 
+export interface UserUsageMetrics {
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  actual_cost: number
+}
+
+export interface UserUsageDay extends UserUsageMetrics {
+  date: string
+}
+
+export interface UserAPIKeyUsage {
+  id: number
+  name: string
+  key_preview: string
+  status: string
+  deleted: boolean
+  group_name: string
+  expires_at: string | null
+  last_used_at: string | null
+  total: UserUsageMetrics
+  daily: UserUsageDay[]
+}
+
+export interface UserUsageDetails {
+  user: AdminUser
+  generated_at: string
+  start_date: string
+  end_date: string
+  timezone: string
+  total: UserUsageMetrics
+  daily: UserUsageDay[]
+  api_keys: UserAPIKeyUsage[]
+}
+
+export async function getUserUsageDetails(
+  id: number,
+  options?: { timezone?: string; signal?: AbortSignal }
+): Promise<UserUsageDetails> {
+  const { data } = await apiClient.get<UserUsageDetails>(`/admin/users/${id}/usage-details`, {
+    params: { timezone: options?.timezone },
+    signal: options?.signal
+  })
+  return data
+}
+
 /**
  * List all users with pagination
  * @param page - Page number (default: 1)
@@ -416,6 +465,7 @@ export const usersAPI = {
   toggleStatus,
   getUserApiKeys,
   getUserUsageStats,
+  getUserUsageDetails,
   getUserBalanceHistory,
   replaceGroup,
   bindUserAuthIdentity,

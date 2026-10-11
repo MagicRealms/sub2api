@@ -612,6 +612,14 @@
 
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
+              <button
+                :data-test="`user-usage-details-${row.id}`"
+                @click="handleUsageDetails(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
+              >
+                <Icon name="chart" size="sm" />
+                <span class="whitespace-nowrap text-xs">{{ t('admin.users.usageDetails.title') }}</span>
+              </button>
               <!-- Edit Button -->
               <button
                 @click="handleEdit(row)"
@@ -783,6 +791,7 @@
       @success="loadUsers"
     />
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
+    <UserUsageDetailsModal :show="showUsageDetailsModal" :user="usageDetailsUser" @close="closeUsageDetailsModal" />
     <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
     <UserBalanceModal :show="showBalanceModal" :user="balanceUser" :operation="balanceOperation" @close="closeBalanceModal" @success="loadUsers" />
     <UserBalanceHistoryModal :show="showBalanceHistoryModal" :user="balanceHistoryUser" @close="closeBalanceHistoryModal" @deposit="handleDepositFromHistory" @withdraw="handleWithdrawFromHistory" />
@@ -826,6 +835,7 @@ import UserEditModal from '@/components/admin/user/UserEditModal.vue'
 import BulkEditUserModal from '@/components/admin/user/BulkEditUserModal.vue'
 import UserPlatformQuotaModal from '@/components/admin/user/UserPlatformQuotaModal.vue'
 import UserApiKeysModal from '@/components/admin/user/UserApiKeysModal.vue'
+import UserUsageDetailsModal from '@/components/admin/user/UserUsageDetailsModal.vue'
 import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsModal.vue'
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
@@ -1346,6 +1356,8 @@ const showDeleteDialog = ref(false)
 const bulkDeleteIds = ref<number[]>([])
 const bulkDeleting = ref(false)
 const showApiKeysModal = ref(false)
+const showUsageDetailsModal = ref(false)
+const usageDetailsUser = ref<AdminUser | null>(null)
 const showAttributesModal = ref(false)
 const showPlatformQuotaModal = ref(false)
 const editingUser = ref<AdminUser | null>(null)
@@ -1769,6 +1781,16 @@ const handleToggleStatus = async (user: AdminUser) => {
 const handleViewApiKeys = (user: AdminUser) => {
   viewingUser.value = user
   showApiKeysModal.value = true
+}
+
+const handleUsageDetails = (user: AdminUser) => {
+  usageDetailsUser.value = user
+  showUsageDetailsModal.value = true
+}
+
+const closeUsageDetailsModal = () => {
+  showUsageDetailsModal.value = false
+  usageDetailsUser.value = null
 }
 
 const closeApiKeysModal = () => {

@@ -158,6 +158,11 @@ const mountBulkDeleteView = () => mount(UsersView, {
       BulkEditUserModal: true,
       UserPlatformQuotaModal: true,
       UserApiKeysModal: true,
+      UserUsageDetailsModal: {
+        props: ['show', 'user'],
+        emits: ['close'],
+        template: '<div v-if="show" data-test="usage-details-dialog">{{ user.id }}<button data-test="close-usage-details" @click="$emit(\'close\')">close</button></div>'
+      },
       UserAllowedGroupsModal: true,
       UserBalanceModal: true,
       UserBalanceHistoryModal: true,
@@ -178,6 +183,15 @@ const getToggleStatusButton = (wrapper: ReturnType<typeof mountBulkDeleteView>, 
 }
 
 describe('admin UsersView', () => {
+  it('opens usage details for the selected user and closes the dialog', async () => {
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    await wrapper.get('[data-test="user-usage-details-42"]').trigger('click')
+    expect(wrapper.get('[data-test="usage-details-dialog"]').text()).toContain('42')
+    await wrapper.get('[data-test="close-usage-details"]').trigger('click')
+    expect(wrapper.find('[data-test="usage-details-dialog"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
   beforeEach(() => {
     vi.useRealTimers()
     localStorage.clear()
