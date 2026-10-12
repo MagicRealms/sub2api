@@ -46,6 +46,19 @@
         <a v-for="(section, index) in sections" :key="section" :href="`#${section}`" class="flex items-center gap-2 hover:text-primary-600"><span class="font-mono text-xs text-primary-600">0{{ index + 1 }}</span>{{ t(`usageGuide.sections.${section}`) }}<Icon name="chevronRight" size="xs" /></a>
       </nav>
 
+      <section id="video-tutorial" class="guide-card p-5 sm:p-6" aria-labelledby="video-title">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400" aria-hidden="true"><Icon name="play" size="lg" /></span>
+          <div class="min-w-0 flex-1">
+            <p class="mb-1 text-xs font-medium text-rose-600 dark:text-rose-400">Bilibili · AI工程师-DIV</p>
+            <h2 id="video-title" class="guide-heading">{{ t('usageGuide.video.title') }}</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-300">{{ t('usageGuide.video.description') }}</p>
+          </div>
+          <a href="https://www.bilibili.com/video/BV15PVb6gE9k/" target="_blank" rel="noopener noreferrer" class="btn btn-secondary shrink-0 gap-2" data-test="bilibili-tutorial-link">{{ t('usageGuide.video.watch') }}<Icon name="externalLink" size="sm" /></a>
+        </div>
+        <p class="mt-4 border-t border-gray-100 pt-3 text-xs leading-6 text-gray-500 dark:border-dark-700 dark:text-dark-400">{{ t('usageGuide.video.note') }}</p>
+      </section>
+
       <section id="prepare" aria-labelledby="prepare-title">
         <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h2 id="prepare-title" class="guide-heading">{{ t('usageGuide.prepareTitle') }}</h2><span class="text-xs text-gray-500 dark:text-dark-400">{{ t('usageGuide.prepareHint') }}</span></div>
         <div class="grid gap-4 md:grid-cols-3">

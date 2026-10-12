@@ -18,6 +18,12 @@ export default {
     previewReply: '你好，很高兴为你提供帮助。',
     testPrompt: '你好，请用一句话介绍你自己。',
     sections: { prepare: '准备密钥', clients: '客户端接入', verify: '验证成功', faq: '常见问题' },
+    video: {
+      title: '更喜欢看视频？跟着操作一遍',
+      description: 'CC Switch 配置与使用教程，介绍添加模型供应商、切换 API 配置等操作，包含 Codex 的接入方式。',
+      watch: '去 B 站看视频',
+      note: '使用本站时，请选择 Codex，并将视频中的 API 地址、密钥和模型替换为本页提供的地址、你在本站创建的密钥和分组支持的模型。CC Switch 安装包可从下方 Codex 教程中的官方项目链接下载。'
+    },
     prepareTitle: '先准备好这三件事',
     prepareHint: '所有客户端都从这一步开始',
     preparation: {

@@ -17,6 +17,10 @@
 - [Sub2API 客户端接入教程](https://page.easytokencc.cn/codex-guide.html)
 - [Sub2API 开发工具接入文档](https://sub2.h4rvey.com/docs)
 
+页面顶部提供 [AI工程师-DIV 的 CC Switch 视频教程](https://www.bilibili.com/video/BV15PVb6gE9k/)外部链接，新窗口打开并标注作者。视频覆盖供应商配置、客户端切换及 Codex；页面提示使用本站的 API 地址、密钥和模型，并沿用 Codex 章节中的官方工具下载入口。
+
+2026-10-12 检索时，Bilibili 公开页面索引快照显示约 25.1 万播放、7,518 赞、1.7 万收藏，作为选择依据；网页及公开 API 的实时抓取返回 HTTP 412，未核实实时统计或评论口碑。页面不展示易过期的互动数字，不嵌入播放器或加载第三方视频资源。
+
 配置字段和客户端行为核对以下项目的官方文档，页面底部保留官方资料入口：
 
 - [Codex CLI](https://developers.openai.com/codex/cli/)

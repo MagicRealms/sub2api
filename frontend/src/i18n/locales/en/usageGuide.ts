@@ -18,6 +18,12 @@ export default {
     previewReply: 'Hello! Happy to help.',
     testPrompt: 'Hello! Please introduce yourself in one sentence.',
     sections: { prepare: 'Get a key', clients: 'Connect a client', verify: 'Verify it works', faq: 'Troubleshooting' },
+    video: {
+      title: 'Prefer a video? Follow along.',
+      description: 'A Chinese CC Switch tutorial covering model providers, switching API configurations and connecting Codex.',
+      watch: 'Watch on Bilibili',
+      note: 'For this gateway, select Codex and replace the video’s API address, key and model with the address on this page, your own key from this site and a model supported by your group. Get CC Switch from the official project linked in the Codex instructions below.'
+    },
     prepareTitle: 'Prepare these three things',
     prepareHint: 'The same starting point for every client',
     preparation: {
