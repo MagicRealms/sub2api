@@ -1,0 +1,92 @@
+export default {
+  usageGuide: {
+    nav: 'Getting started',
+    eyebrow: 'QUICK START · YOUR FIRST REQUEST',
+    title: 'New to our API gateway?',
+    titleAccent: 'Let’s get you connected.',
+    description: 'Welcome to {site}. Create an API key, then connect your favorite client. Find the addresses, settings and steps you need right here.',
+    heroNote: 'Start with everyday chat, coding assistance, or your own application.',
+    getKey: 'Create an API key',
+    chooseClient: 'I already have a key',
+    login: 'Sign in',
+    copy: 'Copy',
+    copyCode: 'Copy {label}',
+    copyPrompt: 'Copy test prompt',
+    contents: 'Guide contents',
+    previewLabel: 'Connection example',
+    previewComment: '# Three things to connect',
+    previewReply: 'Hello! Happy to help.',
+    testPrompt: 'Hello! Please introduce yourself in one sentence.',
+    sections: { prepare: 'Get a key', clients: 'Connect a client', verify: 'Verify it works', faq: 'Troubleshooting' },
+    prepareTitle: 'Prepare these three things',
+    prepareHint: 'The same starting point for every client',
+    preparation: {
+      account: { title: 'Sign in and check your credit', text: 'Check your balance or available subscription quota on the dashboard. Use the balance recharge or redeem entry in the sidebar if you need more credit.', action: 'Open console' },
+      key: { title: 'Create your own API key', text: 'Open API Keys, click Create Key, give it a recognizable name and choose the group you need. Copy the complete generated key.', action: 'Open API Keys' },
+      config: { title: 'Check the address and model', text: 'API Key is the credential you just copied. Base URL is this site’s API address. Use the exact Model ID supported by your key’s group.', action: 'View key configuration' }
+    },
+    groupNote: 'Your key’s group controls which models it can call and how usage is billed. Select a group that fits your needs. A group labeled “no Astra” cannot use Astra models.',
+    clientsTitle: 'What would you like to do?',
+    clientsHint: 'Select your client and follow the steps below. For your first chat, start with Cherry Studio.',
+    clientSummaries: { cherry: 'Chat, questions and everyday assistance', codex: 'Get help reading and writing code', opencode: 'An AI coding assistant in your terminal', api: 'Connect an app or check the API' },
+    noTerminal: 'Graphical interface · fill in the fields',
+    os: 'Choose your operating system',
+    downloadCherry: 'Get Cherry Studio',
+    fields: { name: 'Provider name', type: 'Provider type', keyValue: 'Paste your complete key from this site' },
+    cherry: {
+      addTitle: 'Install the client and add a provider',
+      addText: 'Download and install Cherry Studio. Open Settings → Model Service, add a provider and select OpenAI as its type. You can use this site’s name for the provider. Button names may vary by version.',
+      fieldsTitle: 'Fill in these fields',
+      urlNote: 'Use the root address here, without /v1 or /responses. Cherry Studio appends the request path. Other clients may require a different address format.',
+      chatTitle: 'Add a model and start a conversation',
+      chatText: 'Save your key, sync/fetch models and add the ones you want, or enter the example Model ID manually. Enable the provider, return to Chat, select the model you added and say hello. If your version offers an OpenAI Responses protocol option, you can select it.'
+    },
+    codex: {
+      installTitle: 'Install Codex',
+      installText: 'Install Node.js LTS first if needed, then run this command in a terminal. Skip this step if you already have Codex.',
+      easyTitle: 'Prefer a graphical setup? Try CC Switch',
+      easyText: 'Install CC Switch, then return to API Keys on this site. Find your key, click Import to CC Switch, follow the prompts and activate the Codex provider. Use Key also shows the configuration generated for your key.',
+      downloadSwitch: 'Get CC Switch',
+      manualTitle: 'Configure manually (expand)',
+      configText: 'Find the file below in your user directory. Create the .codex folder and config.toml if needed. Back up an existing configuration before merging these settings, and avoid duplicate entries. On Windows, enter %USERPROFILE%\\.codex in File Explorer’s address bar.',
+      envText: 'Replace YOUR_API_KEY with your complete key and run these commands in the same terminal, then start Codex. Do not use your site login password.',
+      startTitle: 'Activate the settings and start a chat',
+      startText: 'Fully quit and reopen Codex after importing or editing settings. For the CLI, open a terminal in your project folder and run codex. Ask a simple question before starting a coding task. Existing desktop and editor extension users should also restart their client.'
+    },
+    envNote: 'These environment variables apply only to the current terminal and programs launched from it. Set them again after closing the terminal. For persistent use, save them in your user environment variables or shell configuration, then restart the client. Keep keys out of project repositories.',
+    opencode: {
+      installTitle: 'Install OpenCode',
+      installText: 'Install Node.js LTS, then run this command. Skip it if OpenCode is already installed.',
+      configTitle: 'Add the project configuration',
+      configText: 'Create opencode.json in your project root and paste this configuration. Merge the provider and model settings if a file already exists. This example uses Responses and reads the key from an environment variable.',
+      startTitle: 'Set your key and launch',
+      startText: 'Replace YOUR_API_KEY with your key and run these commands in the same terminal in your project folder. In OpenCode, use /models to check and select the model under Sub2API, then ask a simple question.'
+    },
+    api: {
+      modelsTitle: 'Check your key and model list',
+      modelsText: 'Replace YOUR_API_KEY with your complete key and run this command. A model list confirms that the address and authentication work. An actual request is still needed to verify model access.',
+      requestTitle: 'Make a small test request',
+      requestText: 'Run this in the same terminal. It uses streaming /v1/responses. Text deltas followed by response.completed indicate completion. Replace model if the example is not available in your group.',
+      billingNote: 'Listing models does not generate an answer; the conversation test incurs normal usage and charges. The Windows example uses PowerShell and the built-in curl.exe.'
+    },
+    modelNote: 'gpt-6.1-sol is an example, and may not be available in every group. Check the model catalog in Use Key, the synced client list and your group’s description. Model IDs must match exactly. Replace every YOUR_API_KEY with your own key.',
+    verifyTitle: 'Got a reply? Check your usage too.',
+    verifyText: 'After your client receives an answer, open Usage on this site to check the model, tokens and cost for the request. Records may take a moment to appear; refresh if needed.',
+    viewUsage: 'View usage',
+    tryPrompt: 'Try this for your first conversation',
+    verifyNote: 'The preview above is an illustration. Verify your connection using your client’s actual answer and this site’s usage records.',
+    faqTitle: 'Need a hand?',
+    faq: {
+      key: { q: 'What is an API key? Can I use my password?', a: 'An API key is a credential created on this site’s API Keys page. Paste the entire key without extra spaces. Your login password and keys from other platforms cannot replace it. Keep complete keys private and hide them in public screenshots.' },
+      model: { q: 'model_not_allowed or model not found?', a: 'Check the exact Model ID, then your key’s group and model restrictions. A model shown in your client does not guarantee your group has access. Select an available model or create a key for an appropriate group.' },
+      auth: { q: '401 / 403: authentication or permission problems?', a: 'Check that the API address points to this site and the key is from this site, with no extra spaces. Check whether the key is disabled, expired, out of quota or restricted by an IP allowlist. A 403 can also indicate group or model restrictions; read the full error.' },
+      notFound: { q: '404 / missing endpoint: which address do I use?', a: 'The Codex and OpenCode examples use a Base URL ending in /v1. Cherry Studio uses the root address shown here. Avoid duplicate /v1/v1 and do not use a full /v1/responses or /v1/chat/completions endpoint as a normal Base URL. Follow the instructions for your client.' },
+      rate: { q: '429, busy, or no available accounts?', a: 'Reduce concurrent chats or tasks and try again later. Check your concurrency, rate and subscription limits. If the issue continues, send the administrator the time, client, model and error with keys hidden so they can check the channel.' },
+      balance: { q: 'Why am I out of quota with credit remaining?', a: 'Check your key’s own quota and expiry as well as the subscription associated with its group and any period limits. Your account, key and group limits all apply.' },
+      context: { q: 'context_length_exceeded or the conversation is too long?', a: 'Start a new conversation or reduce the included history and files. Coding clients may offer context compaction. Client settings do not increase the model’s actual context window, and longer conversations also cost more.' },
+      website: { q: 'Can I enter this key on the ChatGPT website?', a: 'Use a client or application that supports a custom API address, such as Cherry Studio, Codex or OpenCode. Credit on this gateway pays for API calls here; it is separate from a ChatGPT website subscription.' }
+    },
+    supportNote: 'For support, include the time, client name, Model ID and error text or screenshot. Hide complete API keys; a request_id helps the administrator find the issue.',
+    sourcesNote: 'Adapted for this gateway · See official client documentation for details'
+  }
+}

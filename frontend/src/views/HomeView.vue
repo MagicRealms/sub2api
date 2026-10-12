@@ -30,6 +30,10 @@
         </div>
         <div class="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
           <LocaleSwitcher />
+          <router-link to="/guide" class="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-dark-800">
+            <Icon name="book" size="md" />
+            <span class="hidden sm:inline">{{ t('usageGuide.nav') }}</span>
+          </router-link>
           <a
             v-if="docUrl"
             :href="docUrl"
@@ -59,6 +63,7 @@
           </button>
           <router-link
             :to="isAuthenticated ? dashboardPath : '/login'"
+            data-testid="compact-home-console-link"
             class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
           >
             {{ isAuthenticated ? t('home.dashboard') : t('home.login') }}
@@ -130,6 +135,10 @@
           <LocaleSwitcher />
 
           <!-- Doc Link -->
+          <router-link to="/guide" class="inline-flex items-center gap-1.5 rounded-lg p-2 text-sm font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-dark-800" :title="t('usageGuide.nav')">
+            <Icon name="book" size="md" />
+            <span class="hidden sm:inline">{{ t('usageGuide.nav') }}</span>
+          </router-link>
           <a
             v-if="docUrl"
             :href="docUrl"
@@ -216,13 +225,16 @@
             </p>
 
             <!-- CTA Button -->
-            <div>
+            <div class="flex flex-wrap items-center gap-3">
               <router-link
                 :to="isAuthenticated ? dashboardPath : '/login'"
                 class="btn btn-primary px-8 py-3 text-base shadow-lg shadow-primary-500/30"
               >
                 {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
                 <Icon name="arrowRight" size="md" class="ml-2" :stroke-width="2" />
+              </router-link>
+              <router-link to="/guide" class="btn btn-secondary px-6 py-3 text-base">
+                <Icon name="book" size="md" class="mr-2" />{{ t('usageGuide.nav') }}
               </router-link>
             </div>
           </div>

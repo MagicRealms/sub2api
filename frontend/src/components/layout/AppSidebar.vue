@@ -297,6 +297,12 @@ const KeyIcon = {
     )
 }
 
+const GuideIcon = {
+  render: () => h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' }, [
+    h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', d: 'M12 6.5C9 4.5 5.5 4 3 5v14c2.5-1 6-.5 9 1.5m0-14c3-2 6.5-2.5 9-1.5v14c-2.5-1-6-.5-9 1.5m0-14v14' })
+  ])
+}
+
 const BatchImageIcon = {
   render: () =>
     h(
@@ -724,6 +730,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
+    { path: '/guide', label: t('usageGuide.nav'), icon: GuideIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
