@@ -38,8 +38,8 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function renderBadge() {
-  const wrapper = mount(VersionBadge, { global: { stubs: { Icon: true } } })
+function renderBadge(version?: string) {
+  const wrapper = mount(VersionBadge, { props: { version }, global: { stubs: { Icon: true } } })
   unmount = () => wrapper.unmount()
   return wrapper
 }
@@ -47,6 +47,8 @@ function renderBadge() {
 describe('managed fork update notifications', () => {
   it('shows the upstream release and merge instructions without binary update or rollback actions', async () => {
     const wrapper = renderBadge()
+    expect(wrapper.text()).toContain(`v${state.app.currentVersion}`)
+    expect(wrapper.text()).not.toContain('做一个稳定的中转站')
     expect(wrapper.get('button').attributes('title')).toBe('version.upstreamUpdateAvailable')
     await wrapper.get('button').trigger('click')
     expect(wrapper.text()).toContain('version.forkUpdateHint')
@@ -77,9 +79,13 @@ describe('managed fork update notifications', () => {
     expect(wrapper.text()).not.toContain('version.upToDate')
   })
 
-  it('does not check releases for non-admin users', () => {
+  it.each([undefined, '0.2.17-mr.private-build'])('shows only the slogan and does not check releases for non-admins (version: %s)', (version) => {
     state.auth.isAdmin = false
-    renderBadge()
+    const wrapper = renderBadge(version)
+    expect(wrapper.text()).toBe('做一个稳定的中转站')
+    expect(wrapper.html()).not.toContain(state.app.currentVersion)
+    if (version) expect(wrapper.html()).not.toContain(version)
+    expect(wrapper.find('button').exists()).toBe(false)
     vi.advanceTimersByTime(20 * 60 * 1000)
     expect(state.app.fetchVersion).not.toHaveBeenCalled()
   })

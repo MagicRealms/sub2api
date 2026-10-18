@@ -646,9 +646,9 @@
       </transition>
     </template>
 
-    <!-- Non-admin: Simple static version text -->
-    <span v-else-if="version" class="text-xs text-gray-500 dark:text-dark-400">
-      v{{ version }}
+    <!-- Non-admin: Site slogan, independent of server version/loading state. -->
+    <span v-else class="text-xs text-gray-500 dark:text-dark-400">
+      做一个稳定的中转站
     </span>
   </div>
 </template>
