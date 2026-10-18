@@ -226,6 +226,8 @@ export interface ListContentModerationLogsParams {
   page_size?: number
   result?: string
   group_id?: number
+  user_id?: number
+  api_key_id?: number
   endpoint?: string
   search?: string
   from?: string

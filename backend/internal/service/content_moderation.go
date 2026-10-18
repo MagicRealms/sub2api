@@ -432,6 +432,8 @@ type ContentModerationLogFilter struct {
 	Pagination pagination.PaginationParams
 	Result     string
 	GroupID    *int64
+	UserID     *int64
+	APIKeyID   *int64
 	Endpoint   string
 	Search     string
 	From       *time.Time

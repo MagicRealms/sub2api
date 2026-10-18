@@ -9,6 +9,7 @@ import (
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 )
@@ -65,6 +66,28 @@ func TestBuildContentModerationLogWhere_BlockedIncludesAllBlockActions(t *testin
 	sql := strings.Join(where, " AND ")
 	require.Contains(t, sql, "l.action IN ('block', 'keyword_block', 'hash_block')")
 	require.NotContains(t, sql, "l.action = 'block'")
+}
+
+func TestContentModerationRepositoryExactAttributionFilters(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	userID, apiKeyID := int64(1001), int64(42)
+	where := regexp.QuoteMeta("l.user_id = $1 AND l.api_key_id = $2")
+	mock.ExpectQuery("SELECT COUNT.*"+where).
+		WithArgs(userID, apiKeyID).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectQuery("(?s)SELECT.*"+where).
+		WithArgs(userID, apiKeyID, 10, 10).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	logs, page, err := NewContentModerationRepository(db).ListLogs(context.Background(), service.ContentModerationLogFilter{
+		Pagination: pagination.PaginationParams{Page: 2, PageSize: 10},
+		UserID:     &userID, APIKeyID: &apiKeyID,
+	})
+	require.NoError(t, err)
+	require.Empty(t, logs)
+	require.Equal(t, 2, page.Page)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestContentModerationRepositoryCountFlaggedByUserSince_ExcludesHashBlock(t *testing.T) {

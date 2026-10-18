@@ -285,6 +285,12 @@ func buildContentModerationLogWhere(filter service.ContentModerationLogFilter) (
 	if filter.GroupID != nil {
 		add("l.group_id = $%d", *filter.GroupID)
 	}
+	if filter.UserID != nil {
+		add("l.user_id = $%d", *filter.UserID)
+	}
+	if filter.APIKeyID != nil {
+		add("l.api_key_id = $%d", *filter.APIKeyID)
+	}
 	if endpoint := strings.TrimSpace(filter.Endpoint); endpoint != "" {
 		add("l.endpoint = $%d", endpoint)
 	}

@@ -4,7 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { DOMWrapper, VueWrapper } from '@vue/test-utils'
 
 import RiskControlView from '../RiskControlView.vue'
-import type { ContentModerationAPIKeyStatus, ContentModerationConfig, UpdateContentModerationConfig } from '@/api/admin/riskControl'
+import type { ContentModerationAPIKeyStatus, ContentModerationConfig, ContentModerationLog, UpdateContentModerationConfig } from '@/api/admin/riskControl'
 
 const {
   getConfig,
@@ -147,6 +147,16 @@ const runtimeStatus = () => ({
 })
 
 const AppLayoutStub = { template: '<div><slot /></div>' }
+const auditLog = (overrides: Partial<ContentModerationLog> = {}): ContentModerationLog => ({
+  id: 1, request_id: 'req-first', user_id: 1001, user_email: 'first@example.com',
+  api_key_id: 42, api_key_name: 'Shared key name', group_id: 3, group_name: 'Group',
+  endpoint: '/v1/responses', provider: 'openai', model: 'gpt-model', mode: 'pre_block',
+  action: 'keyword_block', flagged: true, highest_category: 'keyword', highest_score: 1,
+  matched_keyword: 'test-rule', category_scores: {}, threshold_snapshot: {},
+  input_excerpt: 'First submitted prompt', upstream_latency_ms: null, error: '',
+  violation_count: 1, auto_banned: false, email_sent: false, user_status: 'active',
+  queue_delay_ms: null, created_at: '2026-10-18T10:00:00Z', ...overrides,
+})
 const BaseDialogStub = defineComponent({
   props: {
     show: {
@@ -218,6 +228,68 @@ describe('admin RiskControlView', () => {
       api_key_masks: [],
       api_key_statuses: [],
     }))
+  })
+
+  function mountAudit() {
+    return mount(RiskControlView, { global: { stubs: { AppLayout: AppLayoutStub, BaseDialog: BaseDialogStub, Icon: true, Select: true, Toggle: true, Pagination: true, ModelWhitelistSelector: ModelWhitelistSelectorStub, ProxySelector: true } } })
+  }
+
+  it('keeps prompts tied to their user and key IDs even when key names match', async () => {
+    const second = auditLog({ id: 2, request_id: 'req-second', user_id: 1002, user_email: 'second@example.com', api_key_id: 43, input_excerpt: '<img src=x onerror=alert(1)> Second prompt' })
+    listLogs.mockResolvedValue({ items: [auditLog(), second], total: 2, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountAudit()
+    await flushPromises()
+    const keys = wrapper.findAll('[data-test="audit-row-key"]')
+    expect(keys[0].text()).toContain('Shared key name')
+    expect(keys[0].text()).toContain('Key ID 42')
+    expect(keys[1].text()).toContain('Shared key name')
+    expect(keys[1].text()).toContain('Key ID 43')
+    await wrapper.findAll('[data-test="audit-view-detail"]')[1].trigger('click')
+    expect(wrapper.get('[data-test="audit-detail-user"]').text()).toContain('second@example.com')
+    expect(wrapper.get('[data-test="audit-detail-user"]').text()).toContain('1002')
+    expect(wrapper.get('[data-test="audit-detail-key"]').text()).toContain('43')
+    expect(wrapper.get('[data-test="audit-detail-request"]').text()).toBe('req-second')
+    expect(wrapper.get('[data-test="audit-detail-prompt"]').text()).toBe(second.input_excerpt)
+    expect(wrapper.get('[data-test="audit-detail-prompt"]').find('img').exists()).toBe(false)
+    expect(wrapper.get('[data-test="audit-detail"]').text()).not.toContain('first@example.com')
+    wrapper.unmount()
+  })
+
+  it('keeps recorded identity snapshots visible when related IDs are unavailable', async () => {
+    listLogs.mockResolvedValue({ items: [auditLog({ user_id: null, api_key_id: null, user_status: '' })], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountAudit()
+    await flushPromises()
+    await wrapper.get('[data-test="audit-view-detail"]').trigger('click')
+    expect(wrapper.get('[data-test="audit-detail-user"]').text()).toContain('first@example.com')
+    expect(wrapper.get('[data-test="audit-detail-key"]').text()).toContain('Shared key name')
+    expect(wrapper.get('[data-test="audit-detail-key"]').text()).toContain('admin.riskControl.notRecorded')
+    expect(wrapper.get('[data-test="audit-detail"]').text()).not.toMatch(/null|undefined/)
+    wrapper.unmount()
+  })
+
+  it('filters by exact user and key IDs and clears both on reset', async () => {
+    const wrapper = mountAudit()
+    await flushPromises()
+    await wrapper.get('[data-test="audit-user-filter"]').setValue('1002')
+    await wrapper.get('[data-test="audit-key-filter"]').setValue('43')
+    await wrapper.get('[data-test="audit-filter-submit"]').trigger('click')
+    await flushPromises()
+    expect(listLogs).toHaveBeenLastCalledWith(expect.objectContaining({ user_id: 1002, api_key_id: 43, page: 1 }))
+    await findButtonByText(wrapper, 'common.reset').trigger('click')
+    await flushPromises()
+    expect(listLogs).toHaveBeenLastCalledWith(expect.objectContaining({ user_id: undefined, api_key_id: undefined, page: 1 }))
+    expect(updateConfig).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('shows an audit error separately when no prompt excerpt was recorded', async () => {
+    listLogs.mockResolvedValue({ items: [auditLog({ input_excerpt: '', error: 'Upstream moderation unavailable' })], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountAudit()
+    await flushPromises()
+    await wrapper.get('[data-test="audit-view-detail"]').trigger('click')
+    expect(wrapper.get('[data-test="audit-detail-prompt"]').text()).toBe('admin.riskControl.notRecorded')
+    expect(wrapper.get('[data-test="audit-detail-error"]').text()).toBe('Upstream moderation unavailable')
+    wrapper.unmount()
   })
 
   it.each(['openai', 'typesafe'] as const)('shows the selected draft engine keys while %s remains active', async (activeEngine) => {

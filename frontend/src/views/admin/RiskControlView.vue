@@ -270,13 +270,19 @@
               </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <Select v-model="filters.result" :options="resultOptions" @change="reloadLogsFromFirstPage" />
               <Select v-model="filters.group_id" :options="groupFilterOptions" @change="reloadLogsFromFirstPage" />
               <Select v-model="filters.endpoint" :options="endpointOptions" @change="reloadLogsFromFirstPage" />
               <input v-model.trim="filters.search" type="search" class="input" :placeholder="t('admin.riskControl.filters.search')" @keyup.enter="reloadLogsFromFirstPage" />
+              <input v-model="filters.user_id" data-test="audit-user-filter" type="number" min="1" step="1" class="input" :aria-label="t('admin.riskControl.filters.userId')" :placeholder="t('admin.riskControl.filters.userId')" @keyup.enter="reloadLogsFromFirstPage" />
+              <input v-model="filters.api_key_id" data-test="audit-key-filter" type="number" min="1" step="1" class="input" :aria-label="t('admin.riskControl.filters.apiKeyId')" :placeholder="t('admin.riskControl.filters.apiKeyId')" @keyup.enter="reloadLogsFromFirstPage" />
               <input v-model="filters.from" type="datetime-local" class="input" :title="t('admin.riskControl.filters.from')" @change="reloadLogsFromFirstPage" />
               <input v-model="filters.to" type="datetime-local" class="input" :title="t('admin.riskControl.filters.to')" @change="reloadLogsFromFirstPage" />
+            </div>
+            <div class="flex flex-wrap justify-end gap-2">
+              <button type="button" class="btn btn-secondary" :disabled="logsLoading" @click="resetLogFilters">{{ t('common.reset') }}</button>
+              <button type="button" data-test="audit-filter-submit" class="btn btn-primary" :disabled="logsLoading" @click="reloadLogsFromFirstPage">{{ t('common.filter') }}</button>
             </div>
           </div>
 
@@ -307,11 +313,14 @@
                   <tr v-for="row in logs" :key="row.id" class="hover:bg-gray-50 dark:hover:bg-dark-700/60">
                     <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{{ formatDateTime(row.created_at) }}</td>
                     <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{{ row.group_name || '-' }}</td>
-                    <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
-                      <div>{{ row.user_email || '-' }}</div>
+                    <td data-test="audit-row-user" class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
+                      <div>{{ row.user_email || t('admin.riskControl.notRecorded') }}</div>
                       <div v-if="row.user_id" class="text-xs text-gray-400">UID {{ row.user_id }}</div>
                     </td>
-                    <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{{ row.api_key_name || '-' }}</td>
+                    <td data-test="audit-row-key" class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
+                      <div>{{ row.api_key_name || t('admin.riskControl.notRecorded') }}</div>
+                      <div v-if="row.api_key_id" class="font-mono text-xs text-gray-400">Key ID {{ row.api_key_id }}</div>
+                    </td>
                     <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                       <div>{{ row.endpoint || '-' }}</div>
                       <div class="text-xs text-gray-400">{{ row.provider || '-' }} / {{ row.model || '-' }}</div>
@@ -354,11 +363,15 @@
                     <td class="w-[320px] max-w-sm px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                       <button
                         type="button"
+                        data-test="audit-view-detail"
                         class="group flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-gray-100 dark:hover:bg-dark-700"
                         :title="inputSummaryText(row)"
                         @click="openInputDetail(row)"
                       >
-                        <span class="min-w-0 flex-1 truncate">{{ inputSummaryText(row) }}</span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate">{{ inputSummaryText(row) }}</span>
+                          <span class="mt-1 block text-xs font-medium text-primary-600 dark:text-primary-400">{{ t('admin.riskControl.viewDetail') }}</span>
+                        </span>
                         <Icon name="eye" size="xs" class="flex-shrink-0 text-gray-300 transition-colors group-hover:text-primary-500 dark:text-gray-500" />
                       </button>
                     </td>
@@ -1084,7 +1097,23 @@
         width="wide"
         @close="closeInputDetail"
       >
-        <div v-if="inputDetailRow" class="space-y-5">
+        <div v-if="inputDetailRow" data-test="audit-detail" class="space-y-5">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div data-test="audit-detail-user" class="min-w-0 rounded-lg border border-primary-100 bg-primary-50/50 p-4 dark:border-primary-900/60 dark:bg-primary-900/10">
+              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.table.user') }}</p>
+              <p class="mt-1 break-all text-sm font-semibold text-gray-900 dark:text-white">{{ inputDetailRow.user_email || t('admin.riskControl.notRecorded') }}</p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.userId') }}: <span class="font-mono">{{ inputDetailRow.user_id ?? t('admin.riskControl.notRecorded') }}</span></p>
+            </div>
+            <div data-test="audit-detail-key" class="min-w-0 rounded-lg border border-primary-100 bg-primary-50/50 p-4 dark:border-primary-900/60 dark:bg-primary-900/10">
+              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.table.apiKey') }}</p>
+              <p class="mt-1 break-all text-sm font-semibold text-gray-900 dark:text-white">{{ inputDetailRow.api_key_name || t('admin.riskControl.notRecorded') }}</p>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Key ID: <span class="font-mono">{{ inputDetailRow.api_key_id ?? t('admin.riskControl.notRecorded') }}</span></p>
+            </div>
+          </div>
+          <dl class="space-y-2 break-all text-sm text-gray-600 dark:text-gray-300">
+            <div class="flex flex-wrap gap-x-2"><dt class="font-medium">{{ t('admin.riskControl.logId') }}:</dt><dd class="font-mono">{{ inputDetailRow.id }}</dd></div>
+            <div class="flex flex-wrap gap-x-2"><dt class="font-medium">{{ t('admin.riskControl.requestId') }}:</dt><dd data-test="audit-detail-request" class="font-mono">{{ inputDetailRow.request_id || t('admin.riskControl.notRecorded') }}</dd></div>
+          </dl>
           <div class="text-sm break-words" data-test="audit-engine-meta">
             <span class="font-medium">{{ t('admin.riskControl.auditSource') }}: </span>
             <template v-if="inputDetailRow.engine_meta">
@@ -1099,8 +1128,8 @@
               <p class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white">{{ formatDateTime(inputDetailRow.created_at) }}</p>
             </div>
             <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
-              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.table.user') }}</p>
-              <p class="mt-1 truncate text-sm font-semibold text-gray-900 dark:text-white">{{ inputDetailRow.user_email || '-' }}</p>
+              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.table.group') }}</p>
+              <p class="mt-1 break-words text-sm font-semibold text-gray-900 dark:text-white">{{ inputDetailRow.group_name || t('admin.riskControl.notRecorded') }}</p>
             </div>
             <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800/70">
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.table.result') }}</p>
@@ -1116,7 +1145,7 @@
             </div>
             <div v-if="inputDetailRow.matched_keyword" class="rounded-lg border border-red-100 bg-red-50 p-4 dark:border-red-900/60 dark:bg-red-900/20">
               <p class="text-xs font-medium text-red-500 dark:text-red-300">{{ t('admin.riskControl.matchedKeyword') }}</p>
-              <p class="mt-1 truncate text-sm font-semibold text-red-700 dark:text-red-200" :title="inputDetailRow.matched_keyword">{{ inputDetailRow.matched_keyword }}</p>
+              <p class="mt-1 break-words text-sm font-semibold text-red-700 dark:text-red-200">{{ inputDetailRow.matched_keyword }}</p>
             </div>
           </div>
 
@@ -1132,7 +1161,9 @@
                 {{ inputDetailRow.group_name }}
               </span>
             </div>
-            <pre class="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-950 p-4 text-sm leading-6 text-gray-100 shadow-inner dark:bg-black/50">{{ inputDetailText }}</pre>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.inputExcerptHint') }}</p>
+            <pre data-test="audit-detail-prompt" class="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-950 p-4 text-sm leading-6 text-gray-100 shadow-inner dark:bg-black/50">{{ inputDetailText }}</pre>
+            <p v-if="inputDetailRow.error" data-test="audit-detail-error" class="mt-3 whitespace-pre-wrap break-words text-sm text-red-600 dark:text-red-300">{{ inputDetailRow.error }}</p>
           </div>
         </div>
 
@@ -1353,6 +1384,8 @@ const pagination = reactive({
 const filters = reactive({
   result: '',
   group_id: 0,
+  user_id: '' as number | string,
+  api_key_id: '' as number | string,
   endpoint: '',
   search: '',
   from: '',
@@ -1667,7 +1700,7 @@ const riskThresholdRows = computed<RiskThresholdRow[]>(() => (
 
 const inputDetailText = computed(() => {
   if (!inputDetailRow.value) return '-'
-  return inputDetailRow.value.input_excerpt || inputDetailRow.value.error || '-'
+  return inputDetailRow.value.input_excerpt || t('admin.riskControl.notRecorded')
 })
 
 const queueUsagePercent = computed(() => `${Math.min(100, Math.max(0, status.value?.queue_usage_percent ?? 0)).toFixed(1)}%`)
@@ -1951,6 +1984,8 @@ async function loadLogs() {
       page_size: pagination.page_size,
       result: filters.result || undefined,
       group_id: filters.group_id || undefined,
+      user_id: filters.user_id ? Number(filters.user_id) : undefined,
+      api_key_id: filters.api_key_id ? Number(filters.api_key_id) : undefined,
       endpoint: filters.endpoint || undefined,
       search: filters.search || undefined,
       from: normalizeDateTimeLocal(filters.from),
@@ -2041,6 +2076,11 @@ function openSettings() {
 function reloadLogsFromFirstPage() {
   pagination.page = 1
   void loadLogs()
+}
+
+function resetLogFilters() {
+  Object.assign(filters, { result: '', group_id: 0, user_id: '', api_key_id: '', endpoint: '', search: '', from: '', to: '' })
+  reloadLogsFromFirstPage()
 }
 
 function onPageChange(page: number) {

@@ -176,13 +176,22 @@ func (h *ContentModerationHandler) ListLogs(c *gin.Context) {
 		Endpoint: c.Query("endpoint"),
 		Search:   c.Query("search"),
 	}
-	if raw := strings.TrimSpace(c.Query("group_id")); raw != "" {
-		groupID, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || groupID <= 0 {
-			response.BadRequest(c, "Invalid group_id")
-			return
+	for _, field := range []struct {
+		name   string
+		target **int64
+	}{
+		{"group_id", &filter.GroupID},
+		{"user_id", &filter.UserID},
+		{"api_key_id", &filter.APIKeyID},
+	} {
+		if raw := strings.TrimSpace(c.Query(field.name)); raw != "" {
+			id, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || id <= 0 {
+				response.BadRequest(c, "Invalid "+field.name)
+				return
+			}
+			*field.target = &id
 		}
-		filter.GroupID = &groupID
 	}
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
 		t, _, err := parseContentModerationDate(raw)
