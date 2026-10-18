@@ -1,17 +1,28 @@
 <template>
   <div class="space-y-5">
-    <!-- 页头(独立形态下展示标题;后台形态 AppHeader 已有页面标题) -->
-    <div v-if="!embedded">
-      <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
-      <p class="mt-1.5 text-sm text-gray-500 dark:text-dark-400">{{ t('modelPlaza.description') }}</p>
+    <div class="relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white/70 px-5 py-6 dark:border-dark-700/70 dark:bg-dark-800/60 sm:px-7">
+      <div aria-hidden="true" class="pointer-events-none absolute -right-16 -top-28 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"></div>
+      <div class="relative flex flex-wrap items-center justify-between gap-6">
+        <div>
+          <div class="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-600 dark:text-primary-400"><Icon name="grid" size="sm" />MODEL CATALOG</div>
+          <h1 v-if="!embedded" class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
+          <p :class="!embedded ? 'mt-2' : ''" class="text-sm leading-6 text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.intro') }}</p>
+        </div>
+        <dl v-if="response && !loading" class="flex gap-6 sm:gap-8" data-test="plaza-summary">
+          <div><dt class="text-xs text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.groups') }}</dt><dd class="mt-1 text-2xl font-semibold tabular-nums text-gray-900 dark:text-white">{{ response.groups.length }}</dd></div>
+          <div class="border-l border-gray-200 pl-6 dark:border-dark-700 sm:pl-8"><dt class="text-xs text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.uniqueModels') }}</dt><dd class="mt-1 text-2xl font-semibold tabular-nums text-gray-900 dark:text-white">{{ uniqueModelCount }}</dd></div>
+        </dl>
+      </div>
     </div>
 
     <!-- 全局价格说明(管理员配置,Markdown) -->
-    <div
+    <details
       v-if="descriptionHtml"
-      class="plaza-description rounded-2xl border border-gray-100 bg-white px-5 py-4 text-sm shadow-card dark:border-dark-700/50 dark:bg-dark-800/50"
-      v-html="descriptionHtml"
-    ></div>
+      class="rounded-2xl border border-gray-200/70 bg-white/60 text-sm dark:border-dark-700/70 dark:bg-dark-800/40"
+    >
+      <summary class="cursor-pointer px-5 py-3 text-xs font-medium text-gray-600 focus-visible:outline-primary-500 dark:text-dark-300">{{ t('modelPlaza.cards.usageNotes') }}</summary>
+      <div class="plaza-description border-t border-gray-100 px-5 py-4 dark:border-dark-700/60" v-html="descriptionHtml"></div>
+    </details>
 
     <!-- 未登录提示 -->
     <p
@@ -48,9 +59,8 @@
         @update:search="searchQuery = $event"
       />
 
-      <!-- 分组分节的模型清单(默认按生效倍率升序) -->
-      <div v-if="filteredGroups.length > 0" class="space-y-5">
-        <PlazaGroupSection v-for="g in filteredGroups" :key="g.id" :group="g" />
+      <div v-if="filteredGroups.length > 0" class="grid grid-cols-1 gap-5 md:grid-cols-2" :class="filteredGroups.length > 2 ? 'xl:grid-cols-3 2xl:grid-cols-4' : ''">
+        <PlazaGroupCard v-for="g in filteredGroups" :key="g.id" :group="g" @open="detailGroupId = $event" />
       </div>
       <div
         v-else
@@ -59,6 +69,9 @@
         {{ searchActive ? t('modelPlaza.noSearchResult') : t('modelPlaza.empty') }}
       </div>
     </template>
+    <BaseDialog :show="detailGroup !== null" :title="detailGroup?.name ?? ''" width="extra-wide" :close-on-click-outside="true" @close="detailGroupId = null">
+      <PlazaGroupSection v-if="detailGroup" :group="detailGroup" />
+    </BaseDialog>
   </div>
 </template>
 
@@ -68,7 +81,9 @@ import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
+import PlazaGroupCard from './PlazaGroupCard.vue'
 import PlazaGroupSection from './PlazaGroupSection.vue'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
@@ -89,6 +104,9 @@ const selectedPlatform = ref<string>('all')
 const selectedGroupId = ref<number | 'all'>('all')
 const selectedRate = ref<number | 'all'>('all')
 const searchQuery = ref('')
+const detailGroupId = ref<number | null>(null)
+const detailGroup = computed(() => props.response?.groups.find(g => g.id === detailGroupId.value) ?? null)
+const uniqueModelCount = computed(() => new Set((props.response?.groups ?? []).flatMap(g => g.models.map(m => `${m.platform}:${m.name}`))).size)
 
 const searchActive = computed(() => searchQuery.value.trim() !== '')
 

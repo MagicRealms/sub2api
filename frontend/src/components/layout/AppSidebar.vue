@@ -323,6 +323,10 @@ const BatchImageIcon = {
     )
 }
 
+const TestCenterIcon = {
+  render: () => h(Icon, { name: 'beaker' })
+}
+
 const ChartIcon = {
   render: () =>
     h(
@@ -730,7 +734,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/test-center', label: t('nav.testCenter'), icon: ChartIcon },
+    { path: '/test-center', label: t('nav.testCenter'), icon: TestCenterIcon },
     { path: '/guide', label: t('usageGuide.nav'), icon: GuideIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
@@ -853,7 +857,7 @@ const adminNavItems = computed((): NavItem[] => {
   if (authStore.isSimpleMode) {
     const filtered = visible.filter(item => !item.hideInSimpleMode)
     filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
-    filtered.push({ path: '/test-center', label: t('nav.testCenter'), icon: ChartIcon })
+    filtered.push({ path: '/test-center', label: t('nav.testCenter'), icon: TestCenterIcon })
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
     for (const cm of customMenuItemsForAdmin.value) {
       filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })

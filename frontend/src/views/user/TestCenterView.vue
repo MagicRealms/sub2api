@@ -5,7 +5,7 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 class="page-title flex items-center gap-2 text-xl font-black text-gray-900 dark:text-white">
-              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"><Icon name="play" size="sm" /></span>
+              <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"><Icon name="beaker" size="sm" /></span>
               {{ t('testCenter.title') }}
             </h1>
             <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('testCenter.description') }}</p>

@@ -57,6 +57,34 @@ func TestListPlazaGroups_GroupCentricAggregation(t *testing.T) {
 	require.Equal(t, "claude-sonnet", out[0].Models[1].Name)
 }
 
+func TestListPlazaGroups_RespectsEachGroupModelAllowlist(t *testing.T) {
+	ch := plazaPricedChannel(1, "shared", []int64{10, 11, 12, 13}, PlatformOpenAI,
+		"gpt-5.5", "gpt-5.6-sol", "gpt-6-astra", "gpt-image-2")
+	groups := []Group{
+		{ID: 10, Platform: PlatformOpenAI, ModelAllowlist: GroupModelAllowlist{
+			Enabled: true, Models: []string{"gpt-5.6-*", "gpt-6-*", "gpt-image-*"},
+		}},
+		{ID: 11, Platform: PlatformOpenAI, ModelAllowlist: GroupModelAllowlist{
+			Enabled: true, Models: []string{"GPT-5.6-SOL", "gpt-image-2"},
+		}},
+		{ID: 12, Platform: PlatformOpenAI, ModelAllowlist: GroupModelAllowlist{Enabled: true}},
+		{ID: 13, Platform: PlatformOpenAI},
+	}
+
+	out, err := newPlazaService([]Channel{ch}, groups, nil).ListGroups(context.Background())
+	require.NoError(t, err)
+	byID := make(map[int64][]string)
+	for _, g := range out {
+		for _, m := range g.Models {
+			byID[g.ID] = append(byID[g.ID], m.Name)
+		}
+	}
+	require.Equal(t, []string{"gpt-5.6-sol", "gpt-6-astra", "gpt-image-2"}, byID[10])
+	require.Equal(t, []string{"gpt-5.6-sol", "gpt-image-2"}, byID[11])
+	require.NotContains(t, byID, int64(12), "groups with no permitted models must be omitted")
+	require.Len(t, byID[13], 4, "disabled allowlists retain the configured catalog")
+}
+
 func TestListPlazaGroups_Fable51HasNoImplicitReasoningMultiplier(t *testing.T) {
 	ch := plazaPricedChannel(1, "ch", []int64{10}, "anthropic", "claude-fable-5-1")
 	svc := newPlazaService([]Channel{ch}, []Group{{ID: 10, Platform: "anthropic"}}, nil)

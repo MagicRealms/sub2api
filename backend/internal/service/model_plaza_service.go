@@ -172,6 +172,11 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 			}
 			for j := range supported {
 				m := supported[j]
+				// Keep the public catalog aligned with gateway permissions even
+				// when a channel still contains a retired or restricted model.
+				if !groupEnt[gid].ModelAllowlist.Allows(m.Name) {
+					continue
+				}
 				if pg.Platform == PlatformComposite {
 					if !isConcreteRequestPlatform(m.Platform) {
 						continue
