@@ -226,6 +226,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/test-center',
+    name: 'TestCenter',
+    component: () => import('@/views/user/TestCenterView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Test Center',
+      titleKey: 'testCenter.title',
+      descriptionKey: 'testCenter.description'
+    }
+  },
+  {
     path: '/batch-image',
     name: 'BatchImageGuide',
     alias: '/docs/batch-image',
@@ -439,13 +451,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/test-center',
     name: 'AdminTestCenter',
-    component: () => import('@/views/admin/TestCenterView.vue'),
+    redirect: '/test-center',
     meta: {
       requiresAuth: true,
-      requiresAdmin: true,
-      title: 'Test Center',
-      titleKey: 'admin.testCenter.title',
-      descriptionKey: 'admin.testCenter.description'
+      requiresAdmin: false,
+      title: 'Test Center'
     }
   },
   {
