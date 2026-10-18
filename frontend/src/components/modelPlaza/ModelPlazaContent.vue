@@ -59,8 +59,8 @@
         @update:search="searchQuery = $event"
       />
 
-      <div v-if="filteredGroups.length > 0" class="grid grid-cols-1 gap-5 md:grid-cols-2" :class="filteredGroups.length > 2 ? 'xl:grid-cols-3 2xl:grid-cols-4' : ''">
-        <PlazaGroupCard v-for="g in filteredGroups" :key="g.id" :group="g" @open="detailGroupId = $event" />
+      <div v-if="modelEntries.length > 0" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <PlazaModelCard v-for="entry in modelEntries" :key="entry.key" :entry="entry" @open="detail = $event" />
       </div>
       <div
         v-else
@@ -69,7 +69,7 @@
         {{ searchActive ? t('modelPlaza.noSearchResult') : t('modelPlaza.empty') }}
       </div>
     </template>
-    <BaseDialog :show="detailGroup !== null" :title="detailGroup?.name ?? ''" width="extra-wide" :close-on-click-outside="true" @close="detailGroupId = null">
+    <BaseDialog :show="detailGroup !== null" :title="detail?.model.name ?? ''" width="extra-wide" :close-on-click-outside="true" @close="detail = null">
       <PlazaGroupSection v-if="detailGroup" :group="detailGroup" />
     </BaseDialog>
   </div>
@@ -83,8 +83,9 @@ import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
-import PlazaGroupCard from './PlazaGroupCard.vue'
+import PlazaModelCard from './PlazaModelCard.vue'
 import PlazaGroupSection from './PlazaGroupSection.vue'
+import { modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
 
@@ -104,8 +105,13 @@ const selectedPlatform = ref<string>('all')
 const selectedGroupId = ref<number | 'all'>('all')
 const selectedRate = ref<number | 'all'>('all')
 const searchQuery = ref('')
-const detailGroupId = ref<number | null>(null)
-const detailGroup = computed(() => props.response?.groups.find(g => g.id === detailGroupId.value) ?? null)
+const detail = ref<PlazaModelVariant | null>(null)
+const detailGroup = computed(() => {
+  if (!detail.value) return null
+  const group = props.response?.groups.find(g => g.id === detail.value?.group.id)
+  const model = group?.models.find(m => m.name === detail.value?.model.name && m.platform === detail.value?.model.platform)
+  return group && model ? { ...group, models: [model] } : null
+})
 const uniqueModelCount = computed(() => new Set((props.response?.groups ?? []).flatMap(g => g.models.map(m => `${m.platform}:${m.name}`))).size)
 
 const searchActive = computed(() => searchQuery.value.trim() !== '')
@@ -168,6 +174,27 @@ const filteredGroups = computed(() => {
   return [...groups].sort(
     (a, b) => effectiveRate(a) - effectiveRate(b) || a.name.localeCompare(b.name)
   )
+})
+
+/** Each model appears once; only groups returned by the server become selectable. */
+const modelEntries = computed(() => {
+  const entries = new Map<string, PlazaModelEntry>()
+  for (const group of filteredGroups.value) {
+    for (const model of group.models) {
+      const key = `${model.platform}:${model.name}`
+      let entry = entries.get(key)
+      if (!entry) {
+        entry = { key, name: model.name, platform: model.platform, variants: [] }
+        entries.set(key, entry)
+      }
+      if (!entry.variants.some(v => v.group.id === group.id)) entry.variants.push({ group, model })
+    }
+  }
+  for (const entry of entries.values()) {
+    entry.variants.sort((a, b) => modelRate(a) - modelRate(b) || a.group.name.localeCompare(b.group.name))
+  }
+  const isImage = (entry: PlazaModelEntry) => /image|dall-e/i.test(entry.name)
+  return [...entries.values()].sort((a, b) => a.platform.localeCompare(b.platform) || Number(isImage(a)) - Number(isImage(b)) || b.name.localeCompare(a.name, undefined, { numeric: true }))
 })
 </script>
 
