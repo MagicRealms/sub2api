@@ -404,6 +404,7 @@ export default {
         suggestPlatform: 'Platform error: prioritize investigation and fix',
         suggestGeneric: 'See details for more context',
         apiKeyPrefix: 'Key Prefix',
+        apiKeyName: 'Key Name',
         keyDeletedBadge: 'Key Deleted'
       },
       requestDetails: {

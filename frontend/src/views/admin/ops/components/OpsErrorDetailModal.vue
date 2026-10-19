@@ -123,6 +123,16 @@
           </div>
         </div>
 
+        <div v-if="detail.api_key_prefix || detail.api_key_id || detail.api_key_name" class="rounded-xl bg-gray-50 p-4 dark:bg-dark-900">
+          <div class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ t('admin.ops.errorDetail.apiKeyName') }}</div>
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
+            <span class="break-all">{{ detail.api_key_name || '—' }}</span>
+            <span v-if="detail.api_key_deleted" class="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">
+              {{ t('admin.ops.errorDetail.keyDeletedBadge') }}
+            </span>
+          </div>
+        </div>
+
       </div>
 
       <div v-if="rootCauseMessage" class="rounded-xl bg-amber-50 p-6 dark:bg-amber-900/10">
