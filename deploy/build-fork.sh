@@ -48,5 +48,5 @@ cp -a backend/resources "$artifact/"
 cp deploy/docker-entrypoint.sh "$artifact/docker-entrypoint.sh"
 docker build -f deploy/Dockerfile.fork-runtime \
   --build-arg "VERSION=$version" --build-arg "COMMIT=$commit" -t "$image" "$artifact"
-docker run --rm --network none --entrypoint /app/sub2api "$image" -version
+docker run --rm --network none "$image" -version
 printf 'Built image: %s\nCommit: %s\n' "$image" "$commit"
