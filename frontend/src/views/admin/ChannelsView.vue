@@ -147,7 +147,7 @@
     >
       <div class="channel-dialog-body">
         <!-- Tab Bar -->
-        <div class="flex items-center border-b border-gray-200 dark:border-dark-700 flex-shrink-0 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-3 sm:-mt-4">
+        <div class="flex items-center overflow-x-auto border-b border-gray-200 dark:border-dark-700 flex-shrink-0 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-3 sm:-mt-4">
           <!-- Basic Settings Tab -->
           <button
             type="button"
@@ -156,6 +156,16 @@
             :class="activeTab === 'basic' ? 'channel-tab-active' : 'channel-tab-inactive'"
           >
             {{ t('admin.channels.form.basicSettings') }}
+          </button>
+          <!-- Channel IQ Tab -->
+          <button
+            type="button"
+            @click="activeTab = 'channel_iq'"
+            class="channel-tab"
+            :class="activeTab === 'channel_iq' ? 'channel-tab-active' : 'channel-tab-inactive'"
+          >
+            <Icon name="sparkles" size="xs" />
+            {{ t('admin.channels.form.channelIQ.title') }}
           </button>
           <!-- Platform Tabs (only enabled) -->
           <button
@@ -228,51 +238,6 @@
               </p>
             </div>
 
-            <!-- Channel IQ probe configuration -->
-            <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <label class="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                    {{ t('admin.channels.form.channelIQ.title') }}
-                  </label>
-                  <p class="mt-1 text-xs leading-5 text-violet-700/80 dark:text-violet-300/75">
-                    {{ t('admin.channels.form.channelIQ.description') }}
-                  </p>
-                </div>
-                <Toggle
-                  :modelValue="form.channel_iq.enabled"
-                  @update:modelValue="form.channel_iq.enabled = $event"
-                />
-              </div>
-              <div v-if="form.channel_iq.enabled" class="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.model') }}</label>
-                  <input
-                    v-model="form.channel_iq.model"
-                    type="text"
-                    class="input"
-                    :placeholder="t('admin.channels.form.channelIQ.modelPlaceholder')"
-                  />
-                </div>
-                <div>
-                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.interval') }}</label>
-                  <Select v-model="form.channel_iq.interval_seconds" :options="channelIQIntervalOptions" />
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.prompt') }}</label>
-                  <textarea
-                    v-model="form.channel_iq.prompt"
-                    rows="3"
-                    class="input resize-y"
-                    :placeholder="t('admin.channels.form.channelIQ.promptPlaceholder')"
-                  ></textarea>
-                  <p class="mt-1 text-[11px] text-violet-700/70 dark:text-violet-300/70">
-                    {{ t('admin.channels.form.channelIQ.costHint') }}
-                  </p>
-                </div>
-              </div>
-            </div>
-
             <!-- Platform Management -->
             <div class="space-y-3">
               <label class="input-label mb-0">{{ t('admin.channels.form.platformConfig') }}</label>
@@ -312,6 +277,53 @@
                   :modelValue="form.apply_pricing_to_account_stats"
                   @update:modelValue="form.apply_pricing_to_account_stats = $event"
                 />
+              </div>
+            </div>
+          </div>
+
+          <!-- Channel IQ Tab Content -->
+          <div v-show="activeTab === 'channel_iq'" class="space-y-5">
+            <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <label class="text-sm font-semibold text-violet-900 dark:text-violet-200">
+                    {{ t('admin.channels.form.channelIQ.title') }}
+                  </label>
+                  <p class="mt-1 text-xs leading-5 text-violet-700/80 dark:text-violet-300/75">
+                    {{ t('admin.channels.form.channelIQ.description') }}
+                  </p>
+                </div>
+                <Toggle
+                  :modelValue="form.channel_iq.enabled"
+                  @update:modelValue="form.channel_iq.enabled = $event"
+                />
+              </div>
+              <div v-if="form.channel_iq.enabled" class="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.model') }}</label>
+                  <input
+                    v-model="form.channel_iq.model"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.channels.form.channelIQ.modelPlaceholder')"
+                  />
+                </div>
+                <div>
+                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.interval') }}</label>
+                  <Select v-model="form.channel_iq.interval_seconds" :options="channelIQIntervalOptions" />
+                </div>
+                <div class="sm:col-span-2">
+                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.prompt') }}</label>
+                  <textarea
+                    v-model="form.channel_iq.prompt"
+                    rows="5"
+                    class="input resize-y"
+                    :placeholder="t('admin.channels.form.channelIQ.promptPlaceholder')"
+                  ></textarea>
+                  <p class="mt-1 text-[11px] text-violet-700/70 dark:text-violet-300/70">
+                    {{ t('admin.channels.form.channelIQ.costHint') }}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
