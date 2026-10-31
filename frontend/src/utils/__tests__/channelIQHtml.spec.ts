@@ -15,6 +15,8 @@ describe('channel IQ animation extraction', () => {
     expect(html).toContain('<svg')
     expect(html).toContain('<animate')
     expect(html).toContain('animation: fly')
+    expect(html).toContain('width: 100% !important')
+    expect(html).toContain('align-items: center !important')
   })
 
   it('removes scripts, event handlers, and non-image external resources', () => {

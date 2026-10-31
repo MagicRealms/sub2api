@@ -53,7 +53,7 @@
           <iframe
             v-if="result.status === 'success' && hasAnimation(result.response_text)"
             :srcdoc="renderAnimation(result.response_text)"
-            class="mt-4 h-56 w-full rounded-xl border-0 bg-gray-50 dark:bg-dark-900/70"
+            class="mt-4 h-72 w-full rounded-xl border-0 bg-gray-50 dark:bg-dark-900/70 sm:h-80"
             sandbox=""
             :title="t('channelIQ.card.animationTitle')"
           ></iframe>

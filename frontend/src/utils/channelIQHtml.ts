@@ -11,6 +11,40 @@ const channelIQSanitizeConfig = {
   ALLOWED_URI_REGEXP: /^(?:#|data:image\/(?:gif|png|jpeg|webp);base64,)/i,
 }
 
+// Model-generated documents often use a desktop-sized SVG (for example
+// 800x500). Keep the complete scene inside the card viewport and let the
+// browser scale it down or up to the available space.
+const channelIQPreviewStyle = `<style>
+html, body {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+body {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+body > * {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  box-sizing: border-box !important;
+}
+body > svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+body svg {
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+</style>`
+
 function buildSafeStyleBlock(styles: Element[]): string {
   const css = styles
     .map(style => style.textContent || '')
@@ -67,6 +101,6 @@ export function extractChannelIQAnimationDocument(value: string): string {
   // DOMPurify intentionally removes HTML <style> nodes. The style text has
   // already been reduced to declarative, local CSS above, so prepend that
   // isolated block after sanitizing the markup.
-  const sanitized = `${buildSafeStyleBlock(styles)}\n${sanitizedBody}`
+  const sanitized = `${buildSafeStyleBlock(styles)}\n${channelIQPreviewStyle}\n${sanitizedBody}`
   return /<svg\b/i.test(sanitized) ? sanitized : ''
 }
