@@ -25,7 +25,7 @@ const (
 	ChannelIQStatusWarning      = "warning"
 	ChannelIQStatusError        = "error"
 	channelIQDefaultInterval    = 300 * time.Second
-	channelIQDefaultPrompt      = "请用一句话回答：2+2等于多少？只输出结果。"
+	channelIQDefaultPrompt      = "请生成一个可直接嵌入网页的 HTML/SVG 动画，只输出完整代码，不要解释、Markdown 代码围栏、JavaScript 或外部资源。"
 	channelIQMinInterval        = 60 * time.Second
 	channelIQMaxInterval        = 24 * time.Hour
 	channelIQResultLimit        = 6

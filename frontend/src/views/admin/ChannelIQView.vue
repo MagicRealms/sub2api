@@ -105,7 +105,14 @@
                 {{ result.status === 'success' ? t('admin.channelIQ.results.success') : t('admin.channelIQ.results.failed') }}
               </span>
             </div>
-            <div v-if="result.status === 'success' && result.response_text" class="markdown-body mt-4 max-h-56 overflow-auto rounded-xl bg-gray-50 px-3 py-2.5 text-sm dark:bg-dark-900/70" v-html="renderMarkdown(result.response_text)"></div>
+            <iframe
+              v-if="result.status === 'success' && hasAnimation(result.response_text)"
+              :srcdoc="renderAnimation(result.response_text)"
+              class="mt-4 h-56 w-full rounded-xl border-0 bg-gray-50 dark:bg-dark-900/70"
+              sandbox=""
+              :title="t('admin.channelIQ.results.animationTitle')"
+            ></iframe>
+            <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.animationUnavailable') }}</p>
             <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('admin.channelIQ.results.empty') }}</p>
             <div class="mt-4 flex items-center justify-between text-xs text-gray-400">
               <span>{{ result.latency_ms }} ms</span>
@@ -124,8 +131,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -136,7 +141,7 @@ import type { AccountListItem } from '@/types'
 import type { ChannelIQResult } from '@/api/admin/channelIQ'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import '@/styles/announcement-markdown.css'
+import { extractChannelIQAnimationDocument } from '@/utils/channelIQHtml'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -233,8 +238,12 @@ async function runNow() {
   }
 }
 
-function renderMarkdown(value: string): string {
-  return DOMPurify.sanitize(marked.parse(value || '') as string)
+function renderAnimation(value: string): string {
+  return extractChannelIQAnimationDocument(value)
+}
+
+function hasAnimation(value: string): boolean {
+  return renderAnimation(value) !== ''
 }
 
 function formatTime(value?: string): string {
