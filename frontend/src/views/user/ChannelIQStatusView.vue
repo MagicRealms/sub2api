@@ -30,7 +30,7 @@
         <p class="mx-auto mt-2 max-w-lg text-sm text-gray-500 dark:text-gray-400">{{ t('channelIQ.empty.description') }}</p>
       </section>
 
-      <section v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <article
           v-for="result in results"
           :key="result.id"
@@ -50,13 +50,18 @@
             </span>
           </div>
 
-          <iframe
+          <div
             v-if="result.status === 'success' && hasAnimation(result.response_text)"
-            :srcdoc="renderAnimation(result.response_text)"
-            class="mt-4 h-72 w-full rounded-xl border-0 bg-gray-50 dark:bg-dark-900/70 sm:h-80"
-            sandbox=""
-            :title="t('channelIQ.card.animationTitle')"
-          ></iframe>
+            :style="animationStyle(result.response_text)"
+            class="relative mt-4 w-full overflow-hidden rounded-xl bg-transparent"
+          >
+            <iframe
+              :srcdoc="renderAnimation(result.response_text)"
+              class="absolute inset-0 h-full w-full border-0 bg-transparent"
+              sandbox=""
+              :title="t('channelIQ.card.animationTitle')"
+            ></iframe>
+          </div>
           <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.animationUnavailable') }}</p>
           <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('channelIQ.card.waiting') }}</p>
 
@@ -80,7 +85,7 @@ import Icon from '@/components/icons/Icon.vue'
 import channelIQAPI, { type ChannelIQResult } from '@/api/channelIQ'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { extractChannelIQAnimationDocument } from '@/utils/channelIQHtml'
+import { extractChannelIQAnimationDocument, getChannelIQAnimationAspectRatio } from '@/utils/channelIQHtml'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -95,6 +100,10 @@ function renderAnimation(value: string): string {
 
 function hasAnimation(value: string): boolean {
   return renderAnimation(value) !== ''
+}
+
+function animationStyle(value: string): { aspectRatio: string } {
+  return { aspectRatio: String(getChannelIQAnimationAspectRatio(value)) }
 }
 
 function formatTime(value?: string): string {

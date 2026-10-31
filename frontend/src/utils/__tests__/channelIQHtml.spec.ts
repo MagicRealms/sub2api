@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractChannelIQAnimationDocument } from '../channelIQHtml'
+import { extractChannelIQAnimationDocument, getChannelIQAnimationAspectRatio } from '../channelIQHtml'
 
 describe('channel IQ animation extraction', () => {
   it('extracts fenced HTML and keeps declarative SVG animation content', () => {
@@ -17,6 +17,8 @@ describe('channel IQ animation extraction', () => {
     expect(html).toContain('animation: fly')
     expect(html).toContain('width: 100% !important')
     expect(html).toContain('align-items: center !important')
+    expect(html).toContain('background: transparent !important')
+    expect(html).toContain('box-shadow: none !important')
   })
 
   it('removes scripts, event handlers, and non-image external resources', () => {
@@ -37,5 +39,11 @@ describe('channel IQ animation extraction', () => {
 
   it('does not turn a plain answer into an animation document', () => {
     expect(extractChannelIQAnimationDocument('2 + 2 = 4')).toBe('')
+  })
+
+  it('uses the SVG viewBox ratio for the preview viewport', () => {
+    expect(getChannelIQAnimationAspectRatio('<svg viewBox="0 0 1000 625"></svg>')).toBe(1.6)
+    expect(getChannelIQAnimationAspectRatio('<svg viewBox="0 0 1600 900"></svg>')).toBeCloseTo(16 / 9)
+    expect(getChannelIQAnimationAspectRatio('plain answer')).toBe(1.6)
   })
 })

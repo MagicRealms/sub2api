@@ -23,6 +23,7 @@ html, body {
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
+  background: transparent !important;
 }
 body {
   display: flex !important;
@@ -35,6 +36,12 @@ body > * {
   max-height: 100% !important;
   box-sizing: border-box !important;
 }
+body > :only-child:not(svg) {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
 body > svg {
   width: 100% !important;
   height: 100% !important;
@@ -44,6 +51,8 @@ body svg {
   max-height: 100% !important;
 }
 </style>`
+
+const defaultChannelIQAspectRatio = 16 / 10
 
 function buildSafeStyleBlock(styles: Element[]): string {
   const css = styles
@@ -76,6 +85,23 @@ function unwrapHtmlSource(value: string): string {
     if (end >= 0) source = source.slice(0, end + '</svg>'.length)
   }
   return source
+}
+
+/**
+ * Return the SVG canvas ratio so the iframe can use the same shape as the
+ * generated scene. This avoids letterboxing when different probes return
+ * 16:9, 16:10, or another valid viewBox.
+ */
+export function getChannelIQAnimationAspectRatio(value: string): number {
+  const source = unwrapHtmlSource(value.trim())
+  const svgTag = source.match(/<svg\b[^>]*>/i)?.[0] || ''
+  const viewBox = svgTag.match(/\bviewBox\s*=\s*["']\s*([+-]?[\d.]+)[\s,]+([+-]?[\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)\s*["']/i)
+  const width = Number(viewBox?.[3])
+  const height = Number(viewBox?.[4])
+  if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+    return Math.min(2.4, Math.max(0.75, width / height))
+  }
+  return defaultChannelIQAspectRatio
 }
 
 /**
