@@ -114,6 +114,7 @@ func RegisterAdminRoutes(
 
 		// 渠道管理
 		registerChannelRoutes(admin, h)
+		registerChannelIQRoutes(admin, h)
 
 		// 渠道监控
 		registerChannelMonitorRoutes(admin, h, settingService)
@@ -787,6 +788,15 @@ func registerChannelRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		channels.POST("", h.Admin.Channel.Create)
 		channels.PUT("/:id", h.Admin.Channel.Update)
 		channels.DELETE("/:id", h.Admin.Channel.Delete)
+	}
+}
+
+func registerChannelIQRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	channelIQ := admin.Group("/channel-iq")
+	{
+		channelIQ.GET("", h.Admin.ChannelIQ.Get)
+		channelIQ.PUT("", h.Admin.ChannelIQ.Save)
+		channelIQ.POST("/run", h.Admin.ChannelIQ.Run)
 	}
 }
 

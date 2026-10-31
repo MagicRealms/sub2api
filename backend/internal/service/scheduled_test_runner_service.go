@@ -120,11 +120,19 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 }
 
 func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan) {
-	result, err := s.accountTestSvc.RunTestBackground(ctx, plan.AccountID, plan.ModelID)
+	var result *ScheduledTestResult
+	var err error
+	if plan.Kind == ChannelIQPlanKind {
+		result, err = s.accountTestSvc.RunPromptTestBackgroundWithOptions(ctx, plan.AccountID, plan.ModelID, plan.Prompt, plan.ReasoningEffort)
+	} else {
+		result, err = s.accountTestSvc.RunTestBackground(ctx, plan.AccountID, plan.ModelID)
+	}
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d RunTestBackground error: %v", plan.ID, err)
 		return
 	}
+	result.ModelID = plan.ModelID
+	result.ReasoningEffort = plan.ReasoningEffort
 
 	if err := s.scheduledSvc.SaveResult(ctx, plan.ID, plan.MaxResults, result); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d SaveResult error: %v", plan.ID, err)

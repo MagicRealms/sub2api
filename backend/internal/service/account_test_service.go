@@ -70,6 +70,20 @@ type TestEvent struct {
 type AccountTestOptions struct {
 	ImageDataURL string
 	AudioDataURL string
+	// ReasoningEffort is optional and is applied to providers that expose an
+	// OpenAI-compatible reasoning field. Other provider payloads keep their
+	// native defaults while the configured value is still recorded on the card.
+	ReasoningEffort string
+}
+
+type accountTestReasoningContextKey struct{}
+
+func accountTestReasoningEffort(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	value, _ := c.Request.Context().Value(accountTestReasoningContextKey{}).(string)
+	return strings.TrimSpace(value)
 }
 
 func firstAccountTestOptions(opts []AccountTestOptions) AccountTestOptions {
@@ -368,6 +382,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	initAccountTestLogger(c, accountID, modelID, mode)
 	ctx := c.Request.Context()
 	testOpts := firstAccountTestOptions(opts)
+	if effort := strings.TrimSpace(testOpts.ReasoningEffort); effort != "" {
+		ctx = context.WithValue(ctx, accountTestReasoningContextKey{}, effort)
+		c.Request = c.Request.WithContext(ctx)
+	}
 
 	// Get account
 	account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -901,7 +919,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if isOAuth {
 		upstreamTestModelID = normalizeOpenAIModelForUpstream(credentialAccount, testModelID)
 	}
-	payload := createOpenAITestPayload(upstreamTestModelID, isOAuth, prompt)
+	payload := createOpenAITestPayloadWithReasoning(upstreamTestModelID, isOAuth, prompt, accountTestReasoningEffort(c))
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
@@ -1264,7 +1282,7 @@ func (s *AccountTestService) testGrokResponsesConnection(c *gin.Context, ctx con
 
 	s.prepareGrokTestSSE(c)
 
-	payloadBytes, err := buildGrokQuotaProbeBody(testModelID, prompt)
+	payloadBytes, err := buildGrokQuotaProbeBodyWithReasoning(testModelID, prompt, accountTestReasoningEffort(c))
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create Grok test payload")
 	}
@@ -2143,7 +2161,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	c.Writer.Flush()
 
-	payload := createOpenAIChatCompletionsTestPayload(testModelID, prompt)
+	payload := createOpenAIChatCompletionsTestPayload(testModelID, prompt, accountTestReasoningEffort(c))
 	payloadBytes, _ := json.Marshal(payload)
 
 	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
@@ -2819,13 +2837,21 @@ func createOpenAITestPayload(modelID string, isOAuth bool, prompts ...string) ma
 	return payload
 }
 
-func createOpenAIChatCompletionsTestPayload(modelID string, prompt string) map[string]any {
+func createOpenAITestPayloadWithReasoning(modelID string, isOAuth bool, prompt, reasoningEffort string) map[string]any {
+	payload := createOpenAITestPayload(modelID, isOAuth, prompt)
+	if effort := strings.TrimSpace(reasoningEffort); effort != "" {
+		payload["reasoning"] = map[string]any{"effort": effort}
+	}
+	return payload
+}
+
+func createOpenAIChatCompletionsTestPayload(modelID string, prompt string, reasoningEffort ...string) map[string]any {
 	testPrompt := strings.TrimSpace(prompt)
 	if testPrompt == "" {
 		testPrompt = "hi"
 	}
 
-	return map[string]any{
+	payload := map[string]any{
 		"model": modelID,
 		"messages": []map[string]any{
 			{
@@ -2835,6 +2861,12 @@ func createOpenAIChatCompletionsTestPayload(modelID string, prompt string) map[s
 		},
 		"stream": true,
 	}
+	if len(reasoningEffort) > 0 {
+		if effort := strings.TrimSpace(reasoningEffort[0]); effort != "" {
+			payload["reasoning_effort"] = effort
+		}
+	}
+	return payload
 }
 
 // processClaudeStream processes the SSE stream from Claude API
@@ -3311,7 +3343,7 @@ func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) er
 // RunTestBackground executes an account test in-memory (no real HTTP client),
 // capturing SSE output via httptest.NewRecorder, then parses the result.
 func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID int64, modelID string) (*ScheduledTestResult, error) {
-	return s.runTestBackground(ctx, accountID, modelID, "")
+	return s.runTestBackground(ctx, accountID, modelID, "", "")
 }
 
 // RunPromptTestBackground executes an account test with a caller-provided
@@ -3319,10 +3351,16 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 // It is used by channel intelligence probes so the probe exercises the exact
 // prompt configured by an administrator without exposing a streaming endpoint.
 func (s *AccountTestService) RunPromptTestBackground(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
-	return s.runTestBackground(ctx, accountID, modelID, prompt)
+	return s.runTestBackground(ctx, accountID, modelID, prompt, "")
 }
 
-func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
+// RunPromptTestBackgroundWithOptions is used by the dedicated Channel IQ
+// plan, which needs to exercise both its prompt and configured reasoning level.
+func (s *AccountTestService) RunPromptTestBackgroundWithOptions(ctx context.Context, accountID int64, modelID, prompt, reasoningEffort string) (*ScheduledTestResult, error) {
+	return s.runTestBackground(ctx, accountID, modelID, prompt, reasoningEffort)
+}
+
+func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID, prompt, reasoningEffort string) (*ScheduledTestResult, error) {
 	startedAt := time.Now()
 
 	w := httptest.NewRecorder()
@@ -3330,7 +3368,7 @@ func (s *AccountTestService) runTestBackground(ctx context.Context, accountID in
 	ginCtx.Request = (&http.Request{}).WithContext(ctx)
 	ginCtx.Set(accountTestBackgroundKey, true)
 
-	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault)
+	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault, AccountTestOptions{ReasoningEffort: reasoningEffort})
 
 	finishedAt := time.Now()
 	body := w.Body.String()

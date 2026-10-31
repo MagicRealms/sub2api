@@ -146,7 +146,6 @@ func RegisterUserRoutes(
 		channelIQ := authenticated.Group("/channel-iq")
 		{
 			channelIQ.GET("", h.ChannelIQ.List)
-			channelIQ.POST("/:id/run", h.ChannelIQ.Run)
 		}
 
 		// V2 passive views require feature on + mode=v2.

@@ -1,31 +1,31 @@
 import { apiClient } from './client'
 
-export type ChannelIQStatus = 'disabled' | 'unconfigured' | 'pending' | 'healthy' | 'warning' | 'error'
+export type ChannelIQStatus = 'success' | 'failed' | 'pending'
 
-export interface ChannelIQItem {
-  channel_id: number
-  channel_name: string
-  group_id?: number
-  group_name?: string
-  platform?: string
-  model?: string
-  status: ChannelIQStatus
-  latency_ms?: number
-  response_preview?: string
-  error?: string
-  checked_at?: string
-  next_check_at?: string
-  interval_seconds?: number
+export interface ChannelIQResult {
+  id: number
+  status: ChannelIQStatus | string
+  model_id: string
+  reasoning_effort: string
+  response_text: string
+  error_message?: string
+  latency_ms: number
+  started_at: string
+  finished_at: string
+  created_at: string
 }
 
-export async function list(): Promise<{ items: ChannelIQItem[] }> {
-  const { data } = await apiClient.get<{ items: ChannelIQItem[] }>('/channel-iq')
+export interface ChannelIQPublicSnapshot {
+  configured: boolean
+  enabled: boolean
+  model_id?: string
+  reasoning_effort?: string
+  results: ChannelIQResult[]
+}
+
+export async function get(): Promise<ChannelIQPublicSnapshot> {
+  const { data } = await apiClient.get<ChannelIQPublicSnapshot>('/channel-iq')
   return data
 }
 
-export async function run(channelId: number): Promise<ChannelIQItem> {
-  const { data } = await apiClient.post<ChannelIQItem>(`/channel-iq/${channelId}/run`)
-  return data
-}
-
-export default { list, run }
+export default { get }

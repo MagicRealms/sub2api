@@ -573,6 +573,22 @@ func buildGrokQuotaProbeBody(model string, prompts ...string) ([]byte, error) {
 	})
 }
 
+func buildGrokQuotaProbeBodyWithReasoning(model, prompt, reasoningEffort string) ([]byte, error) {
+	body, err := buildGrokQuotaProbeBody(model, prompt)
+	if err != nil {
+		return nil, err
+	}
+	if effort := strings.TrimSpace(reasoningEffort); effort != "" {
+		var payload map[string]any
+		if err := json.Unmarshal(body, &payload); err != nil {
+			return nil, err
+		}
+		payload["reasoning_effort"] = effort
+		return json.Marshal(payload)
+	}
+	return body, nil
+}
+
 func maxInt(a, b int) int {
 	if a > b {
 		return a

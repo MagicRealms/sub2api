@@ -157,16 +157,6 @@
           >
             {{ t('admin.channels.form.basicSettings') }}
           </button>
-          <!-- Channel IQ Tab -->
-          <button
-            type="button"
-            @click="activeTab = 'channel_iq'"
-            class="channel-tab"
-            :class="activeTab === 'channel_iq' ? 'channel-tab-active' : 'channel-tab-inactive'"
-          >
-            <Icon name="sparkles" size="xs" />
-            {{ t('admin.channels.form.channelIQ.title') }}
-          </button>
           <!-- Platform Tabs (only enabled) -->
           <button
             v-for="section in form.platforms.filter(s => s.enabled)"
@@ -277,53 +267,6 @@
                   :modelValue="form.apply_pricing_to_account_stats"
                   @update:modelValue="form.apply_pricing_to_account_stats = $event"
                 />
-              </div>
-            </div>
-          </div>
-
-          <!-- Channel IQ Tab Content -->
-          <div v-show="activeTab === 'channel_iq'" class="space-y-5">
-            <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <label class="text-sm font-semibold text-violet-900 dark:text-violet-200">
-                    {{ t('admin.channels.form.channelIQ.title') }}
-                  </label>
-                  <p class="mt-1 text-xs leading-5 text-violet-700/80 dark:text-violet-300/75">
-                    {{ t('admin.channels.form.channelIQ.description') }}
-                  </p>
-                </div>
-                <Toggle
-                  :modelValue="form.channel_iq.enabled"
-                  @update:modelValue="form.channel_iq.enabled = $event"
-                />
-              </div>
-              <div v-if="form.channel_iq.enabled" class="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.model') }}</label>
-                  <input
-                    v-model="form.channel_iq.model"
-                    type="text"
-                    class="input"
-                    :placeholder="t('admin.channels.form.channelIQ.modelPlaceholder')"
-                  />
-                </div>
-                <div>
-                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.interval') }}</label>
-                  <Select v-model="form.channel_iq.interval_seconds" :options="channelIQIntervalOptions" />
-                </div>
-                <div class="sm:col-span-2">
-                  <label class="input-label text-xs">{{ t('admin.channels.form.channelIQ.prompt') }}</label>
-                  <textarea
-                    v-model="form.channel_iq.prompt"
-                    rows="5"
-                    class="input resize-y"
-                    :placeholder="t('admin.channels.form.channelIQ.promptPlaceholder')"
-                  ></textarea>
-                  <p class="mt-1 text-[11px] text-violet-700/70 dark:text-violet-300/70">
-                    {{ t('admin.channels.form.channelIQ.costHint') }}
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -749,13 +692,6 @@ interface PlatformSection {
   account_stats_pricing_rules: FormPricingRule[]
 }
 
-interface ChannelIQForm {
-  enabled: boolean
-  model: string
-  prompt: string
-  interval_seconds: number
-}
-
 // ── Table columns ──
 const columns = computed<Column[]>(() => [
   { key: 'name', label: t('admin.channels.columns.name', 'Name'), sortable: true },
@@ -783,14 +719,6 @@ const billingModelSourceOptions = computed(() => [
   { value: 'requested', label: t('admin.channels.form.billingModelSourceRequested', 'Bill by requested model') },
   { value: 'upstream', label: t('admin.channels.form.billingModelSourceUpstream', 'Bill by final upstream model') },
   { value: 'response_model', label: t('admin.channels.form.billingModelSourceResponse', 'Bill by upstream response model') }
-])
-
-const channelIQIntervalOptions = computed(() => [
-  { value: 60, label: t('admin.channels.form.channelIQ.intervalOptions.minute') },
-  { value: 300, label: t('admin.channels.form.channelIQ.intervalOptions.fiveMinutes') },
-  { value: 900, label: t('admin.channels.form.channelIQ.intervalOptions.fifteenMinutes') },
-  { value: 1800, label: t('admin.channels.form.channelIQ.intervalOptions.thirtyMinutes') },
-  { value: 3600, label: t('admin.channels.form.channelIQ.intervalOptions.hour') },
 ])
 
 // ── State ──
@@ -832,12 +760,6 @@ const form = reactive({
   billing_model_source: 'channel_mapped' as string,
   platforms: [] as PlatformSection[],
   apply_pricing_to_account_stats: false,
-  channel_iq: {
-    enabled: false,
-    model: '',
-    prompt: '',
-    interval_seconds: 300,
-  } as ChannelIQForm,
 })
 
 let abortController: AbortController | null = null
@@ -1270,16 +1192,6 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
     delete featuresConfig.bedrock_cc_compat
   }
 
-  // Channel IQ is channel-level configuration. Keep it under features_config
-  // so existing feature keys survive a save and older deployments need no DB
-  // migration.
-  featuresConfig.channel_iq = {
-    enabled: !!form.channel_iq.enabled,
-    model: form.channel_iq.model.trim(),
-    prompt: form.channel_iq.prompt.trim(),
-    interval_seconds: Number(form.channel_iq.interval_seconds) || 300,
-  }
-
   return { group_ids: uniqueGroupIds, model_pricing, model_mapping, features_config: featuresConfig }
 }
 
@@ -1450,10 +1362,6 @@ function resetForm() {
   form.billing_model_source = 'channel_mapped'
   form.platforms = []
   form.apply_pricing_to_account_stats = false
-  form.channel_iq.enabled = false
-  form.channel_iq.model = ''
-  form.channel_iq.prompt = ''
-  form.channel_iq.interval_seconds = 300
   activeTab.value = 'basic'
   ruleAccountSearchRunner.clearAll()
   clearAllRuleAccountSearchState()
@@ -1475,13 +1383,6 @@ async function openEditDialog(channel: Channel) {
   form.restrict_models = channel.restrict_models || false
   form.billing_model_source = channel.billing_model_source || 'channel_mapped'
   form.apply_pricing_to_account_stats = channel.apply_pricing_to_account_stats || false
-  const channelIQ = channel.features_config?.channel_iq as Partial<ChannelIQForm> | undefined
-  form.channel_iq.enabled = channelIQ?.enabled === true
-  form.channel_iq.model = typeof channelIQ?.model === 'string' ? channelIQ.model : ''
-  form.channel_iq.prompt = typeof channelIQ?.prompt === 'string' ? channelIQ.prompt : ''
-  form.channel_iq.interval_seconds = typeof channelIQ?.interval_seconds === 'number' && channelIQ.interval_seconds > 0
-    ? channelIQ.interval_seconds
-    : 300
   // Must load groups first so apiToForm can map groupID → platform
   await Promise.all([loadGroups(), loadAllChannelsForConflict()])
   form.platforms = apiToForm(channel)
