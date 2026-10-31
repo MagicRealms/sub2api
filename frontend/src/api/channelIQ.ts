@@ -1,6 +1,23 @@
 import { apiClient } from './client'
 
 export type ChannelIQStatus = 'success' | 'failed' | 'pending'
+export type ChannelIQCriterionStatus = 'pass' | 'partial' | 'fail' | 'unknown'
+
+export interface ChannelIQCriterion {
+  status: ChannelIQCriterionStatus
+}
+
+export interface ChannelIQEvaluation {
+  graded: boolean
+  grade: string
+  score: number
+  criteria: {
+    wheels: ChannelIQCriterion
+    leg_pedal: ChannelIQCriterion
+    view_consistent: ChannelIQCriterion
+    pelican_beak: ChannelIQCriterion
+  }
+}
 
 export interface ChannelIQResult {
   id: number
@@ -13,6 +30,7 @@ export interface ChannelIQResult {
   started_at: string
   finished_at: string
   created_at: string
+  evaluation?: ChannelIQEvaluation
 }
 
 export interface ChannelIQPublicSnapshot {

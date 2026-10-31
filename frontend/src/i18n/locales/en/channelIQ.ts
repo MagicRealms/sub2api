@@ -1,7 +1,7 @@
 export default {
   channelIQ: {
     title: 'Intelligence Status',
-    description: 'An administrator schedules one upstream key to test model ability. This page only shows the latest six results.',
+    description: 'An administrator schedules one upstream key to test model ability. Results use the four structural checks from the pelican test.',
     loadError: 'Failed to load intelligence status',
     footnote: 'Results are updated by the administrator task. This page is read-only for users.',
     status: {
@@ -26,6 +26,22 @@ export default {
       waiting: 'Waiting for the first result…',
       checkedAt: 'Checked {time}',
       notChecked: 'Not checked yet',
+      rubricTitle: 'Pelican ability rubric',
+      grades: {
+        baseline: 'All four pass',
+        mild: 'Mild degradation',
+        moderate: 'Moderate degradation',
+        severe: 'Severe degradation',
+        ungraded: 'Ungraded (run again)',
+      },
+      criteria: {
+        wheels: 'Two wheels',
+        legPedal: 'Legs to pedals',
+        viewConsistent: 'Consistent view',
+        pelicanBeak: 'Pelican beak and pouch',
+      },
+      criterionStatus: { pass: 'Pass', partial: 'Partial', fail: 'Fail', unknown: 'Ungraded' },
+      requestSuccess: 'Request succeeded',
     },
     empty: {
       title: 'No channel status yet',

@@ -119,6 +119,20 @@
             </div>
             <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.animationUnavailable') }}</p>
             <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('admin.channelIQ.results.empty') }}</p>
+            <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
+              <div class="flex items-center justify-between gap-3 text-xs">
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ t('admin.channelIQ.results.rubricTitle') }}</span>
+                <span class="rounded-full px-2 py-1 font-semibold" :class="evaluationGradeClass(result)">
+                  {{ evaluationGradeLabel(result) }} · {{ result.evaluation.score }}/4
+                </span>
+              </div>
+              <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div v-for="criterion in evaluationCriteria(result)" :key="criterion.key" class="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 dark:bg-dark-800">
+                  <span class="text-gray-600 dark:text-gray-300">{{ criterion.label }}</span>
+                  <span class="shrink-0 rounded-full px-1.5 py-0.5 font-semibold" :class="criterionStatusClass(criterion.status)">{{ criterionStatusLabel(criterion.status) }}</span>
+                </div>
+              </div>
+            </div>
             <div class="mt-4 flex items-center justify-between text-xs text-gray-400">
               <span>{{ result.latency_ms }} ms</span>
               <span>{{ formatDate(result.finished_at) }}</span>
@@ -143,7 +157,7 @@ import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import { adminAPI } from '@/api/admin'
 import type { AccountListItem } from '@/types'
-import type { ChannelIQResult } from '@/api/admin/channelIQ'
+import type { ChannelIQCriterionStatus, ChannelIQResult } from '@/api/admin/channelIQ'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { extractChannelIQAnimationDocument, getChannelIQAnimationAspectRatio } from '@/utils/channelIQHtml'
@@ -253,6 +267,43 @@ function hasAnimation(value: string): boolean {
 
 function animationStyle(value: string): { aspectRatio: string } {
   return { aspectRatio: String(getChannelIQAnimationAspectRatio(value)) }
+}
+
+function evaluationGradeLabel(result: ChannelIQResult): string {
+  const evaluation = result.evaluation
+  if (!evaluation?.graded) return t('admin.channelIQ.results.grades.ungraded')
+  return t(`admin.channelIQ.results.grades.${evaluation.grade}`)
+}
+
+function evaluationGradeClass(result: ChannelIQResult): string {
+  const evaluation = result.evaluation
+  if (!evaluation?.graded) return 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300'
+  if (evaluation.grade === 'baseline') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+  if (evaluation.grade === 'mild') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+  if (evaluation.grade === 'moderate') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+  return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+}
+
+function evaluationCriteria(result: ChannelIQResult): Array<{ key: string; label: string; status: ChannelIQCriterionStatus }> {
+  const criteria = result.evaluation?.criteria
+  if (!criteria) return []
+  return [
+    { key: 'wheels', label: t('admin.channelIQ.results.criteria.wheels'), status: criteria.wheels.status },
+    { key: 'leg_pedal', label: t('admin.channelIQ.results.criteria.legPedal'), status: criteria.leg_pedal.status },
+    { key: 'view_consistent', label: t('admin.channelIQ.results.criteria.viewConsistent'), status: criteria.view_consistent.status },
+    { key: 'pelican_beak', label: t('admin.channelIQ.results.criteria.pelicanBeak'), status: criteria.pelican_beak.status },
+  ]
+}
+
+function criterionStatusLabel(status: ChannelIQCriterionStatus): string {
+  return t(`admin.channelIQ.results.criterionStatus.${status}`)
+}
+
+function criterionStatusClass(status: ChannelIQCriterionStatus): string {
+  if (status === 'pass') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+  if (status === 'partial') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+  if (status === 'fail') return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+  return 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300'
 }
 
 function formatTime(value?: string): string {

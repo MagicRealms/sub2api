@@ -25,7 +25,7 @@ const (
 	ChannelIQStatusWarning      = "warning"
 	ChannelIQStatusError        = "error"
 	channelIQDefaultInterval    = 300 * time.Second
-	channelIQDefaultPrompt      = "请生成一个可直接嵌入网页的 HTML/SVG 动画，只输出完整代码，不要解释、Markdown 代码围栏、JavaScript 或外部资源。"
+	channelIQDefaultPrompt      = "创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md"
 	channelIQMinInterval        = 60 * time.Second
 	channelIQMaxInterval        = 24 * time.Hour
 	channelIQResultLimit        = 6
@@ -112,19 +112,20 @@ func defaultChannelIQPrompt(prompt string) string {
 	return channelIQDefaultPrompt
 }
 
-// ChannelIQResult is the public card payload. ResponseText is Markdown/plain
-// text and is rendered and sanitized by the frontend before it becomes HTML.
+// ChannelIQResult is the public card payload. ResponseText contains the raw
+// model output; the frontend extracts only the SVG animation from it.
 type ChannelIQResult struct {
-	ID              int64     `json:"id"`
-	Status          string    `json:"status"`
-	ModelID         string    `json:"model_id"`
-	ReasoningEffort string    `json:"reasoning_effort"`
-	ResponseText    string    `json:"response_text"`
-	ErrorMessage    string    `json:"error_message,omitempty"`
-	LatencyMs       int64     `json:"latency_ms"`
-	StartedAt       time.Time `json:"started_at"`
-	FinishedAt      time.Time `json:"finished_at"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              int64                `json:"id"`
+	Status          string               `json:"status"`
+	ModelID         string               `json:"model_id"`
+	ReasoningEffort string               `json:"reasoning_effort"`
+	ResponseText    string               `json:"response_text"`
+	ErrorMessage    string               `json:"error_message,omitempty"`
+	LatencyMs       int64                `json:"latency_ms"`
+	StartedAt       time.Time            `json:"started_at"`
+	FinishedAt      time.Time            `json:"finished_at"`
+	CreatedAt       time.Time            `json:"created_at"`
+	Evaluation      *ChannelIQEvaluation `json:"evaluation,omitempty"`
 }
 
 type ChannelIQAdminSnapshot struct {
@@ -221,11 +222,13 @@ func (s *ChannelIQService) listResults(ctx context.Context, plan *ScheduledTestP
 		if reasoningEffort == "" {
 			reasoningEffort = strings.TrimSpace(plan.ReasoningEffort)
 		}
+		evaluation := evaluateChannelIQResponse(result.ResponseText)
 		items = append(items, &ChannelIQResult{
 			ID: result.ID, Status: result.Status, ModelID: modelID,
 			ReasoningEffort: reasoningEffort, ResponseText: result.ResponseText,
 			ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
 			FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
+			Evaluation: &evaluation,
 		})
 	}
 	return items, nil
@@ -333,7 +336,7 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	// used by the scheduled runner to avoid leaking a stuck upstream request.
 	testCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), channelIQManualTestTimeout)
 	defer cancel()
-	result, err := s.accountTest.RunPromptTestBackgroundWithOptions(testCtx, plan.AccountID, plan.ModelID, plan.Prompt, plan.ReasoningEffort)
+	result, err := s.accountTest.RunPromptTestBackgroundWithOptions(testCtx, plan.AccountID, plan.ModelID, channelIQPromptForExecution(plan.Prompt), plan.ReasoningEffort)
 	if err != nil {
 		return nil, err
 	}
@@ -346,11 +349,13 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	if cronErr == nil {
 		_ = s.planRepo.UpdateAfterRun(testCtx, plan.ID, time.Now(), nextRun)
 	}
+	evaluation := evaluateChannelIQResponse(result.ResponseText)
 	return &ChannelIQResult{
 		ID: result.ID, Status: result.Status, ModelID: strings.TrimSpace(plan.ModelID),
 		ReasoningEffort: strings.TrimSpace(plan.ReasoningEffort), ResponseText: result.ResponseText,
 		ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
 		FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
+		Evaluation: &evaluation,
 	}, nil
 }
 

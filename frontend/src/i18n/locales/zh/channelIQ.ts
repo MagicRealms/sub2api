@@ -1,7 +1,7 @@
 export default {
   channelIQ: {
     title: '智商状态',
-    description: '管理员会用一个上游 Key 定时测试模型能力，这里只展示最近六次测试结果。',
+    description: '管理员会用一个上游 Key 定时测试模型能力，这里按鹈鹕测试的四项结构标准展示最近六次结果。',
     loadError: '智商状态加载失败',
     footnote: '结果由管理员配置的测试任务自动更新，用户端仅可查看。',
     status: {
@@ -26,6 +26,22 @@ export default {
       waiting: '等待第一次测试结果…',
       checkedAt: '检测于 {time}',
       notChecked: '尚未检测',
+      rubricTitle: '鹈鹕结构能力判定',
+      grades: {
+        baseline: '四项均通过',
+        mild: '轻度退化',
+        moderate: '中度退化',
+        severe: '重度退化',
+        ungraded: '未判定（需重新测试）',
+      },
+      criteria: {
+        wheels: '两个车轮',
+        legPedal: '腿连到脚踏',
+        viewConsistent: '视角统一',
+        pelicanBeak: '鹈鹕喙与喉囊',
+      },
+      criterionStatus: { pass: '通过', partial: '勉强', fail: '未通过', unknown: '未判定' },
+      requestSuccess: '请求成功',
     },
     empty: {
       title: '还没有渠道状态',

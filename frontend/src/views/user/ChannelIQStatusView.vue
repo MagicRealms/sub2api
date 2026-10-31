@@ -18,7 +18,7 @@
         </div>
       </section>
 
-      <section v-if="loading && results.length === 0" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <section v-if="loading && results.length === 0" class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <div v-for="n in 6" :key="n" class="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-800"></div>
       </section>
 
@@ -46,7 +46,7 @@
               </div>
             </div>
             <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="result.status === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/25 dark:text-rose-300'">
-              {{ result.status === 'success' ? t('channelIQ.status.healthy') : t('channelIQ.status.error') }}
+              {{ result.status === 'success' ? t('channelIQ.card.requestSuccess') : t('channelIQ.status.error') }}
             </span>
           </div>
 
@@ -64,6 +64,20 @@
           </div>
           <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.animationUnavailable') }}</p>
           <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('channelIQ.card.waiting') }}</p>
+          <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
+            <div class="flex items-center justify-between gap-3 text-xs">
+              <span class="font-semibold text-gray-700 dark:text-gray-200">{{ t('channelIQ.card.rubricTitle') }}</span>
+              <span class="rounded-full px-2 py-1 font-semibold" :class="evaluationGradeClass(result)">
+                {{ evaluationGradeLabel(result) }} · {{ result.evaluation.score }}/4
+              </span>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div v-for="criterion in evaluationCriteria(result)" :key="criterion.key" class="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 dark:bg-dark-800">
+                <span class="text-gray-600 dark:text-gray-300">{{ criterion.label }}</span>
+                <span class="shrink-0 rounded-full px-1.5 py-0.5 font-semibold" :class="criterionStatusClass(criterion.status)">{{ criterionStatusLabel(criterion.status) }}</span>
+              </div>
+            </div>
+          </div>
 
           <div class="mt-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
             <span>{{ result.latency_ms }} ms</span>
@@ -82,7 +96,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
-import channelIQAPI, { type ChannelIQResult } from '@/api/channelIQ'
+import channelIQAPI, { type ChannelIQCriterionStatus, type ChannelIQResult } from '@/api/channelIQ'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { extractChannelIQAnimationDocument, getChannelIQAnimationAspectRatio } from '@/utils/channelIQHtml'
@@ -104,6 +118,43 @@ function hasAnimation(value: string): boolean {
 
 function animationStyle(value: string): { aspectRatio: string } {
   return { aspectRatio: String(getChannelIQAnimationAspectRatio(value)) }
+}
+
+function evaluationGradeLabel(result: ChannelIQResult): string {
+  const evaluation = result.evaluation
+  if (!evaluation?.graded) return t('channelIQ.card.grades.ungraded')
+  return t(`channelIQ.card.grades.${evaluation.grade}`)
+}
+
+function evaluationGradeClass(result: ChannelIQResult): string {
+  const evaluation = result.evaluation
+  if (!evaluation?.graded) return 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300'
+  if (evaluation.grade === 'baseline') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+  if (evaluation.grade === 'mild') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+  if (evaluation.grade === 'moderate') return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+  return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+}
+
+function evaluationCriteria(result: ChannelIQResult): Array<{ key: string; label: string; status: ChannelIQCriterionStatus }> {
+  const criteria = result.evaluation?.criteria
+  if (!criteria) return []
+  return [
+    { key: 'wheels', label: t('channelIQ.card.criteria.wheels'), status: criteria.wheels.status },
+    { key: 'leg_pedal', label: t('channelIQ.card.criteria.legPedal'), status: criteria.leg_pedal.status },
+    { key: 'view_consistent', label: t('channelIQ.card.criteria.viewConsistent'), status: criteria.view_consistent.status },
+    { key: 'pelican_beak', label: t('channelIQ.card.criteria.pelicanBeak'), status: criteria.pelican_beak.status },
+  ]
+}
+
+function criterionStatusLabel(status: ChannelIQCriterionStatus): string {
+  return t(`channelIQ.card.criterionStatus.${status}`)
+}
+
+function criterionStatusClass(status: ChannelIQCriterionStatus): string {
+  if (status === 'pass') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+  if (status === 'partial') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+  if (status === 'fail') return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+  return 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300'
 }
 
 function formatTime(value?: string): string {
