@@ -29,6 +29,10 @@ const (
 	channelIQMinInterval        = 60 * time.Second
 	channelIQMaxInterval        = 24 * time.Hour
 	channelIQResultLimit        = 6
+	// A model probe can spend tens of seconds in upstream reasoning before its
+	// response stream completes. Keep the manual probe independent of the
+	// browser request lifetime while still bounding a genuinely stuck probe.
+	channelIQManualTestTimeout = 5 * time.Minute
 )
 
 // ChannelIQConfig contains the persisted single-key test configuration. The
@@ -322,18 +326,25 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	if s.accountTest == nil || s.scheduled == nil {
 		return nil, fmt.Errorf("渠道智商测试服务未就绪")
 	}
-	result, err := s.accountTest.RunPromptTestBackgroundWithOptions(ctx, plan.AccountID, plan.ModelID, plan.Prompt, plan.ReasoningEffort)
+	// The admin browser request has a finite HTTP timeout and may be closed by
+	// a tab refresh or a transient network change. A probe is a persisted
+	// background operation, so do not cancel the upstream stream just because
+	// the request that started it disappeared. Keep the same five-minute bound
+	// used by the scheduled runner to avoid leaking a stuck upstream request.
+	testCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), channelIQManualTestTimeout)
+	defer cancel()
+	result, err := s.accountTest.RunPromptTestBackgroundWithOptions(testCtx, plan.AccountID, plan.ModelID, plan.Prompt, plan.ReasoningEffort)
 	if err != nil {
 		return nil, err
 	}
 	result.ModelID = plan.ModelID
 	result.ReasoningEffort = plan.ReasoningEffort
-	if err := s.scheduled.SaveResult(ctx, plan.ID, channelIQResultLimit, result); err != nil {
+	if err := s.scheduled.SaveResult(testCtx, plan.ID, channelIQResultLimit, result); err != nil {
 		return nil, fmt.Errorf("保存渠道智商结果失败: %w", err)
 	}
 	nextRun, cronErr := computeNextRun(plan.CronExpression, time.Now())
 	if cronErr == nil {
-		_ = s.planRepo.UpdateAfterRun(ctx, plan.ID, time.Now(), nextRun)
+		_ = s.planRepo.UpdateAfterRun(testCtx, plan.ID, time.Now(), nextRun)
 	}
 	return &ChannelIQResult{
 		ID: result.ID, Status: result.Status, ModelID: strings.TrimSpace(plan.ModelID),
