@@ -50,6 +50,10 @@ type ScheduledTestPlanRepository interface {
 	ListDue(ctx context.Context, now time.Time) ([]*ScheduledTestPlan, error)
 	Update(ctx context.Context, plan *ScheduledTestPlan) (*ScheduledTestPlan, error)
 	Delete(ctx context.Context, id int64) error
+	// ClaimDue advances next_run_at only when the plan is still due. This keeps
+	// overlapping scheduler ticks or multiple app instances from running a
+	// slow plan more than once.
+	ClaimDue(ctx context.Context, id int64, now time.Time, nextRunAt time.Time) (bool, error)
 	UpdateAfterRun(ctx context.Context, id int64, lastRunAt time.Time, nextRunAt time.Time) error
 }
 

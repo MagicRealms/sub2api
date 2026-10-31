@@ -3,12 +3,17 @@ import DOMPurify from 'dompurify'
 const channelIQSanitizeConfig = {
   USE_PROFILES: { html: true, svg: true, svgFilters: true },
   ADD_TAGS: ['animate', 'animateMotion', 'animateTransform', 'set'],
+  ADD_ATTR: [
+    'accumulate', 'additive', 'alignment-baseline', 'attributeName', 'attributeType', 'begin', 'calcMode',
+    'cx', 'cy', 'd', 'dur', 'end', 'fill', 'fill-opacity', 'filter', 'focusable', 'from', 'gradientTransform',
+    'gradientUnits', 'height', 'href', 'keyPoints', 'keySplines', 'keyTimes', 'offset', 'opacity', 'path',
+    'pathLength', 'points', 'preserveAspectRatio', 'repeatCount', 'role', 'r', 'rotate', 'rx', 'ry', 'stdDeviation',
+    'stop-color', 'stop-opacity', 'stroke', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity',
+    'stroke-width', 'to', 'transform', 'transform-origin', 'values', 'viewBox', 'version', 'width', 'x', 'x1', 'x2',
+    'y', 'y1', 'y2', 'xmlns', 'xmlns:xlink',
+  ],
   FORBID_TAGS: ['base', 'embed', 'form', 'iframe', 'input', 'link', 'meta', 'object', 'script', 'textarea'],
   FORBID_ATTR: ['srcdoc'],
-  // SVG animations may use fragment references such as href="#path".
-  // External URLs and executable/data documents are unnecessary for a card
-  // preview and could make a model response reach outside the site.
-  ALLOWED_URI_REGEXP: /^(?:#|data:image\/(?:gif|png|jpeg|webp);base64,)/i,
 }
 
 // Model-generated documents often use a desktop-sized SVG (for example
@@ -68,6 +73,32 @@ function buildSafeStyleBlock(styles: Element[]): string {
   return css ? `<style>${css}</style>` : ''
 }
 
+function sanitizeSvgResources(markup: string): string {
+  const parsed = new DOMParser().parseFromString(markup, 'image/svg+xml')
+  const root = parsed.documentElement
+  if (!root || root.tagName.toLowerCase() !== 'svg') return ''
+
+  const isSafeResource = (value: string): boolean => /^(?:#|data:image\/(?:gif|png|jpeg|webp);base64,)/i.test(value.trim())
+  const stripExternalUrls = (value: string): string => value
+    .replace(/url\(\s*(['"]?)(?!#|data:image\/(?:gif|png|jpeg|webp);base64,)[^)]*\1\s*\)/gi, 'none')
+    .replace(/@import[\s\S]*?;\s*/gi, '')
+
+  root.querySelectorAll('*').forEach(element => {
+    for (const name of ['href', 'xlink:href', 'src']) {
+      const value = element.getAttribute(name)
+      if (value && !isSafeResource(value)) element.removeAttribute(name)
+    }
+    const style = element.getAttribute('style')
+    if (style) element.setAttribute('style', stripExternalUrls(style))
+    for (const attribute of Array.from(element.attributes)) {
+      if (attribute.name !== 'style' && /url\(/i.test(attribute.value)) {
+        element.setAttribute(attribute.name, stripExternalUrls(attribute.value))
+      }
+    }
+  })
+  return root.outerHTML
+}
+
 function unwrapHtmlSource(value: string): string {
   const fenced = [...value.matchAll(/```(?:html|xml|svg)?\s*([\s\S]*?)```/gi)]
     .map(match => match[1].trim())
@@ -120,10 +151,13 @@ export function extractChannelIQAnimationDocument(value: string): string {
   if (!parsed.querySelector('svg')) return ''
 
   const styles = Array.from(parsed.querySelectorAll('style'))
-  const body = parsed.body.cloneNode(true) as HTMLElement
-  body.querySelectorAll('style').forEach(style => style.remove())
-  const bodyMarkup = body.innerHTML || parsed.querySelector('svg')?.outerHTML || ''
-  const sanitizedBody = DOMPurify.sanitize(bodyMarkup, channelIQSanitizeConfig)
+  const svg = parsed.querySelector('svg')
+  if (!svg) return ''
+  // The surrounding HTML often contains a fixed desktop-sized .scene wrapper.
+  // Render the SVG canvas itself so that wrapper dimensions cannot crop it.
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+  const bodyMarkup = svg.outerHTML
+  const sanitizedBody = sanitizeSvgResources(DOMPurify.sanitize(bodyMarkup, channelIQSanitizeConfig))
   // DOMPurify intentionally removes HTML <style> nodes. The style text has
   // already been reduced to declarative, local CSS above, so prepend that
   // isolated block after sanitizing the markup.

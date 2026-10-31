@@ -107,6 +107,20 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 	var wg sync.WaitGroup
 
 	for _, plan := range plans {
+		nextRun, err := computeNextRun(plan.CronExpression, now)
+		if err != nil {
+			logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d computeNextRun error: %v", plan.ID, err)
+			continue
+		}
+		claimed, err := s.planRepo.ClaimDue(ctx, plan.ID, now, nextRun)
+		if err != nil {
+			logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d claim error: %v", plan.ID, err)
+			continue
+		}
+		if !claimed {
+			// Another scheduler tick or application instance claimed the plan.
+			continue
+		}
 		sem <- struct{}{}
 		wg.Add(1)
 		go func(p *ScheduledTestPlan) {
