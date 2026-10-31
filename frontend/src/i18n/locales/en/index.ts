@@ -7,6 +7,7 @@ import admin from './admin'
 import misc from './misc'
 import usageGuide from './usageGuide'
 import testCenter from './testCenter'
+import channelIQ from './channelIQ'
 
 export default {
   ...landing,
@@ -18,4 +19,5 @@ export default {
   ...misc,
   ...usageGuide,
   ...testCenter,
+  ...channelIQ,
 }

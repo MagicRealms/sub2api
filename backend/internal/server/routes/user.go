@@ -142,6 +142,13 @@ func RegisterUserRoutes(
 			monitors.GET("/:id/status", h.ChannelMonitor.GetStatus)
 		}
 
+		// 渠道智商（用户只读；配置由管理员在渠道管理中维护）
+		channelIQ := authenticated.Group("/channel-iq")
+		{
+			channelIQ.GET("", h.ChannelIQ.List)
+			channelIQ.POST("/:id/run", h.ChannelIQ.Run)
+		}
+
 		// V2 passive views require feature on + mode=v2.
 		monitorV2 := authenticated.Group("/channel-monitor-v2")
 		monitorV2.Use(panelRateLimiter.Heavy())
