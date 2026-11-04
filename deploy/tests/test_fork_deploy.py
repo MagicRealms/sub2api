@@ -78,7 +78,11 @@ class ForkDeployTest(unittest.TestCase):
                     self.assertGreaterEqual(info["polls"], 2)
                 else:
                     self.assertEqual(info["polls"], 0)
-                backups = list((root / "backups").glob("*/database.dump"))
+                backups = sorted(
+                    (root / "backups").glob("*/database.dump"),
+                    key=lambda path: path.parent.stat().st_mtime,
+                    reverse=True,
+                )
                 self.assertEqual(len(backups), 2 if seed_backups else 1)
                 self.assertEqual(backups[0].read_text(), "database snapshot\n")
                 self.assertEqual(backups[0].parent.stat().st_mode & 0o777, 0o700)
