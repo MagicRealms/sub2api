@@ -65,6 +65,8 @@ describe('channel IQ full HTML preview', () => {
     expect(result).toContain('Pelican ride')
     expect(result).toContain('href="#wheel"')
     expect(result).toContain('xlink:href="#wheel"')
+    expect(result).toContain('position: relative !important')
+    expect(result).toContain('background: transparent !important')
     expect(result).toContain('requestAnimationFrame(() => document.body.dataset.moving')
     expect(result).toContain('animation-play-state: paused')
     expect(result).toContain('function fitContent()')

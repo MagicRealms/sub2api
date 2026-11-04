@@ -312,5 +312,5 @@ export function extractChannelIQHtmlPreviewDocument(value: string, nonce: string
     ? [channelIQControlScript(token, autoplay), ...inlineScripts]
       .map(script => `<script nonce="${safeNonce}">${script.replace(/<\/script/gi, '<\\/script')}</script>`).join('\n')
     : ''
-  return `<!doctype html><html${autoplay ? '' : ' class="channel-iq-paused"'}><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer">${styles}${channelIQFrameStyle}</head><body>${body}${scripts}</body></html>`
+  return `<!doctype html><html${autoplay ? '' : ' class="channel-iq-paused"'}><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer">${styles}${channelIQPreviewStyle}${channelIQFrameStyle}</head><body>${body}${scripts}</body></html>`
 }
