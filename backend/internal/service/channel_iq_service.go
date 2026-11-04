@@ -29,10 +29,6 @@ const (
 	channelIQMinInterval        = 60 * time.Second
 	channelIQMaxInterval        = 24 * time.Hour
 	channelIQResultLimit        = 6
-	// A model probe can spend tens of seconds in upstream reasoning before its
-	// response stream completes. Keep the manual probe independent of the
-	// browser request lifetime while still bounding a genuinely stuck probe.
-	channelIQManualTestTimeout = 5 * time.Minute
 )
 
 // ChannelIQConfig contains the persisted single-key test configuration. The
@@ -329,12 +325,8 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	if s.accountTest == nil || s.scheduled == nil {
 		return nil, fmt.Errorf("渠道智商测试服务未就绪")
 	}
-	// The admin browser request has a finite HTTP timeout and may be closed by
-	// a tab refresh or a transient network change. A probe is a persisted
-	// background operation, so do not cancel the upstream stream just because
-	// the request that started it disappeared. Keep the same five-minute bound
-	// used by the scheduled runner to avoid leaking a stuck upstream request.
-	testCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), channelIQManualTestTimeout)
+	// Each probe has its own lifetime, independent of the browser request.
+	testCtx, cancel := newChannelIQProbeContext()
 	defer cancel()
 	result, err := s.accountTest.RunPromptTestBackgroundWithOptions(testCtx, plan.AccountID, plan.ModelID, channelIQPromptForExecution(plan.Prompt), plan.ReasoningEffort)
 	if err != nil {

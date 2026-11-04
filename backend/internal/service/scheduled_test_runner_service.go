@@ -137,6 +137,9 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 	var result *ScheduledTestResult
 	var err error
 	if plan.Kind == ChannelIQPlanKind {
+		probeCtx, cancel := newChannelIQProbeContext()
+		defer cancel()
+		ctx = probeCtx
 		result, err = s.accountTestSvc.RunPromptTestBackgroundWithOptions(ctx, plan.AccountID, plan.ModelID, channelIQPromptForExecution(plan.Prompt), plan.ReasoningEffort)
 	} else {
 		result, err = s.accountTestSvc.RunTestBackground(ctx, plan.AccountID, plan.ModelID)
