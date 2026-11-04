@@ -268,7 +268,7 @@ export function extractChannelIQHtmlPreviewDocument(value: string, nonce: string
   const parsed = new DOMParser().parseFromString(source, 'text/html')
   if (!parsed.querySelector('svg')) return ''
 
-  const inlineScripts = Array.from(parsed.querySelectorAll('script:not([src])'))
+  const inlineScripts = Array.from(parsed.querySelectorAll<HTMLScriptElement>('script:not([src])'))
     .filter(script => !script.type || script.type === 'text/javascript')
     .map(script => script.textContent || '')
     .filter(Boolean)
