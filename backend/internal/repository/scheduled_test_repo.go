@@ -132,6 +132,10 @@ func (r *scheduledTestPlanRepository) ClaimDueWithResult(ctx context.Context, id
 	claimed, err := tx.ExecContext(ctx, `
 		UPDATE scheduled_test_plans SET next_run_at = $3, updated_at = NOW()
 		WHERE id = $1 AND kind = 'channel_iq' AND enabled = true AND next_run_at <= $2
+		  AND NOT EXISTS (
+			SELECT 1 FROM scheduled_test_results
+			WHERE plan_id = $1 AND status = 'running'
+		  )
 	`, id, now, nextRunAt)
 	if err != nil {
 		return false, err
@@ -228,7 +232,7 @@ func (r *scheduledTestResultRepository) FailStaleChannelIQRunning(ctx context.Co
 		WHERE result.plan_id = plan.id AND plan.kind = 'channel_iq'
 		  AND result.status = 'running'
 		  AND result.started_at < date_trunc('hour', $1::timestamptz)
-		  AND $1::timestamptz >= date_trunc('hour', $1::timestamptz) + interval '30 seconds'
+		  AND $1::timestamptz >= date_trunc('hour', $1::timestamptz)
 	`, now)
 	if err != nil {
 		return 0, err
