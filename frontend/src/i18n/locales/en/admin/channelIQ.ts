@@ -22,7 +22,7 @@ export default {
         fiveMinutes: 'Every 5 minutes',
         fifteenMinutes: 'Every 15 minutes',
         thirtyMinutes: 'Every 30 minutes',
-        hour: 'Every 1 hour',
+        hour: 'On the hour, every hour',
         day: 'Every day',
       },
       enabledLabel: 'Enable automatic tests',
@@ -36,6 +36,8 @@ export default {
     },
     results: {
       title: 'Latest six results',
+      startedAt: 'Started',
+      finishedAt: 'Finished',
       description: 'Each card renders the HTML/SVG animation and shows the four structural checks, test model, and reasoning effort. A successful request alone does not pass the ability test.',
       count: '{count} records',
       autoModel: 'Account default',

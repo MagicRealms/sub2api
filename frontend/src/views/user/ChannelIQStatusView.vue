@@ -39,7 +39,7 @@
           <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
           <div class="flex items-start justify-between gap-3">
             <div>
-              <div class="text-xs text-gray-400 dark:text-gray-500">{{ formatTime(result.created_at) }}</div>
+              <div class="text-xs text-gray-400 dark:text-gray-500">{{ t('channelIQ.card.startedAt') }} {{ formatTime(result.started_at) }} · #{{ result.id }}</div>
               <div class="mt-2 flex flex-wrap gap-1.5 text-xs">
                 <span class="rounded-full bg-violet-50 px-2 py-1 font-medium text-violet-700 dark:bg-violet-900/25 dark:text-violet-300">{{ result.model_id || t('channelIQ.card.autoModel') }}</span>
                 <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ result.reasoning_effort || t('channelIQ.card.autoReasoning') }}</span>
@@ -81,7 +81,7 @@
 
           <div class="mt-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
             <span>{{ result.latency_ms }} ms</span>
-            <span>{{ formatTime(result.finished_at) }}</span>
+            <span>{{ t('channelIQ.card.finishedAt') }} {{ formatTime(result.finished_at) }}</span>
           </div>
         </article>
       </section>

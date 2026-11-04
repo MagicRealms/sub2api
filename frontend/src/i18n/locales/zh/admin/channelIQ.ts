@@ -22,7 +22,7 @@ export default {
         fiveMinutes: '每 5 分钟',
         fifteenMinutes: '每 15 分钟',
         thirtyMinutes: '每 30 分钟',
-        hour: '每 1 小时',
+        hour: '每小时整点',
         day: '每天',
       },
       enabledLabel: '启用自动测试',
@@ -36,6 +36,8 @@ export default {
     },
     results: {
       title: '最近六次结果',
+      startedAt: '开始',
+      finishedAt: '完成',
       description: '每张卡片渲染 HTML/SVG 动画，并显示四项结构判定、测试模型和思考强度。生成成功不等于能力通过。',
       count: '共 {count} 条',
       autoModel: '账号默认模型',

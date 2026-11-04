@@ -19,4 +19,7 @@ func TestChannelIQProbeContextIsIndependentAndBounded(t *testing.T) {
 	if first.Err() == nil || second.Err() != nil {
 		t.Fatalf("probe contexts must be independent: first=%v, second=%v", first.Err(), second.Err())
 	}
+	if !HTTPUpstreamRedirectsDisabled(second) {
+		t.Fatal("probe redirects must be disabled to prevent replaying a POST")
+	}
 }

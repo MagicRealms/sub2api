@@ -53,7 +53,7 @@
           </div>
           <div>
             <label class="input-label">{{ t('admin.channelIQ.config.interval') }}</label>
-            <Select v-model="form.interval_seconds" :options="intervalOptions" />
+            <div class="input flex items-center">{{ t('admin.channelIQ.config.intervalOptions.hour') }}</div>
           </div>
           <div class="flex items-center justify-between rounded-xl border border-gray-200 px-4 dark:border-dark-700">
             <div>
@@ -70,7 +70,7 @@
         </div>
 
         <div class="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-5 dark:border-dark-700">
-          <button type="button" class="btn btn-secondary" :disabled="saving || running" @click="runNow">
+          <button v-if="!form.enabled" type="button" class="btn btn-secondary" :disabled="saving || running" @click="runNow">
             <Icon name="refresh" size="sm" :class="running ? 'animate-spin' : ''" />
             <span class="ml-2">{{ t('admin.channelIQ.config.runNow') }}</span>
           </button>
@@ -95,7 +95,7 @@
             <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
             <div class="flex items-start justify-between gap-3">
               <div>
-                <div class="text-xs text-gray-400">{{ formatTime(result.created_at) }}</div>
+                <div class="text-xs text-gray-400">{{ t('admin.channelIQ.results.startedAt') }} {{ formatTime(result.started_at) }} · #{{ result.id }}</div>
                 <div class="mt-2 flex flex-wrap gap-1.5 text-xs">
                   <span class="rounded-full bg-violet-50 px-2 py-1 font-medium text-violet-700 dark:bg-violet-900/25 dark:text-violet-300">{{ result.model_id || t('admin.channelIQ.results.autoModel') }}</span>
                   <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ result.reasoning_effort || t('admin.channelIQ.results.autoReasoning') }}</span>
@@ -135,7 +135,7 @@
             </div>
             <div class="mt-4 flex items-center justify-between text-xs text-gray-400">
               <span>{{ result.latency_ms }} ms</span>
-              <span>{{ formatDate(result.finished_at) }}</span>
+              <span>{{ t('admin.channelIQ.results.finishedAt') }} {{ formatDate(result.finished_at) }}</span>
             </div>
           </article>
         </div>
@@ -170,7 +170,7 @@ const running = ref(false)
 const accountsLoading = ref(false)
 const accounts = ref<AccountListItem[]>([])
 const results = ref<ChannelIQResult[]>([])
-const form = reactive({ account_id: 0, model_id: '', prompt: '', reasoning_effort: '', interval_seconds: 300, enabled: false })
+const form = reactive({ account_id: 0, model_id: '', prompt: '', reasoning_effort: '', interval_seconds: 3600, enabled: false })
 
 const accountOptions = computed(() => accounts.value.map(account => ({
   value: account.id,
@@ -185,15 +185,6 @@ const reasoningOptions = computed(() => [
   { value: 'max', label: 'max' },
   { value: 'ultra', label: 'ultra' },
 ])
-const intervalOptions = computed(() => [
-  { value: 60, label: t('admin.channelIQ.config.intervalOptions.minute') },
-  { value: 300, label: t('admin.channelIQ.config.intervalOptions.fiveMinutes') },
-  { value: 900, label: t('admin.channelIQ.config.intervalOptions.fifteenMinutes') },
-  { value: 1800, label: t('admin.channelIQ.config.intervalOptions.thirtyMinutes') },
-  { value: 3600, label: t('admin.channelIQ.config.intervalOptions.hour') },
-  { value: 86400, label: t('admin.channelIQ.config.intervalOptions.day') },
-])
-
 function applySnapshot(snapshot: Awaited<ReturnType<typeof adminAPI.channelIQ.get>>) {
   results.value = snapshot.results || []
   if (snapshot.config) {
@@ -201,7 +192,7 @@ function applySnapshot(snapshot: Awaited<ReturnType<typeof adminAPI.channelIQ.ge
     form.model_id = snapshot.config.model_id || ''
     form.prompt = snapshot.config.prompt || ''
     form.reasoning_effort = snapshot.config.reasoning_effort || ''
-    form.interval_seconds = snapshot.config.interval_seconds || 300
+    form.interval_seconds = 3600
     form.enabled = snapshot.config.enabled
   }
 }

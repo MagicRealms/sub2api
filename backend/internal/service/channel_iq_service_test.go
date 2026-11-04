@@ -2,6 +2,18 @@ package service
 
 import "testing"
 
+func TestChannelIQOnlySchedulesHourly(t *testing.T) {
+	cron, err := channelIQCronForInterval(channelIQHourlyInterval)
+	if err != nil || cron != "0 */1 * * *" {
+		t.Fatalf("unexpected hourly schedule: %q, %v", cron, err)
+	}
+	for _, interval := range []int{60, 300, 1800, 86400} {
+		if _, err := channelIQCronForInterval(interval); err == nil {
+			t.Fatalf("interval %d must not schedule extra tests", interval)
+		}
+	}
+}
+
 func TestParseChannelIQConfigDefaultsAndClamps(t *testing.T) {
 	defaultConfig := ParseChannelIQConfig(nil)
 	if defaultConfig.Enabled || defaultConfig.IntervalSeconds != 300 {

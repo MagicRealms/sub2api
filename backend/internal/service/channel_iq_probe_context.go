@@ -8,5 +8,5 @@ import (
 const channelIQTestTimeout = 30 * time.Minute
 
 func newChannelIQProbeContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), channelIQTestTimeout)
+	return context.WithTimeout(WithHTTPUpstreamRedirectsDisabled(context.Background()), channelIQTestTimeout)
 }

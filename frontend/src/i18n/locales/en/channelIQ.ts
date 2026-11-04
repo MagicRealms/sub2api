@@ -14,6 +14,8 @@ export default {
     },
     summary: { total: 'Test records', healthy: 'Healthy', pending: 'Testing', errors: 'Errors', records: 'Recent records' },
     card: {
+      startedAt: 'Started',
+      finishedAt: 'Finished',
       noGroup: 'No group bound',
       autoPlatform: 'Automatic platform',
       model: 'Test model',

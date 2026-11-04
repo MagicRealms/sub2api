@@ -14,6 +14,8 @@ export default {
     },
     summary: { total: '测试记录', healthy: '能力正常', pending: '测试中', errors: '异常', records: '最近记录' },
     card: {
+      startedAt: '开始',
+      finishedAt: '完成',
       noGroup: '未绑定分组',
       autoPlatform: '自动平台',
       model: '测试模型',

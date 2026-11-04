@@ -29,6 +29,7 @@ const (
 	channelIQMinInterval        = 60 * time.Second
 	channelIQMaxInterval        = 24 * time.Hour
 	channelIQResultLimit        = 6
+	channelIQHourlyInterval     = 3600
 )
 
 // ChannelIQConfig contains the persisted single-key test configuration. The
@@ -275,9 +276,9 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 	if !account.IsActive() {
 		return nil, fmt.Errorf("测试 Key 当前不是可用状态")
 	}
-	interval := normalizeChannelIQInterval(input.IntervalSeconds)
-	if interval%60 != 0 {
-		return nil, fmt.Errorf("检测间隔必须按分钟设置")
+	interval := input.IntervalSeconds
+	if interval == 0 {
+		interval = channelIQHourlyInterval
 	}
 	cronExpr, err := channelIQCronForInterval(interval)
 	if err != nil {
@@ -322,6 +323,9 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	if plan == nil {
 		return nil, fmt.Errorf("请先保存渠道智商配置")
 	}
+	if plan.Enabled {
+		return nil, fmt.Errorf("自动测试已启用，每小时整点只运行一次；暂停自动测试后才可手动测试")
+	}
 	if s.accountTest == nil || s.scheduled == nil {
 		return nil, fmt.Errorf("渠道智商测试服务未就绪")
 	}
@@ -354,20 +358,10 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 }
 
 func channelIQCronForInterval(seconds int) (string, error) {
-	minutes := seconds / 60
-	if minutes <= 0 {
-		return "", fmt.Errorf("检测间隔必须至少为 1 分钟")
+	if seconds != channelIQHourlyInterval {
+		return "", fmt.Errorf("渠道智商仅支持每小时整点测试一次")
 	}
-	if minutes < 60 {
-		return fmt.Sprintf("*/%d * * * *", minutes), nil
-	}
-	if minutes%60 == 0 && minutes/60 < 24 {
-		return fmt.Sprintf("0 */%d * * *", minutes/60), nil
-	}
-	if minutes == 24*60 {
-		return "0 0 * * *", nil
-	}
-	return "", fmt.Errorf("检测间隔暂不支持，请选择 1 分钟到 24 小时之间的整分钟")
+	return "0 */1 * * *", nil
 }
 
 func channelIQIntervalFromCron(expr string) int {
