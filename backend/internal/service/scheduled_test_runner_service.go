@@ -147,14 +147,20 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 	}
 	result.ModelID = plan.ModelID
 	result.ReasoningEffort = plan.ReasoningEffort
+	persistCtx, cancel := scheduledTestPersistenceContext(ctx)
+	defer cancel()
+	maxResults := plan.MaxResults
+	if plan.Kind == ChannelIQPlanKind {
+		maxResults = channelIQResultLimit
+	}
 
-	if err := s.scheduledSvc.SaveResult(ctx, plan.ID, plan.MaxResults, result); err != nil {
+	if err := s.scheduledSvc.SaveResult(persistCtx, plan.ID, maxResults, result); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d SaveResult error: %v", plan.ID, err)
 	}
 
 	// Auto-recover account if test succeeded and auto_recover is enabled.
 	if result.Status == "success" && plan.AutoRecover {
-		s.tryRecoverAccount(ctx, plan.AccountID, plan.ID)
+		s.tryRecoverAccount(persistCtx, plan.AccountID, plan.ID)
 	}
 
 	nextRun, err := computeNextRun(plan.CronExpression, time.Now())
@@ -163,7 +169,7 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 		return
 	}
 
-	if err := s.planRepo.UpdateAfterRun(ctx, plan.ID, time.Now(), nextRun); err != nil {
+	if err := s.planRepo.UpdateAfterRun(persistCtx, plan.ID, time.Now(), nextRun); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d UpdateAfterRun error: %v", plan.ID, err)
 	}
 }

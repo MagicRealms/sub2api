@@ -342,12 +342,14 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	}
 	result.ModelID = plan.ModelID
 	result.ReasoningEffort = plan.ReasoningEffort
-	if err := s.scheduled.SaveResult(testCtx, plan.ID, channelIQResultLimit, result); err != nil {
+	persistCtx, persistCancel := scheduledTestPersistenceContext(testCtx)
+	defer persistCancel()
+	if err := s.scheduled.SaveResult(persistCtx, plan.ID, channelIQResultLimit, result); err != nil {
 		return nil, fmt.Errorf("保存渠道智商结果失败: %w", err)
 	}
 	nextRun, cronErr := computeNextRun(plan.CronExpression, time.Now())
 	if cronErr == nil {
-		_ = s.planRepo.UpdateAfterRun(testCtx, plan.ID, time.Now(), nextRun)
+		_ = s.planRepo.UpdateAfterRun(persistCtx, plan.ID, time.Now(), nextRun)
 	}
 	evaluation := evaluateChannelIQResponse(result.ResponseText)
 	return &ChannelIQResult{

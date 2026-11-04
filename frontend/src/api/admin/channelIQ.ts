@@ -74,8 +74,8 @@ export async function save(input: SaveChannelIQConfigRequest): Promise<ChannelIQ
 export async function run(): Promise<ChannelIQResult> {
   // Reasoning models can take longer than the global 30s UI timeout. The
   // backend bounds the probe at five minutes and persists it independently of
-  // the browser request, so give the manual action the same response window.
-  const { data } = await apiClient.post<ChannelIQResult>('/admin/channel-iq/run', undefined, { timeout: 5 * 60 * 1000 })
+  // the browser request, so allow result persistence after the probe deadline.
+  const { data } = await apiClient.post<ChannelIQResult>('/admin/channel-iq/run', undefined, { timeout: 5 * 60 * 1000 + 30 * 1000 })
   return data
 }
 
