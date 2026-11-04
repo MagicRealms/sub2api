@@ -167,7 +167,7 @@ func (r *scheduledTestPlanRepository) ClaimDueWithResult(ctx context.Context, id
 
 func (r *scheduledTestPlanRepository) UpdateAfterRun(ctx context.Context, id int64, lastRunAt time.Time, nextRunAt time.Time) error {
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE scheduled_test_plans SET last_run_at = $2, next_run_at = $3, updated_at = NOW() WHERE id = $1
+		UPDATE scheduled_test_plans SET last_run_at = $2, next_run_at = GREATEST(next_run_at, $3), updated_at = NOW() WHERE id = $1
 	`, id, lastRunAt, nextRunAt)
 	return err
 }
@@ -219,15 +219,17 @@ func (r *scheduledTestResultRepository) CompleteRunning(ctx context.Context, res
 	return nil
 }
 
-func (r *scheduledTestResultRepository) FailStaleChannelIQRunning(ctx context.Context, before time.Time) (int64, error) {
+func (r *scheduledTestResultRepository) FailStaleChannelIQRunning(ctx context.Context, now time.Time) (int64, error) {
 	updated, err := r.db.ExecContext(ctx, `
 		UPDATE scheduled_test_results AS result
-		SET status = 'failed', error_message = '测试进程中断或超时', finished_at = NOW(),
+		SET status = 'failed', error_message = '测试进程中断，未在下一整点前完成', finished_at = NOW(),
 		    latency_ms = GREATEST(0, (EXTRACT(EPOCH FROM (NOW() - result.started_at)) * 1000)::bigint)
 		FROM scheduled_test_plans AS plan
 		WHERE result.plan_id = plan.id AND plan.kind = 'channel_iq'
-		  AND result.status = 'running' AND result.started_at < $1
-	`, before)
+		  AND result.status = 'running'
+		  AND result.started_at < date_trunc('hour', $1::timestamptz)
+		  AND $1::timestamptz >= date_trunc('hour', $1::timestamptz) + interval '30 seconds'
+	`, now)
 	if err != nil {
 		return 0, err
 	}

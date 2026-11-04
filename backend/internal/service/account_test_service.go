@@ -68,8 +68,9 @@ type TestEvent struct {
 // AccountTestOptions carries optional media for admin connectivity tests.
 // ImageDataURL / AudioDataURL are full data URLs (data:<mime>;base64,...).
 type AccountTestOptions struct {
-	ImageDataURL string
-	AudioDataURL string
+	ImageDataURL     string
+	AudioDataURL     string
+	ContinuationText string
 	// ReasoningEffort is optional and is applied to providers that expose an
 	// OpenAI-compatible reasoning field. Other provider payloads keep their
 	// native defaults while the configured value is still recorded on the card.
@@ -77,6 +78,7 @@ type AccountTestOptions struct {
 }
 
 type accountTestReasoningContextKey struct{}
+type accountTestContinuationContextKey struct{}
 
 func accountTestReasoningEffort(c *gin.Context) string {
 	if c == nil || c.Request == nil {
@@ -84,6 +86,14 @@ func accountTestReasoningEffort(c *gin.Context) string {
 	}
 	value, _ := c.Request.Context().Value(accountTestReasoningContextKey{}).(string)
 	return strings.TrimSpace(value)
+}
+
+func accountTestContinuation(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	value, _ := c.Request.Context().Value(accountTestContinuationContextKey{}).(string)
+	return value
 }
 
 func firstAccountTestOptions(opts []AccountTestOptions) AccountTestOptions {
@@ -384,8 +394,11 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	testOpts := firstAccountTestOptions(opts)
 	if effort := strings.TrimSpace(testOpts.ReasoningEffort); effort != "" {
 		ctx = context.WithValue(ctx, accountTestReasoningContextKey{}, effort)
-		c.Request = c.Request.WithContext(ctx)
 	}
+	if testOpts.ContinuationText != "" {
+		ctx = context.WithValue(ctx, accountTestContinuationContextKey{}, testOpts.ContinuationText)
+	}
+	c.Request = c.Request.WithContext(ctx)
 
 	// Get account
 	account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -393,6 +406,10 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return s.sendErrorAndEnd(c, "Account not found")
 	}
 	bindAccountTestPlatform(c, account)
+	if continuation := accountTestContinuation(c); continuation != "" && !account.IsOpenAI() &&
+		!(account.RoutesProtocolByInbound() && account.GetAPIProtocol() == APIProtocolResponses) {
+		prompt = channelIQPlainContinuationPrompt(prompt, continuation)
+	}
 
 	// Synthetic UI load-test accounts exercise the real SSE parsing and modal
 	// interactions, but intentionally do not send their placeholder credentials
@@ -899,7 +916,8 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
 		if !openai_compat.ShouldUseResponsesAPI(account.Extra) {
-			return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+			return s.testOpenAIChatCompletionsConnection(c, account, testModelID,
+				channelIQPlainContinuationPrompt(prompt, accountTestContinuation(c)), normalizedBaseURL, authToken)
 		}
 		apiURL = buildOpenAIResponsesURLForPlatform(credentialAccount.Platform, normalizedBaseURL)
 	} else {
@@ -919,7 +937,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if isOAuth {
 		upstreamTestModelID = normalizeOpenAIModelForUpstream(credentialAccount, testModelID)
 	}
-	payload := createOpenAITestPayloadWithReasoning(upstreamTestModelID, isOAuth, prompt, accountTestReasoningEffort(c))
+	payload := createOpenAITestPayloadWithReasoning(upstreamTestModelID, isOAuth, prompt, accountTestReasoningEffort(c), accountTestContinuation(c))
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event once. A task-invalid Agent Identity response may
@@ -2837,8 +2855,16 @@ func createOpenAITestPayload(modelID string, isOAuth bool, prompts ...string) ma
 	return payload
 }
 
-func createOpenAITestPayloadWithReasoning(modelID string, isOAuth bool, prompt, reasoningEffort string) map[string]any {
+func createOpenAITestPayloadWithReasoning(modelID string, isOAuth bool, prompt, reasoningEffort string, continuation ...string) map[string]any {
 	payload := createOpenAITestPayload(modelID, isOAuth, prompt)
+	if len(continuation) > 0 && continuation[0] != "" {
+		input := payload["input"].([]map[string]any)
+		input = append(input,
+			map[string]any{"role": "assistant", "content": []map[string]any{{"type": "output_text", "text": continuation[0]}}},
+			map[string]any{"role": "user", "content": []map[string]any{{"type": "input_text", "text": "continue"}}},
+		)
+		payload["input"] = input
+	}
 	if effort := strings.TrimSpace(reasoningEffort); effort != "" {
 		payload["reasoning"] = map[string]any{"effort": effort}
 	}
@@ -3343,7 +3369,7 @@ func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) er
 // RunTestBackground executes an account test in-memory (no real HTTP client),
 // capturing SSE output via httptest.NewRecorder, then parses the result.
 func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID int64, modelID string) (*ScheduledTestResult, error) {
-	return s.runTestBackground(ctx, accountID, modelID, "", "")
+	return s.runTestBackground(ctx, accountID, modelID, "", "", "")
 }
 
 // RunPromptTestBackground executes an account test with a caller-provided
@@ -3351,16 +3377,20 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 // It is used by channel intelligence probes so the probe exercises the exact
 // prompt configured by an administrator without exposing a streaming endpoint.
 func (s *AccountTestService) RunPromptTestBackground(ctx context.Context, accountID int64, modelID, prompt string) (*ScheduledTestResult, error) {
-	return s.runTestBackground(ctx, accountID, modelID, prompt, "")
+	return s.runTestBackground(ctx, accountID, modelID, prompt, "", "")
 }
 
 // RunPromptTestBackgroundWithOptions is used by the dedicated Channel IQ
 // plan, which needs to exercise both its prompt and configured reasoning level.
 func (s *AccountTestService) RunPromptTestBackgroundWithOptions(ctx context.Context, accountID int64, modelID, prompt, reasoningEffort string) (*ScheduledTestResult, error) {
-	return s.runTestBackground(ctx, accountID, modelID, prompt, reasoningEffort)
+	return s.runTestBackground(ctx, accountID, modelID, prompt, reasoningEffort, "")
 }
 
-func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID, prompt, reasoningEffort string) (*ScheduledTestResult, error) {
+func (s *AccountTestService) RunPromptTestBackgroundWithContinuation(ctx context.Context, accountID int64, modelID, prompt, reasoningEffort, continuation string) (*ScheduledTestResult, error) {
+	return s.runTestBackground(ctx, accountID, modelID, prompt, reasoningEffort, continuation)
+}
+
+func (s *AccountTestService) runTestBackground(ctx context.Context, accountID int64, modelID, prompt, reasoningEffort, continuation string) (*ScheduledTestResult, error) {
 	startedAt := time.Now()
 
 	w := httptest.NewRecorder()
@@ -3368,7 +3398,9 @@ func (s *AccountTestService) runTestBackground(ctx context.Context, accountID in
 	ginCtx.Request = (&http.Request{}).WithContext(ctx)
 	ginCtx.Set(accountTestBackgroundKey, true)
 
-	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault, AccountTestOptions{ReasoningEffort: reasoningEffort})
+	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, prompt, AccountTestModeDefault, AccountTestOptions{
+		ReasoningEffort: reasoningEffort, ContinuationText: continuation,
+	})
 
 	finishedAt := time.Now()
 	body := w.Body.String()

@@ -92,8 +92,7 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 	defer cancel()
 
 	now := time.Now()
-	staleBefore := now.Add(-channelIQTestTimeout - 2*time.Minute)
-	if count, err := s.scheduledSvc.FailStaleChannelIQRunning(ctx, staleBefore); err != nil {
+	if count, err := s.scheduledSvc.FailStaleChannelIQRunning(ctx, now); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] stale channel IQ recovery error: %v", err)
 	} else if count > 0 {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] marked %d interrupted channel IQ runs as failed", count)
@@ -138,24 +137,27 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 		}
 		sem <- struct{}{}
 		wg.Add(1)
-		go func(p *ScheduledTestPlan, pending *ScheduledTestResult) {
+		go func(p *ScheduledTestPlan, pending *ScheduledTestResult, next time.Time) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			s.runOnePlan(ctx, p, pending)
-		}(plan, runningResult)
+			s.runOnePlan(ctx, p, pending, next)
+		}(plan, runningResult, nextRun)
 	}
 
 	wg.Wait()
 }
 
-func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan, pending *ScheduledTestResult) {
+func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan, pending *ScheduledTestResult, claimedNextRun time.Time) {
 	var result *ScheduledTestResult
 	var err error
 	if plan.Kind == ChannelIQPlanKind {
-		probeCtx, cancel := newChannelIQProbeContext()
+		probeCtx, cancel := newChannelIQProbeWindowContext(claimedNextRun)
 		defer cancel()
 		ctx = probeCtx
-		result, err = s.accountTestSvc.RunPromptTestBackgroundWithOptions(ctx, plan.AccountID, plan.ModelID, channelIQPromptForExecution(plan.Prompt), plan.ReasoningEffort)
+		prompt := channelIQPromptForExecution(plan.Prompt)
+		result = runChannelIQProbeUntil(ctx, claimedNextRun, func(attemptCtx context.Context, continuation string) (*ScheduledTestResult, error) {
+			return s.accountTestSvc.RunPromptTestBackgroundWithContinuation(attemptCtx, plan.AccountID, plan.ModelID, prompt, plan.ReasoningEffort, continuation)
+		}, waitChannelIQRetry)
 	} else {
 		result, err = s.accountTestSvc.RunTestBackground(ctx, plan.AccountID, plan.ModelID)
 	}
@@ -175,6 +177,10 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 	}
 	result.ModelID = plan.ModelID
 	result.ReasoningEffort = plan.ReasoningEffort
+	if pending != nil {
+		result.StartedAt = pending.StartedAt
+		result.LatencyMs = result.FinishedAt.Sub(pending.StartedAt).Milliseconds()
+	}
 	persistCtx, cancel := scheduledTestPersistenceContext(ctx)
 	defer cancel()
 	maxResults := plan.MaxResults
@@ -197,10 +203,13 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 		s.tryRecoverAccount(persistCtx, plan.AccountID, plan.ID)
 	}
 
-	nextRun, err := computeNextRun(plan.CronExpression, time.Now())
-	if err != nil {
-		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d computeNextRun error: %v", plan.ID, err)
-		return
+	nextRun := claimedNextRun
+	if plan.Kind != ChannelIQPlanKind {
+		nextRun, err = computeNextRun(plan.CronExpression, time.Now())
+		if err != nil {
+			logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d computeNextRun error: %v", plan.ID, err)
+			return
+		}
 	}
 
 	if err := s.planRepo.UpdateAfterRun(persistCtx, plan.ID, time.Now(), nextRun); err != nil {

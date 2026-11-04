@@ -77,3 +77,17 @@ func TestChannelIQClaimDoesNotDuplicateAlreadyClaimedHour(t *testing.T) {
 	require.False(t, claimed)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestChannelIQCompletionNeverSkipsOrRegressesClaimedNextHour(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	finished := time.Date(2026, 11, 4, 18, 0, 1, 0, time.UTC)
+	nextHour := finished.Add(-time.Second)
+	mock.ExpectExec("next_run_at = GREATEST\\(next_run_at, \\$3\\)").
+		WithArgs(int64(1), finished, nextHour).WillReturnResult(sqlmock.NewResult(0, 1))
+
+	repo := &scheduledTestPlanRepository{db: db}
+	require.NoError(t, repo.UpdateAfterRun(context.Background(), 1, finished, nextHour))
+	require.NoError(t, mock.ExpectationsWereMet())
+}
