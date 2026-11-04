@@ -1,6 +1,9 @@
 <template>
   <div v-if="srcdoc" class="mt-4">
-    <div class="relative aspect-[8/5] w-full overflow-hidden rounded-md bg-white ring-1 ring-gray-200 dark:ring-dark-700">
+    <div
+      class="relative w-full overflow-hidden rounded-md bg-white ring-1 ring-gray-200 dark:ring-dark-700"
+      :style="{ aspectRatio: String(aspectRatio) }"
+    >
       <iframe
         ref="frame"
         :srcdoc="srcdoc"
@@ -33,7 +36,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
-import { extractChannelIQHtmlPreviewDocument } from '@/utils/channelIQHtml'
+import { extractChannelIQHtmlPreviewDocument, getChannelIQAnimationAspectRatio } from '@/utils/channelIQHtml'
 
 const props = defineProps<{ responseText: string; title: string; autoplay: boolean }>()
 const { t } = useI18n()
@@ -42,6 +45,7 @@ const playing = ref(props.autoplay)
 const token = crypto.randomUUID()
 const nonce = document.querySelector<HTMLScriptElement>('script[nonce]')?.nonce || ''
 const srcdoc = computed(() => extractChannelIQHtmlPreviewDocument(props.responseText, nonce, token, props.autoplay))
+const aspectRatio = computed(() => getChannelIQAnimationAspectRatio(props.responseText))
 
 function syncPlaying() {
   frame.value?.contentWindow?.postMessage({ kind: 'channel-iq-control', token, playing: playing.value }, '*')
