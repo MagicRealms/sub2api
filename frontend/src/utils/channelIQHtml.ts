@@ -31,21 +31,23 @@ html, body {
   background: transparent !important;
 }
 body {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+  position: relative !important;
+  display: block !important;
   box-sizing: border-box !important;
 }
 body > * {
   max-width: 100% !important;
-  max-height: 100% !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
   box-sizing: border-box !important;
 }
-body > :only-child:not(svg) {
-  width: 100% !important;
-  height: 100% !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+body > :first-child {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  margin: 0 !important;
+  transform-origin: center center !important;
 }
 body > svg {
   width: 100% !important;
@@ -200,6 +202,34 @@ function channelIQControlScript(token: string, autoplay: boolean): string {
   const callbacks = new Map();
   const nativeRAF = window.requestAnimationFrame.bind(window);
   const nativeCancel = window.cancelAnimationFrame.bind(window);
+  const content = () => Array.from(document.body.children)
+    .find(element => !['SCRIPT', 'STYLE'].includes(element.tagName)) || null;
+
+  function fitContent() {
+    const root = content();
+    if (!root) return;
+    root.style.position = 'absolute';
+    root.style.left = '50%';
+    root.style.top = '50%';
+    root.style.margin = '0';
+    root.style.transform = 'translate(-50%, -50%)';
+    const rect = root.getBoundingClientRect();
+    const width = Math.max(rect.width, root.scrollWidth || 0, 1);
+    const height = Math.max(rect.height, root.scrollHeight || 0, 1);
+    const availableWidth = Math.max(window.innerWidth, 1);
+    const availableHeight = Math.max(window.innerHeight, 1);
+    const scale = Math.min(1, availableWidth / width, availableHeight / height);
+    root.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+
+  function reportReady() {
+    fitContent();
+    window.parent.postMessage({
+      kind: 'channel-iq-ready', token,
+      width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+      height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+    }, '*');
+  }
 
   function schedule(id) {
     const pending = callbacks.get(id);
@@ -250,13 +280,12 @@ function channelIQControlScript(token: string, autoplay: boolean): string {
     if (event.source !== window.parent || event.data?.kind !== 'channel-iq-control' || event.data.token !== token) return;
     setPlaying(event.data.playing === true);
   });
+  window.addEventListener('resize', fitContent, { passive: true });
   document.addEventListener('DOMContentLoaded', () => {
     syncAnimations();
-    window.parent.postMessage({
-      kind: 'channel-iq-ready', token,
-      width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
-      height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
-    }, '*');
+    reportReady();
+    setTimeout(fitContent, 0);
+    setTimeout(fitContent, 120);
   });
 })();`
 }

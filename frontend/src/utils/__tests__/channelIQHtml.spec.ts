@@ -20,9 +20,8 @@ describe('channel IQ animation extraction', () => {
     expect(html).toContain('preserveAspectRatio="xMidYMid meet"')
     expect(html).toContain('animation: fly')
     expect(html).toContain('width: 100% !important')
-    expect(html).toContain('align-items: center !important')
+    expect(html).toContain('position: relative !important')
     expect(html).toContain('background: transparent !important')
-    expect(html).toContain('box-shadow: none !important')
   })
 
   it('removes scripts, event handlers, and non-image external resources', () => {
@@ -68,6 +67,8 @@ describe('channel IQ full HTML preview', () => {
     expect(result).toContain('xlink:href="#wheel"')
     expect(result).toContain('requestAnimationFrame(() => document.body.dataset.moving')
     expect(result).toContain('animation-play-state: paused')
+    expect(result).toContain('function fitContent()')
+    expect(result).toContain("scale(' + scale + ')")
     expect(result).toContain('script-src \'nonce-abc123456789==\'')
     expect(result).not.toContain('<iframe')
   })
