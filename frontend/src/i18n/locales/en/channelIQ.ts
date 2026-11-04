@@ -24,6 +24,8 @@ export default {
       latency: 'Latency',
       response: 'Latest animation',
       animationTitle: 'Channel IQ SVG animation preview',
+      play: 'Play animation',
+      pause: 'Pause animation',
       animationUnavailable: 'This result does not contain a renderable SVG animation.',
       waiting: 'Waiting for the first result…',
       running: 'This test is running. The result will update when it finishes.',

@@ -91,7 +91,7 @@
         </div>
 
         <div v-if="results.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-          <article v-for="result in results" :key="result.id" class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+          <article v-for="(result, index) in results" :key="result.id" class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
             <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'running' ? 'bg-amber-500' : result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
             <div class="flex items-start justify-between gap-3">
               <div>
@@ -105,19 +105,7 @@
                 {{ result.status === 'running' ? t('admin.channelIQ.results.running') : result.status === 'success' ? t('admin.channelIQ.results.success') : t('admin.channelIQ.results.failed') }}
               </span>
             </div>
-            <div
-              v-if="result.status === 'success' && hasAnimation(result.response_text)"
-              :style="animationStyle(result.response_text)"
-              class="relative mt-4 w-full overflow-hidden rounded-xl bg-transparent"
-            >
-              <iframe
-                :srcdoc="renderAnimation(result.response_text)"
-                class="absolute inset-0 h-full w-full border-0 bg-transparent"
-                sandbox=""
-                :title="t('admin.channelIQ.results.animationTitle')"
-              ></iframe>
-            </div>
-            <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.animationUnavailable') }}</p>
+            <ChannelIQPreview v-if="result.status === 'success'" :response-text="result.response_text" :title="t('admin.channelIQ.results.animationTitle')" :autoplay="index === 0" />
             <p v-else-if="result.status === 'running'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.runningDetail') }}</p>
             <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('admin.channelIQ.results.empty') }}</p>
             <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
@@ -153,6 +141,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ChannelIQPreview from '@/components/common/ChannelIQPreview.vue'
 import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
@@ -161,7 +150,6 @@ import type { AccountListItem } from '@/types'
 import type { ChannelIQCriterionStatus, ChannelIQResult } from '@/api/admin/channelIQ'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { extractChannelIQAnimationDocument, getChannelIQAnimationAspectRatio } from '@/utils/channelIQHtml'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -248,18 +236,6 @@ async function runNow() {
   } finally {
     running.value = false
   }
-}
-
-function renderAnimation(value: string): string {
-  return extractChannelIQAnimationDocument(value)
-}
-
-function hasAnimation(value: string): boolean {
-  return renderAnimation(value) !== ''
-}
-
-function animationStyle(value: string): { aspectRatio: string } {
-  return { aspectRatio: String(getChannelIQAnimationAspectRatio(value)) }
 }
 
 function evaluationGradeLabel(result: ChannelIQResult): string {

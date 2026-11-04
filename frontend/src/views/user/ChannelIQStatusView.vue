@@ -32,7 +32,7 @@
 
       <section v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <article
-          v-for="result in results"
+          v-for="(result, index) in results"
           :key="result.id"
           class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
         >
@@ -50,19 +50,7 @@
             </span>
           </div>
 
-          <div
-            v-if="result.status === 'success' && hasAnimation(result.response_text)"
-            :style="animationStyle(result.response_text)"
-            class="relative mt-4 w-full overflow-hidden rounded-xl bg-transparent"
-          >
-            <iframe
-              :srcdoc="renderAnimation(result.response_text)"
-              class="absolute inset-0 h-full w-full border-0 bg-transparent"
-              sandbox=""
-              :title="t('channelIQ.card.animationTitle')"
-            ></iframe>
-          </div>
-          <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.animationUnavailable') }}</p>
+          <ChannelIQPreview v-if="result.status === 'success'" :response-text="result.response_text" :title="t('channelIQ.card.animationTitle')" :autoplay="index === 0" />
           <p v-else-if="result.status === 'running'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.running') }}</p>
           <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('channelIQ.card.waiting') }}</p>
           <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
@@ -96,11 +84,11 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ChannelIQPreview from '@/components/common/ChannelIQPreview.vue'
 import Icon from '@/components/icons/Icon.vue'
 import channelIQAPI, { type ChannelIQCriterionStatus, type ChannelIQResult } from '@/api/channelIQ'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { extractChannelIQAnimationDocument, getChannelIQAnimationAspectRatio } from '@/utils/channelIQHtml'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -108,18 +96,6 @@ const results = ref<ChannelIQResult[]>([])
 const configured = ref(false)
 const loading = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
-
-function renderAnimation(value: string): string {
-  return extractChannelIQAnimationDocument(value)
-}
-
-function hasAnimation(value: string): boolean {
-  return renderAnimation(value) !== ''
-}
-
-function animationStyle(value: string): { aspectRatio: string } {
-  return { aspectRatio: String(getChannelIQAnimationAspectRatio(value)) }
-}
 
 function evaluationGradeLabel(result: ChannelIQResult): string {
   const evaluation = result.evaluation

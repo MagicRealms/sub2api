@@ -2,7 +2,7 @@ import DOMPurify from 'dompurify'
 
 const channelIQSanitizeConfig = {
   USE_PROFILES: { html: true, svg: true, svgFilters: true },
-  ADD_TAGS: ['animate', 'animateMotion', 'animateTransform', 'set'],
+  ADD_TAGS: ['animate', 'animateMotion', 'animateTransform', 'set', 'use'],
   ADD_ATTR: [
     'accumulate', 'additive', 'alignment-baseline', 'attributeName', 'attributeType', 'begin', 'calcMode',
     'cx', 'cy', 'd', 'dur', 'end', 'fill', 'fill-opacity', 'filter', 'focusable', 'from', 'gradientTransform',
@@ -10,7 +10,7 @@ const channelIQSanitizeConfig = {
     'pathLength', 'points', 'preserveAspectRatio', 'repeatCount', 'role', 'r', 'rotate', 'rx', 'ry', 'stdDeviation',
     'stop-color', 'stop-opacity', 'stroke', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity',
     'stroke-width', 'to', 'transform', 'transform-origin', 'values', 'viewBox', 'version', 'width', 'x', 'x1', 'x2',
-    'y', 'y1', 'y2', 'xmlns', 'xmlns:xlink',
+    'y', 'y1', 'y2', 'xmlns', 'xmlns:xlink', 'xlink:href',
   ],
   FORBID_TAGS: ['base', 'embed', 'form', 'iframe', 'input', 'link', 'meta', 'object', 'script', 'textarea'],
   FORBID_ATTR: ['srcdoc'],
@@ -163,4 +163,125 @@ export function extractChannelIQAnimationDocument(value: string): string {
   // isolated block after sanitizing the markup.
   const sanitized = `${buildSafeStyleBlock(styles)}\n${channelIQPreviewStyle}\n${sanitizedBody}`
   return /<svg\b/i.test(sanitized) ? sanitized : ''
+}
+
+const channelIQFrameStyle = `<style>
+html, body { width: 100%; min-height: 100%; margin: 0; overflow: hidden; }
+html.channel-iq-paused *, html.channel-iq-paused *::before, html.channel-iq-paused *::after {
+  animation-play-state: paused !important;
+}
+</style>`
+
+function stripExternalResources(markup: string): string {
+  const doc = new DOMParser().parseFromString(markup, 'text/html')
+  const safeURL = (value: string): boolean => /^(?:#|data:image\/(?:gif|png|jpeg|webp);base64,)/i.test(value.trim())
+  doc.querySelectorAll('*').forEach(element => {
+    for (const name of ['href', 'xlink:href', 'src', 'srcset', 'action', 'formaction']) {
+      const value = element.getAttribute(name)
+      if (value && !safeURL(value)) element.removeAttribute(name)
+    }
+    const style = element.getAttribute('style')
+    if (style) {
+      element.setAttribute('style', style
+        .replace(/@import[\s\S]*?;\s*/gi, '')
+        .replace(/url\(\s*(['"]?)(?!#|data:image\/(?:gif|png|jpeg|webp);base64,)[^)]*\1\s*\)/gi, 'none'))
+    }
+  })
+  return doc.body.innerHTML
+}
+
+function channelIQControlScript(token: string, autoplay: boolean): string {
+  return `(() => {
+  const token = ${JSON.stringify(token)};
+  let playing = ${autoplay ? 'true' : 'false'};
+  let pausedAt = playing ? 0 : performance.now();
+  let pausedDuration = 0;
+  let nextID = 1;
+  const callbacks = new Map();
+  const nativeRAF = window.requestAnimationFrame.bind(window);
+  const nativeCancel = window.cancelAnimationFrame.bind(window);
+
+  function schedule(id) {
+    const pending = callbacks.get(id);
+    if (!pending || !playing) return;
+    pending.nativeID = nativeRAF(timestamp => {
+      callbacks.delete(id);
+      pending.callback(timestamp - pausedDuration);
+    });
+  }
+  window.requestAnimationFrame = callback => {
+    const id = nextID++;
+    callbacks.set(id, { callback, nativeID: null });
+    schedule(id);
+    return id;
+  };
+  window.cancelAnimationFrame = id => {
+    const pending = callbacks.get(id);
+    if (pending && pending.nativeID !== null) nativeCancel(pending.nativeID);
+    callbacks.delete(id);
+  };
+
+  function syncAnimations() {
+    document.documentElement.classList.toggle('channel-iq-paused', !playing);
+    document.querySelectorAll('svg').forEach(svg => {
+      if (playing) svg.unpauseAnimations?.();
+      else svg.pauseAnimations?.();
+    });
+  }
+  function setPlaying(next) {
+    if (next === playing) return;
+    if (next) {
+      pausedDuration += performance.now() - pausedAt;
+      playing = true;
+      syncAnimations();
+      for (const id of callbacks.keys()) schedule(id);
+    } else {
+      playing = false;
+      pausedAt = performance.now();
+      for (const pending of callbacks.values()) {
+        if (pending.nativeID !== null) nativeCancel(pending.nativeID);
+        pending.nativeID = null;
+      }
+      syncAnimations();
+    }
+  }
+
+  window.addEventListener('message', event => {
+    if (event.source !== window.parent || event.data?.kind !== 'channel-iq-control' || event.data.token !== token) return;
+    setPlaying(event.data.playing === true);
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    syncAnimations();
+    window.parent.postMessage({
+      kind: 'channel-iq-ready', token,
+      width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+      height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+    }, '*');
+  });
+})();`
+}
+
+/** Render model HTML in an opaque-origin iframe with only local, inline assets. */
+export function extractChannelIQHtmlPreviewDocument(value: string, nonce: string, token: string, autoplay: boolean): string {
+  const source = unwrapHtmlSource(value.trim())
+  if (!/<svg\b/i.test(source)) return ''
+  const parsed = new DOMParser().parseFromString(source, 'text/html')
+  if (!parsed.querySelector('svg')) return ''
+
+  const inlineScripts = Array.from(parsed.querySelectorAll('script:not([src])'))
+    .filter(script => !script.type || script.type === 'text/javascript')
+    .map(script => script.textContent || '')
+    .filter(Boolean)
+  const styles = buildSafeStyleBlock(Array.from(parsed.querySelectorAll('style')))
+  const body = stripExternalResources(DOMPurify.sanitize(parsed.body.innerHTML, channelIQSanitizeConfig))
+  if (!/<svg\b/i.test(body)) return ''
+
+  const safeNonce = /^[A-Za-z0-9+/=-]{8,128}$/.test(nonce) ? nonce : ''
+  const scriptPolicy = safeNonce ? `'nonce-${safeNonce}'` : "'none'"
+  const csp = `default-src 'none'; script-src ${scriptPolicy}; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; form-action 'none'; object-src 'none'; base-uri 'none'; navigate-to 'none'`
+  const scripts = safeNonce
+    ? [channelIQControlScript(token, autoplay), ...inlineScripts]
+      .map(script => `<script nonce="${safeNonce}">${script.replace(/<\/script/gi, '<\\/script')}</script>`).join('\n')
+    : ''
+  return `<!doctype html><html${autoplay ? '' : ' class="channel-iq-paused"'}><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer">${styles}${channelIQFrameStyle}</head><body>${body}${scripts}</body></html>`
 }
