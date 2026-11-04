@@ -219,14 +219,17 @@ func (s *ChannelIQService) listResults(ctx context.Context, plan *ScheduledTestP
 		if reasoningEffort == "" {
 			reasoningEffort = strings.TrimSpace(plan.ReasoningEffort)
 		}
-		evaluation := evaluateChannelIQResponse(result.ResponseText)
-		items = append(items, &ChannelIQResult{
+		item := &ChannelIQResult{
 			ID: result.ID, Status: result.Status, ModelID: modelID,
 			ReasoningEffort: reasoningEffort, ResponseText: result.ResponseText,
 			ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
 			FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
-			Evaluation: &evaluation,
-		})
+		}
+		if result.Status == "success" {
+			evaluation := evaluateChannelIQResponse(result.ResponseText)
+			item.Evaluation = &evaluation
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }
@@ -295,6 +298,8 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 			CronExpression: cronExpr, Enabled: input.Enabled, MaxResults: channelIQResultLimit,
 		})
 	} else {
+		previousEnabled := plan.Enabled
+		previousCron := plan.CronExpression
 		plan.AccountID = input.AccountID
 		plan.ModelID = strings.TrimSpace(input.ModelID)
 		plan.Kind = ChannelIQPlanKind
@@ -303,7 +308,11 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 		plan.CronExpression = cronExpr
 		plan.Enabled = input.Enabled
 		plan.MaxResults = channelIQResultLimit
-		plan, err = s.scheduled.UpdatePlan(ctx, plan)
+		if previousEnabled && input.Enabled && previousCron == cronExpr && plan.NextRunAt != nil {
+			plan, err = s.planRepo.UpdateWithoutRescheduling(ctx, plan)
+		} else {
+			plan, err = s.scheduled.UpdatePlan(ctx, plan)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("保存渠道智商配置失败: %w", err)

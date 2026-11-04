@@ -89,6 +89,14 @@ func (s *ScheduledTestService) SaveResult(ctx context.Context, planID int64, max
 	return s.resultRepo.PruneOldResults(ctx, planID, maxResults)
 }
 
+func (s *ScheduledTestService) CompleteRunningResult(ctx context.Context, result *ScheduledTestResult) error {
+	return s.resultRepo.CompleteRunning(ctx, result)
+}
+
+func (s *ScheduledTestService) FailStaleChannelIQRunning(ctx context.Context, before time.Time) (int64, error) {
+	return s.resultRepo.FailStaleChannelIQRunning(ctx, before)
+}
+
 func computeNextRun(cronExpr string, from time.Time) (time.Time, error) {
 	sched, err := scheduledTestCronParser.Parse(cronExpr)
 	if err != nil {

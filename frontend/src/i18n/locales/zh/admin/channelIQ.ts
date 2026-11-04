@@ -44,6 +44,8 @@ export default {
       autoReasoning: '默认思考',
       success: '请求成功',
       failed: '失败',
+      running: '测试中',
+      runningDetail: '本次测试正在进行，完成后自动更新结果。',
       animationTitle: '渠道智商 SVG 动画预览',
       animationUnavailable: '本次结果没有检测到可渲染的 SVG 动画。',
       empty: '测试失败，暂无动画结果',

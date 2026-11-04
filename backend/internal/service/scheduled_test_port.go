@@ -49,17 +49,22 @@ type ScheduledTestPlanRepository interface {
 	ListByKind(ctx context.Context, kind string) ([]*ScheduledTestPlan, error)
 	ListDue(ctx context.Context, now time.Time) ([]*ScheduledTestPlan, error)
 	Update(ctx context.Context, plan *ScheduledTestPlan) (*ScheduledTestPlan, error)
+	UpdateWithoutRescheduling(ctx context.Context, plan *ScheduledTestPlan) (*ScheduledTestPlan, error)
 	Delete(ctx context.Context, id int64) error
 	// ClaimDue advances next_run_at only when the plan is still due. This keeps
 	// overlapping scheduler ticks or multiple app instances from running a
 	// slow plan more than once.
 	ClaimDue(ctx context.Context, id int64, now time.Time, nextRunAt time.Time) (bool, error)
+	// ClaimDueWithResult atomically records a channel IQ attempt when claiming its hour.
+	ClaimDueWithResult(ctx context.Context, id int64, now time.Time, nextRunAt time.Time, result *ScheduledTestResult, keepCount int) (bool, error)
 	UpdateAfterRun(ctx context.Context, id int64, lastRunAt time.Time, nextRunAt time.Time) error
 }
 
 // ScheduledTestResultRepository defines the data access interface for test results.
 type ScheduledTestResultRepository interface {
 	Create(ctx context.Context, result *ScheduledTestResult) (*ScheduledTestResult, error)
+	CompleteRunning(ctx context.Context, result *ScheduledTestResult) error
+	FailStaleChannelIQRunning(ctx context.Context, before time.Time) (int64, error)
 	ListByPlanID(ctx context.Context, planID int64, limit int) ([]*ScheduledTestResult, error)
 	PruneOldResults(ctx context.Context, planID int64, keepCount int) error
 }

@@ -1,6 +1,6 @@
 import { apiClient } from './client'
 
-export type ChannelIQStatus = 'success' | 'failed' | 'pending'
+export type ChannelIQStatus = 'success' | 'failed' | 'running'
 export type ChannelIQCriterionStatus = 'pass' | 'partial' | 'fail' | 'unknown'
 
 export interface ChannelIQCriterion {

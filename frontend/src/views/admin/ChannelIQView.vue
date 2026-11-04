@@ -11,7 +11,7 @@
             <h1 class="text-2xl font-black tracking-tight sm:text-3xl">{{ t('admin.channelIQ.title') }}</h1>
             <p class="mt-2 text-sm leading-6 text-white/80">{{ t('admin.channelIQ.description') }}</p>
           </div>
-          <button type="button" class="btn border-white/30 bg-white/15 text-white hover:bg-white/25" :disabled="loading" @click="load">
+          <button type="button" class="btn border-white/30 bg-white/15 text-white hover:bg-white/25" :disabled="loading" @click="load()">
             <Icon name="refresh" size="sm" :class="loading ? 'animate-spin' : ''" />
             <span class="ml-2">{{ t('common.refresh') }}</span>
           </button>
@@ -92,7 +92,7 @@
 
         <div v-if="results.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
           <article v-for="result in results" :key="result.id" class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-            <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
+            <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'running' ? 'bg-amber-500' : result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
             <div class="flex items-start justify-between gap-3">
               <div>
                 <div class="text-xs text-gray-400">{{ t('admin.channelIQ.results.startedAt') }} {{ formatTime(result.started_at) }} · #{{ result.id }}</div>
@@ -101,8 +101,8 @@
                   <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ result.reasoning_effort || t('admin.channelIQ.results.autoReasoning') }}</span>
                 </div>
               </div>
-              <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="result.status === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/25 dark:text-rose-300'">
-                {{ result.status === 'success' ? t('admin.channelIQ.results.success') : t('admin.channelIQ.results.failed') }}
+              <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="result.status === 'running' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300' : result.status === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/25 dark:text-rose-300'">
+                {{ result.status === 'running' ? t('admin.channelIQ.results.running') : result.status === 'success' ? t('admin.channelIQ.results.success') : t('admin.channelIQ.results.failed') }}
               </span>
             </div>
             <div
@@ -118,6 +118,7 @@
               ></iframe>
             </div>
             <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.animationUnavailable') }}</p>
+            <p v-else-if="result.status === 'running'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.runningDetail') }}</p>
             <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('admin.channelIQ.results.empty') }}</p>
             <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
               <div class="flex items-center justify-between gap-3 text-xs">
@@ -133,7 +134,7 @@
                 </div>
               </div>
             </div>
-            <div class="mt-4 flex items-center justify-between text-xs text-gray-400">
+            <div v-if="result.status !== 'running'" class="mt-4 flex items-center justify-between text-xs text-gray-400">
               <span>{{ result.latency_ms }} ms</span>
               <span>{{ t('admin.channelIQ.results.finishedAt') }} {{ formatDate(result.finished_at) }}</span>
             </div>
@@ -149,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -167,6 +168,7 @@ const appStore = useAppStore()
 const loading = ref(false)
 const saving = ref(false)
 const running = ref(false)
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 const accountsLoading = ref(false)
 const accounts = ref<AccountListItem[]>([])
 const results = ref<ChannelIQResult[]>([])
@@ -209,15 +211,15 @@ async function loadAccounts() {
   }
 }
 
-async function load() {
-  loading.value = true
+async function load(silent = false) {
+  if (!silent) loading.value = true
   try {
     const snapshot = await adminAPI.channelIQ.get()
     applySnapshot(snapshot)
   } catch (error: unknown) {
-    appStore.showError(extractApiErrorMessage(error, t('admin.channelIQ.loadError')))
+    if (!silent) appStore.showError(extractApiErrorMessage(error, t('admin.channelIQ.loadError')))
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -307,5 +309,12 @@ function formatDate(value?: string): string {
 
 onMounted(async () => {
   await Promise.all([loadAccounts(), load()])
+  refreshTimer = setInterval(() => {
+    if (!saving.value && !running.value) void load(true)
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
 })
 </script>

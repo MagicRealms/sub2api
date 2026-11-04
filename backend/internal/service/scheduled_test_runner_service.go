@@ -92,6 +92,12 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 	defer cancel()
 
 	now := time.Now()
+	staleBefore := now.Add(-channelIQTestTimeout - 2*time.Minute)
+	if count, err := s.scheduledSvc.FailStaleChannelIQRunning(ctx, staleBefore); err != nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] stale channel IQ recovery error: %v", err)
+	} else if count > 0 {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] marked %d interrupted channel IQ runs as failed", count)
+	}
 	plans, err := s.planRepo.ListDue(ctx, now)
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] ListDue error: %v", err)
@@ -112,7 +118,16 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 			logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d computeNextRun error: %v", plan.ID, err)
 			continue
 		}
-		claimed, err := s.planRepo.ClaimDue(ctx, plan.ID, now, nextRun)
+		var runningResult *ScheduledTestResult
+		var claimed bool
+		if plan.Kind == ChannelIQPlanKind {
+			runningResult = &ScheduledTestResult{
+				ModelID: plan.ModelID, ReasoningEffort: plan.ReasoningEffort, StartedAt: now,
+			}
+			claimed, err = s.planRepo.ClaimDueWithResult(ctx, plan.ID, now, nextRun, runningResult, channelIQResultLimit)
+		} else {
+			claimed, err = s.planRepo.ClaimDue(ctx, plan.ID, now, nextRun)
+		}
 		if err != nil {
 			logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d claim error: %v", plan.ID, err)
 			continue
@@ -123,17 +138,17 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 		}
 		sem <- struct{}{}
 		wg.Add(1)
-		go func(p *ScheduledTestPlan) {
+		go func(p *ScheduledTestPlan, pending *ScheduledTestResult) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			s.runOnePlan(ctx, p)
-		}(plan)
+			s.runOnePlan(ctx, p, pending)
+		}(plan, runningResult)
 	}
 
 	wg.Wait()
 }
 
-func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan) {
+func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan, pending *ScheduledTestResult) {
 	var result *ScheduledTestResult
 	var err error
 	if plan.Kind == ChannelIQPlanKind {
@@ -146,6 +161,16 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 	}
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d RunTestBackground error: %v", plan.ID, err)
+		if pending == nil {
+			return
+		}
+		result = &ScheduledTestResult{
+			Status: "failed", ErrorMessage: err.Error(), StartedAt: pending.StartedAt,
+			FinishedAt: time.Now(), LatencyMs: time.Since(pending.StartedAt).Milliseconds(),
+		}
+	}
+	if result == nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d returned no result", plan.ID)
 		return
 	}
 	result.ModelID = plan.ModelID
@@ -157,7 +182,13 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 		maxResults = channelIQResultLimit
 	}
 
-	if err := s.scheduledSvc.SaveResult(persistCtx, plan.ID, maxResults, result); err != nil {
+	if pending != nil {
+		result.ID = pending.ID
+		err = s.scheduledSvc.CompleteRunningResult(persistCtx, result)
+	} else {
+		err = s.scheduledSvc.SaveResult(persistCtx, plan.ID, maxResults, result)
+	}
+	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d SaveResult error: %v", plan.ID, err)
 	}
 

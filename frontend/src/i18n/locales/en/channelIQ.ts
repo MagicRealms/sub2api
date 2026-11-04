@@ -26,6 +26,7 @@ export default {
       animationTitle: 'Channel IQ SVG animation preview',
       animationUnavailable: 'This result does not contain a renderable SVG animation.',
       waiting: 'Waiting for the first result…',
+      running: 'This test is running. The result will update when it finishes.',
       checkedAt: 'Checked {time}',
       notChecked: 'Not checked yet',
       rubricTitle: 'Pelican ability rubric',

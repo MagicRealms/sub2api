@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -93,6 +94,17 @@ func (r *scheduledTestPlanRepository) Update(ctx context.Context, plan *service.
 	return scanPlan(row)
 }
 
+func (r *scheduledTestPlanRepository) UpdateWithoutRescheduling(ctx context.Context, plan *service.ScheduledTestPlan) (*service.ScheduledTestPlan, error) {
+	row := r.db.QueryRowContext(ctx, `
+		UPDATE scheduled_test_plans
+		SET account_id = $2, model_id = $3, prompt = $4, reasoning_effort = $5,
+		    enabled = $6, max_results = $7, updated_at = NOW()
+		WHERE id = $1 AND kind = 'channel_iq'
+		RETURNING id, account_id, model_id, kind, prompt, reasoning_effort, cron_expression, enabled, max_results, auto_recover, last_run_at, next_run_at, created_at, updated_at
+	`, plan.ID, plan.AccountID, plan.ModelID, plan.Prompt, plan.ReasoningEffort, plan.Enabled, plan.MaxResults)
+	return scanPlan(row)
+}
+
 func (r *scheduledTestPlanRepository) Delete(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM scheduled_test_plans WHERE id = $1`, id)
 	return err
@@ -109,6 +121,48 @@ func (r *scheduledTestPlanRepository) ClaimDue(ctx context.Context, id int64, no
 	}
 	rows, err := result.RowsAffected()
 	return rows == 1, err
+}
+
+func (r *scheduledTestPlanRepository) ClaimDueWithResult(ctx context.Context, id int64, now time.Time, nextRunAt time.Time, run *service.ScheduledTestResult, keepCount int) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	claimed, err := tx.ExecContext(ctx, `
+		UPDATE scheduled_test_plans SET next_run_at = $3, updated_at = NOW()
+		WHERE id = $1 AND kind = 'channel_iq' AND enabled = true AND next_run_at <= $2
+	`, id, now, nextRunAt)
+	if err != nil {
+		return false, err
+	}
+	rows, err := claimed.RowsAffected()
+	if err != nil || rows == 0 {
+		return false, err
+	}
+	run.PlanID = id
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO scheduled_test_results (plan_id, status, model_id, reasoning_effort, response_text, error_message, latency_ms, started_at, finished_at, created_at)
+		VALUES ($1, 'running', $2, $3, '', '', 0, $4, $4, NOW()) RETURNING id
+	`, id, run.ModelID, run.ReasoningEffort, run.StartedAt).Scan(&run.ID)
+	if err != nil {
+		return false, err
+	}
+	if keepCount > 0 {
+		_, err = tx.ExecContext(ctx, `
+			DELETE FROM scheduled_test_results WHERE id IN (
+				SELECT id FROM scheduled_test_results WHERE plan_id = $1
+				ORDER BY created_at DESC, id DESC OFFSET $2
+			)
+		`, id, keepCount)
+		if err != nil {
+			return false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit channel IQ claim: %w", err)
+	}
+	return true, nil
 }
 
 func (r *scheduledTestPlanRepository) UpdateAfterRun(ctx context.Context, id int64, lastRunAt time.Time, nextRunAt time.Time) error {
@@ -143,6 +197,41 @@ func (r *scheduledTestResultRepository) Create(ctx context.Context, result *serv
 		return nil, err
 	}
 	return out, nil
+}
+
+func (r *scheduledTestResultRepository) CompleteRunning(ctx context.Context, result *service.ScheduledTestResult) error {
+	updated, err := r.db.ExecContext(ctx, `
+		UPDATE scheduled_test_results SET status = $2, model_id = $3, reasoning_effort = $4,
+		response_text = $5, error_message = $6, latency_ms = $7, started_at = $8, finished_at = $9
+		WHERE id = $1 AND status = 'running'
+	`, result.ID, result.Status, result.ModelID, result.ReasoningEffort, result.ResponseText,
+		result.ErrorMessage, result.LatencyMs, result.StartedAt, result.FinishedAt)
+	if err != nil {
+		return err
+	}
+	rows, err := updated.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("channel IQ running result %d was not found", result.ID)
+	}
+	return nil
+}
+
+func (r *scheduledTestResultRepository) FailStaleChannelIQRunning(ctx context.Context, before time.Time) (int64, error) {
+	updated, err := r.db.ExecContext(ctx, `
+		UPDATE scheduled_test_results AS result
+		SET status = 'failed', error_message = '测试进程中断或超时', finished_at = NOW(),
+		    latency_ms = GREATEST(0, (EXTRACT(EPOCH FROM (NOW() - result.started_at)) * 1000)::bigint)
+		FROM scheduled_test_plans AS plan
+		WHERE result.plan_id = plan.id AND plan.kind = 'channel_iq'
+		  AND result.status = 'running' AND result.started_at < $1
+	`, before)
+	if err != nil {
+		return 0, err
+	}
+	return updated.RowsAffected()
 }
 
 func (r *scheduledTestResultRepository) ListByPlanID(ctx context.Context, planID int64, limit int) ([]*service.ScheduledTestResult, error) {

@@ -26,6 +26,7 @@ export default {
       animationTitle: '渠道智商 SVG 动画预览',
       animationUnavailable: '本次结果没有检测到可渲染的 SVG 动画。',
       waiting: '等待第一次测试结果…',
+      running: '本次测试正在进行，完成后自动更新结果。',
       checkedAt: '检测于 {time}',
       notChecked: '尚未检测',
       rubricTitle: '鹈鹕结构能力判定',

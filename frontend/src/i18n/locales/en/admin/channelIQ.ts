@@ -44,6 +44,8 @@ export default {
       autoReasoning: 'Default reasoning',
       success: 'Request succeeded',
       failed: 'Failed',
+      running: 'Running',
+      runningDetail: 'This test is running. The result will update when it finishes.',
       animationTitle: 'Channel IQ SVG animation preview',
       animationUnavailable: 'This result does not contain a renderable SVG animation.',
       empty: 'The test failed and has no animation result.',

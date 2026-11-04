@@ -36,7 +36,7 @@
           :key="result.id"
           class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
         >
-          <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
+          <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'running' ? 'bg-amber-500' : result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
           <div class="flex items-start justify-between gap-3">
             <div>
               <div class="text-xs text-gray-400 dark:text-gray-500">{{ t('channelIQ.card.startedAt') }} {{ formatTime(result.started_at) }} · #{{ result.id }}</div>
@@ -45,8 +45,8 @@
                 <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ result.reasoning_effort || t('channelIQ.card.autoReasoning') }}</span>
               </div>
             </div>
-            <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="result.status === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/25 dark:text-rose-300'">
-              {{ result.status === 'success' ? t('channelIQ.card.requestSuccess') : t('channelIQ.status.error') }}
+            <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="result.status === 'running' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/25 dark:text-amber-300' : result.status === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/25 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-900/25 dark:text-rose-300'">
+              {{ result.status === 'running' ? t('channelIQ.status.pending') : result.status === 'success' ? t('channelIQ.card.requestSuccess') : t('channelIQ.status.error') }}
             </span>
           </div>
 
@@ -63,6 +63,7 @@
             ></iframe>
           </div>
           <p v-else-if="result.status === 'success'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.animationUnavailable') }}</p>
+          <p v-else-if="result.status === 'running'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.running') }}</p>
           <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('channelIQ.card.waiting') }}</p>
           <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
             <div class="flex items-center justify-between gap-3 text-xs">
@@ -79,7 +80,7 @@
             </div>
           </div>
 
-          <div class="mt-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
+          <div v-if="result.status !== 'running'" class="mt-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
             <span>{{ result.latency_ms }} ms</span>
             <span>{{ t('channelIQ.card.finishedAt') }} {{ formatTime(result.finished_at) }}</span>
           </div>
