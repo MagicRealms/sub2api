@@ -1005,7 +1005,11 @@ export default {
 	    threshold5h: '5h auto-reset threshold (%)',
 	    threshold7d: '7d auto-reset threshold (%)',
 	    thresholdHint: 'Each window is evaluated independently. Enter 0.1–100; both default to 100.',
-	    thresholdInvalid: 'Automatic reset-credit thresholds must be between 0.1% and 100%.'
+	    thresholdInvalid: 'Automatic reset-credit thresholds must be between 0.1% and 100%.',
+	    expiringTitle: 'Automatically use expiring reset credits',
+	    expiringHint: 'Independent switch: attempt to use an available reset credit during its final hour before expiry. Off by default.',
+	    expiringStatus: 'Expiring',
+	    notLimited: 'Upstream limit not reached; reset credit was not consumed'
 	  },
       // Quota control (Anthropic OAuth/SetupToken only)
       quotaControl: {

@@ -91,7 +91,7 @@
       >
         {{ autoResetStateLabel }}
         <span v-if="autoResetState.trigger_window" class="ml-1 tabular-nums">
-          {{ autoResetState.trigger_window }}
+          {{ autoResetState.trigger_window === 'expiry' ? t('admin.accounts.autoResetCredit.expiringStatus') : autoResetState.trigger_window }}
         </span>
       </span>
       <span v-if="autoResetState.checked_at" class="text-gray-500 dark:text-gray-400">
@@ -100,9 +100,9 @@
       <span
         v-if="autoResetState.error_code"
         class="max-w-full truncate text-red-600 dark:text-red-400"
-        :title="autoResetState.error_code"
+        :title="autoResetState.error_code === 'RESET_NOT_LIMITED' ? t('admin.accounts.autoResetCredit.notLimited') : autoResetState.error_code"
       >
-        {{ autoResetState.error_code }}
+        {{ autoResetState.error_code === 'RESET_NOT_LIMITED' ? t('admin.accounts.autoResetCredit.notLimited') : autoResetState.error_code }}
       </span>
     </div>
 
@@ -251,7 +251,7 @@ const updateCredits = (usage: OpenAIQuotaUsage | null) => {
 type AutoResetCreditState = NonNullable<NonNullable<Account['extra']>['codex_auto_reset_credit_state']>
 const validAutoResetStatuses = new Set(['checking', 'available', 'resetting', 'success', 'no_credit', 'failed'])
 const autoResetState = computed<AutoResetCreditState | null>(() => {
-  if (props.account.extra?.auto_reset_credit_enabled !== true) return null
+  if (props.account.extra?.auto_reset_credit_enabled !== true && props.account.extra?.auto_reset_credit_expiring_enabled !== true) return null
   const state = props.account.extra?.codex_auto_reset_credit_state
   if (!state || typeof state !== 'object' || !validAutoResetStatuses.has(String(state.status))) return null
   return state

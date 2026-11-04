@@ -1864,6 +1864,7 @@ describe('EditAccountModal OpenAI 自动使用重置卡', () => {
     expect((parent.get('[data-testid="auto-reset-credit-5h-threshold"]').element as HTMLInputElement).value).toBe('100')
     expect((parent.get('[data-testid="auto-reset-credit-7d-threshold"]').element as HTMLInputElement).value).toBe('100')
     expect(parent.get('[data-testid="auto-reset-credit-5h-threshold"]').attributes('disabled')).toBeDefined()
+    expect(parent.get('[data-testid="auto-reset-credit-expiring-enabled"]').attributes('aria-checked')).toBe('false')
     parent.unmount()
 
     for (const account of [buildAccount(), buildOpenAISetupTokenAccount(), buildOpenAISparkShadowAccount()]) {
@@ -1871,6 +1872,23 @@ describe('EditAccountModal OpenAI 自动使用重置卡', () => {
       expect(wrapper.find('[data-testid="auto-reset-credit-settings"]').exists()).toBe(false)
       wrapper.unmount()
     }
+  })
+
+  it('单独开启到期用卡时无需开启额度阈值开关', async () => {
+    const account = buildOpenAIOAuthParentAccount()
+    updateAccountMock.mockResolvedValue(account)
+    const wrapper = mountModal(account)
+
+    await wrapper.get('[data-testid="auto-reset-credit-expiring-enabled"]').trigger('click')
+    expect(wrapper.get('[data-testid="auto-reset-credit-expiring-enabled"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.get('[data-testid="auto-reset-credit-5h-threshold"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+      auto_reset_credit_enabled: false,
+      auto_reset_credit_expiring_enabled: true
+    })
+    wrapper.unmount()
   })
 
   it('独立保存两个阈值，并禁止把运行态回写到管理请求', async () => {

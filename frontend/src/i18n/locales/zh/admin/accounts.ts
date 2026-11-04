@@ -1107,7 +1107,11 @@ export default {
 	    threshold5h: '5h 自动用卡阈值(%)',
 	    threshold7d: '7d 自动用卡阈值(%)',
 	    thresholdHint: '两个窗口独立判断，任一达到自身阈值即触发。可填写 0.1–100，默认均为 100。',
-	    thresholdInvalid: '自动使用重置卡阈值必须在 0.1% 到 100% 之间。'
+	    thresholdInvalid: '自动使用重置卡阈值必须在 0.1% 到 100% 之间。',
+	    expiringTitle: '自动使用快过期的重置卡',
+	    expiringHint: '独立开关：可用重置卡进入到期前 1 小时后自动尝试使用；默认关闭。',
+	    expiringStatus: '即将到期',
+	    notLimited: '上游未达到限额，未消耗重置卡'
 	  },
       // Quota control (Anthropic OAuth/SetupToken only)
       quotaControl: {

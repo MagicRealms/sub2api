@@ -17,8 +17,29 @@ func TestNormalizeOpenAIAutoResetCreditExtra(t *testing.T) {
 		account := &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}
 		config := ResolveOpenAIAutoResetCreditConfig(account)
 		require.False(t, config.Enabled)
+		require.False(t, config.ExpiringEnabled)
 		require.Equal(t, 1.0, config.Threshold5h)
 		require.Equal(t, 1.0, config.Threshold7d)
+	})
+
+	t.Run("到期用卡开关独立且仅允许布尔值", func(t *testing.T) {
+		extra, err := normalizeOpenAIAutoResetCreditExtra(PlatformOpenAI, AccountTypeOAuth, false, map[string]any{
+			OpenAIAutoResetCreditExpiringExtraKey: true,
+		})
+		require.NoError(t, err)
+		config := ResolveOpenAIAutoResetCreditConfig(&Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: extra})
+		require.False(t, config.Enabled)
+		require.True(t, config.ExpiringEnabled)
+		require.NotContains(t, stripOpenAIAutoResetCreditManagedExtra(extra, true), OpenAIAutoResetCreditExpiringExtraKey)
+
+		_, err = normalizeOpenAIAutoResetCreditExtra(PlatformOpenAI, AccountTypeOAuth, false, map[string]any{
+			OpenAIAutoResetCreditExpiringExtraKey: "true",
+		})
+		require.Error(t, err)
+		_, err = normalizeOpenAIAutoResetCreditExtra(PlatformOpenAI, AccountTypeOAuth, true, map[string]any{
+			OpenAIAutoResetCreditExpiringExtraKey: true,
+		})
+		require.Error(t, err)
 	})
 
 	t.Run("开启时补齐两个百分百阈值并剥离运行态", func(t *testing.T) {
@@ -156,6 +177,12 @@ func TestSelectOpenAIAutoResetCandidate_FailsClosed(t *testing.T) {
 		AttemptCycleHash: "cycle-a", AttemptCreditHash: shortOpenAIAutoResetHash("missing"),
 	}, "cycle-a")
 	require.Error(t, err, "模糊结果后原卡消失时不得切换下一张卡")
+
+	selected, err = selectOpenAIAutoResetCandidate(candidates[0:1], 1, &OpenAIAutoResetCreditState{
+		Status: OpenAIAutoResetStatusSuccess, AttemptCycleHash: "cycle-a", AttemptCreditHash: shortOpenAIAutoResetHash("earlier"),
+	}, "cycle-a")
+	require.NoError(t, err)
+	require.Equal(t, "later", selected.ID, "确认成功后允许选择下一张卡")
 }
 
 func TestOpenAIQuotaAutoResetService_AssessesIndependentWindows(t *testing.T) {
@@ -182,6 +209,111 @@ func TestOpenAIQuotaAutoResetService_AssessesIndependentWindows(t *testing.T) {
 			require.Equal(t, test.wantWindow, assessment.triggerWindow)
 		})
 	}
+}
+
+func TestOpenAIAutoResetExpiringCreditDue(t *testing.T) {
+	now := time.Now().UTC()
+	for _, test := range []struct {
+		name   string
+		expiry string
+		want   bool
+	}{
+		{"outside window", now.Add(61 * time.Minute).Format(time.RFC3339), false},
+		{"inside window", now.Add(59 * time.Minute).Format(time.RFC3339), true},
+		{"already expired", now.Add(-time.Minute).Format(time.RFC3339), false},
+		{"missing expiry", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			credits := &OpenAIRateLimitResetCredits{AvailableCount: 1, Credits: []OpenAIRateLimitResetCreditDetail{{ExpiresAt: test.expiry}}}
+			require.Equal(t, test.want, openAIAutoResetExpiringCreditDue(credits, now))
+			require.Equal(t, test.want, openAIAutoResetCachedExpiryDue(map[string]any{openaiQuotaResetCreditsKey: credits}, now))
+		})
+	}
+}
+
+func TestOpenAIQuotaAutoResetService_ExpiringOnlyConsumesOnce(t *testing.T) {
+	now := time.Now().UTC()
+	expiresAt := now.Add(45 * time.Minute).Format(time.RFC3339)
+	account := &Account{
+		ID: 510, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true,
+		Extra: map[string]any{
+			OpenAIAutoResetCreditEnabledExtraKey:  false,
+			OpenAIAutoResetCreditExpiringExtraKey: true,
+			"codex_usage_updated_at":              now.Format(time.RFC3339),
+			openaiQuotaResetCreditsKey:            &OpenAIRateLimitResetCredits{AvailableCount: 1, Credits: []OpenAIRateLimitResetCreditDetail{{ExpiresAt: expiresAt}}},
+		},
+	}
+	repo := &autoResetTestAccountRepo{account: account}
+	quota := &autoResetTestQuota{usage: &OpenAIQuotaUsage{
+		FetchedAt: now.Unix(),
+		RateLimit: &OpenAIRateLimit{PrimaryWindow: &OpenAIRateLimitWindow{
+			UsedPercent: 10, LimitWindowSeconds: 5 * 60 * 60, ResetAt: now.Add(4 * time.Hour).Unix(),
+		}},
+		RateLimitResetCredits: &OpenAIRateLimitResetCredits{AvailableCount: 1, Credits: []OpenAIRateLimitResetCreditDetail{{ExpiresAt: expiresAt}}},
+		autoResetCandidates:   []openAIAutoResetCreditCandidate{{ID: "expiring-card", ExpiresAt: expiresAt}},
+	}}
+	config := DefaultIdempotencyConfig()
+	config.ObserveOnly = false
+	service := NewOpenAIQuotaAutoResetService(repo, quota, autoResetTestRecoverer{},
+		NewIdempotencyCoordinator(newInMemoryIdempotencyRepo(), config), nil, nil, nil)
+	require.NoError(t, service.evaluateAccount(context.Background(), account.ID))
+	require.Equal(t, int32(1), quota.resetCalls.Load())
+	require.Equal(t, "expiry", repo.stateForTest().TriggerWindow)
+	require.NoError(t, service.evaluateAccount(context.Background(), account.ID))
+	require.Equal(t, int32(1), quota.resetCalls.Load(), "repeated scans must reuse the same redemption")
+}
+
+func TestOpenAIQuotaAutoResetService_ExpiringCreditWaitsForFinalHour(t *testing.T) {
+	now := time.Now().UTC()
+	expiresAt := now.Add(61 * time.Minute).Format(time.RFC3339)
+	account := &Account{
+		ID: 511, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true,
+		Extra: map[string]any{
+			OpenAIAutoResetCreditExpiringExtraKey: true,
+			"codex_usage_updated_at":              now.Format(time.RFC3339),
+			openaiQuotaResetCreditsKey:            &OpenAIRateLimitResetCredits{AvailableCount: 1, Credits: []OpenAIRateLimitResetCreditDetail{{ExpiresAt: expiresAt}}},
+			OpenAIAutoResetCreditStateExtraKey:    &OpenAIAutoResetCreditState{Status: OpenAIAutoResetStatusAvailable, AvailableCount: 1, CheckedAt: now.Format(time.RFC3339)},
+		},
+	}
+	quota := &autoResetTestQuota{}
+	service := NewOpenAIQuotaAutoResetService(&autoResetTestAccountRepo{account: account}, quota, nil, nil, nil, nil, nil)
+	require.NoError(t, service.evaluateAccount(context.Background(), account.ID))
+	require.Zero(t, quota.queryCalls.Load())
+	require.Zero(t, quota.resetCalls.Load())
+}
+
+func TestOpenAIQuotaAutoResetService_ExpiringNotLimitedIsNotSuccess(t *testing.T) {
+	now := time.Now().UTC()
+	expiresAt := now.Add(30 * time.Minute).Format(time.RFC3339)
+	account := &Account{
+		ID: 512, Platform: PlatformOpenAI, Type: AccountTypeOAuth,
+		Status: StatusActive, Schedulable: true,
+		Extra: map[string]any{OpenAIAutoResetCreditExpiringExtraKey: true},
+	}
+	quota := &autoResetTestQuota{
+		resetCode: "not_limited",
+		usage: &OpenAIQuotaUsage{
+			FetchedAt: now.Unix(),
+			RateLimit: &OpenAIRateLimit{PrimaryWindow: &OpenAIRateLimitWindow{
+				UsedPercent: 10, LimitWindowSeconds: 5 * 60 * 60, ResetAt: now.Add(4 * time.Hour).Unix(),
+			}},
+			RateLimitResetCredits: &OpenAIRateLimitResetCredits{AvailableCount: 1, Credits: []OpenAIRateLimitResetCreditDetail{{ExpiresAt: expiresAt}}},
+			autoResetCandidates:   []openAIAutoResetCreditCandidate{{ID: "not-limited-card", ExpiresAt: expiresAt}},
+		},
+	}
+	config := DefaultIdempotencyConfig()
+	config.ObserveOnly = false
+	repo := &autoResetTestAccountRepo{account: account}
+	service := NewOpenAIQuotaAutoResetService(repo, quota, autoResetTestRecoverer{},
+		NewIdempotencyCoordinator(newInMemoryIdempotencyRepo(), config), nil, nil, nil)
+	require.NoError(t, service.evaluateAccount(context.Background(), account.ID))
+	require.Equal(t, OpenAIAutoResetStatusAvailable, repo.stateForTest().Status)
+	require.Equal(t, "RESET_NOT_LIMITED", repo.stateForTest().ErrorCode)
+	require.Equal(t, 1, repo.stateForTest().AvailableCount)
+	require.NoError(t, service.evaluateAccount(context.Background(), account.ID))
+	require.Equal(t, int32(1), quota.resetCalls.Load())
 }
 
 type autoResetTestAccountRepo struct {
@@ -212,6 +344,7 @@ func (r *autoResetTestAccountRepo) UpdateExtra(_ context.Context, id int64, upda
 
 type autoResetTestQuota struct {
 	usage        *OpenAIQuotaUsage
+	resetCode    string
 	resetCalls   atomic.Int32
 	resetEntered chan struct{}
 	releaseReset chan struct{}
@@ -257,7 +390,11 @@ func (q *autoResetTestQuota) ResetCreditTargeted(_ context.Context, _ int64, cre
 	if q.releaseReset != nil {
 		<-q.releaseReset
 	}
-	return &OpenAIQuotaResetResult{Code: "ok", WindowsReset: 2}, nil
+	code := q.resetCode
+	if code == "" {
+		code = "ok"
+	}
+	return &OpenAIQuotaResetResult{Code: code, WindowsReset: 2}, nil
 }
 
 type autoResetTestRecoverer struct{}
