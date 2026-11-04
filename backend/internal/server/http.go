@@ -118,10 +118,12 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 		MaxHeaderBytes: cfg.Server.MaxHeaderBytes,
 		// ReadHeaderTimeout: 读取请求头的超时时间，防止慢速请求头攻击
 		ReadHeaderTimeout: time.Duration(cfg.Server.ReadHeaderTimeout) * time.Second,
+		// ReadTimeout: 读取请求头和完整请求体的总超时。响应阶段不受此限制，
+		// 因此不会截断长时间运行的 SSE/流式模型响应。
+		ReadTimeout: time.Duration(cfg.Server.ReadBodyTimeout) * time.Second,
 		// IdleTimeout: 空闲连接超时时间，释放不活跃的连接资源
 		IdleTimeout: time.Duration(cfg.Server.IdleTimeout) * time.Second,
 		// 注意：不设置 WriteTimeout，因为流式响应可能持续十几分钟
-		// 不设置 ReadTimeout，因为大请求体可能需要较长时间读取
 	}
 
 	globalMaxSize := cfg.Server.MaxRequestBodySize

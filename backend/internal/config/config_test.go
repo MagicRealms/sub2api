@@ -126,6 +126,7 @@ func TestLoadHTTPIngressSafetyDefaults(t *testing.T) {
 	cfg, err := Load()
 	require.NoError(t, err)
 	require.Equal(t, 10, cfg.Server.ReadHeaderTimeout)
+	require.Equal(t, 180, cfg.Server.ReadBodyTimeout)
 	require.Equal(t, 64*1024, cfg.Server.MaxHeaderBytes)
 	require.Empty(t, cfg.Server.TrustedProxies)
 	require.False(t, cfg.Server.TrustedProxiesConfigured)
@@ -1645,6 +1646,11 @@ func TestValidateConfigErrors(t *testing.T) {
 			name:    "server read header timeout",
 			mutate:  func(c *Config) { c.Server.ReadHeaderTimeout = 0 },
 			wantErr: "server.read_header_timeout",
+		},
+		{
+			name:    "server read body timeout",
+			mutate:  func(c *Config) { c.Server.ReadBodyTimeout = 29 },
+			wantErr: "server.read_body_timeout",
 		},
 		{
 			name:    "server max header bytes too small",

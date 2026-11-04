@@ -85,5 +85,29 @@ if [[ "$healthy" != true ]]; then
   echo "New image failed health checks; restored $rollback_image. Database backup: $backup/database.dump" >&2
   exit 1
 fi
+
+# Keep only the two newest fork deployment snapshots. Each snapshot contains
+# the database dump, application data archive, and compose rollback metadata.
+keep_count=0
+while IFS= read -r backup_dir; do
+  [[ -n "$backup_dir" ]] || continue
+  keep_count=$((keep_count + 1))
+  if (( keep_count > 2 )); then
+    rm -rf -- "$backup_dir"
+  fi
+done < <(find backups -mindepth 1 -maxdepth 1 -type d -name '*-fork-*' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-)
+
+# Keep the running image and its immediate rollback image. Older fork tags are
+# no longer needed after the new deployment has passed its health check.
+while IFS= read -r candidate_image; do
+  [[ -n "$candidate_image" ]] || continue
+  if [[ "$candidate_image" == "$image" || "$candidate_image" == "$rollback_image" ]]; then
+    continue
+  fi
+  if ! docker image rm "$candidate_image" >/dev/null; then
+    printf 'Warning: could not remove old fork image %s\n' "$candidate_image" >&2
+  fi
+done < <(docker image ls --format '{{.Repository}}:{{.Tag}}' | awk '/^magicrealms\/sub2api:/')
+
 printf '%s\n' "$image" > .last-built-image
 printf 'Healthy image: %s\nBackup: %s\n' "$image" "$backup"

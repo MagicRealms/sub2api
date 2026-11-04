@@ -692,6 +692,7 @@ type ServerConfig struct {
 	EnableServerTiming       bool      `mapstructure:"enable_server_timing"`  // Admin UI Server-Timing response header
 	FrontendURL              string    `mapstructure:"frontend_url"`          // 前端基础 URL，用于生成邮件中的外部链接
 	ReadHeaderTimeout        int       `mapstructure:"read_header_timeout"`   // 读取请求头超时（秒）
+	ReadBodyTimeout          int       `mapstructure:"read_body_timeout"`     // 读取完整请求体超时（秒）
 	MaxHeaderBytes           int       `mapstructure:"max_header_bytes"`      // 请求头最大字节数（HTTP/2 映射为 header-list 上限）
 	IdleTimeout              int       `mapstructure:"idle_timeout"`          // 空闲连接超时（秒）
 	TrustedProxies           []string  `mapstructure:"trusted_proxies"`       // 可信代理列表（CIDR/IP）
@@ -2063,6 +2064,7 @@ func setDefaults() {
 	viper.SetDefault("server.enable_server_timing", false)
 	viper.SetDefault("server.frontend_url", "")
 	viper.SetDefault("server.read_header_timeout", 10) // 10秒读取请求头
+	viper.SetDefault("server.read_body_timeout", 180)  // 180秒读取完整请求体，避免截断上传长期占用连接
 	viper.SetDefault("server.max_header_bytes", 64*1024)
 	viper.SetDefault("server.idle_timeout", 120) // 120秒空闲超时
 	viper.SetDefault("server.max_request_body_size", int64(256*1024*1024))
@@ -2754,6 +2756,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Server.ReadHeaderTimeout < 1 || c.Server.ReadHeaderTimeout > 60 {
 		return fmt.Errorf("server.read_header_timeout must be between 1 and 60 seconds")
+	}
+	if c.Server.ReadBodyTimeout < 30 || c.Server.ReadBodyTimeout > 1800 {
+		return fmt.Errorf("server.read_body_timeout must be between 30 and 1800 seconds")
 	}
 	if c.Server.MaxHeaderBytes < 8*1024 || c.Server.MaxHeaderBytes > 1024*1024 {
 		return fmt.Errorf("server.max_header_bytes must be between 8192 and 1048576 bytes")

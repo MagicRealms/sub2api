@@ -15,6 +15,11 @@ def save(): p.write_text(json.dumps(s))
 if a[:2] == ['image','inspect']:
     if '--format' in a:
         print('https://github.com/MagicRealms/sub2api' if 'source' in a[-1] else 'a'*40)
+elif a[:2] == ['image','ls']:
+    print('magicrealms/sub2api:old')
+    print('magicrealms/sub2api:unused')
+elif a[:2] == ['image','rm']:
+    s.setdefault('removed', []).append(a[-1]); save()
 elif a[0] == 'inspect':
     if '.Config.Image' in a[-1]: print(s['old'])
     else: print('unhealthy' if s['scenario']=='unhealthy' else 'healthy')
@@ -37,16 +42,22 @@ else: raise SystemExit('unexpected docker '+str(a))
 
 
 class ForkDeployTest(unittest.TestCase):
-    def run_scenario(self, scenario, legacy=False, drain=False):
+    def run_scenario(self, scenario, legacy=False, drain=False, seed_backups=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             old = "weishaw/sub2api:0.1.169" if legacy else "magicrealms/sub2api:old"
             state = root / "state.json"
-            state.write_text(json.dumps(dict(old=old, scenario=scenario, polls=0, deploys=[])))
+            state.write_text(json.dumps(dict(old=old, scenario=scenario, polls=0, deploys=[], removed=[])))
             original = f"services:\n  sub2api:\n    image: {old}\n    mem_limit: 1536m\n  redis:\n    mem_limit: 256m\n"
             (root / "docker-compose.override.yml").write_text(original)
             (root / "docker-compose.yml").write_text("services: {}\n")
             (root / ".env").write_text("TEST_SETTING=retained\n")
+            if seed_backups:
+                for index in range(3):
+                    backup = root / "backups" / f"old-{index}-fork-test"
+                    backup.mkdir(parents=True)
+                    (backup / "database.dump").write_text(f"old {index}\n")
+                    os.utime(backup, (index + 1, index + 1))
             bindir = root / "bin"
             bindir.mkdir()
             (bindir / "docker").write_text(FAKE_DOCKER)
@@ -68,7 +79,7 @@ class ForkDeployTest(unittest.TestCase):
                 else:
                     self.assertEqual(info["polls"], 0)
                 backups = list((root / "backups").glob("*/database.dump"))
-                self.assertEqual(len(backups), 1)
+                self.assertEqual(len(backups), 2 if seed_backups else 1)
                 self.assertEqual(backups[0].read_text(), "database snapshot\n")
                 self.assertEqual(backups[0].parent.stat().st_mode & 0o777, 0o700)
             else:
@@ -83,6 +94,8 @@ class ForkDeployTest(unittest.TestCase):
     def test_failed_health_restores_previous_image(self): self.run_scenario("unhealthy")
     def test_busy_requests_leave_deployment_unchanged(self): self.run_scenario("busy", drain=True)
     def test_legacy_online_updated_image_requires_actual_rollback(self): self.run_scenario("healthy", legacy=True)
+    def test_retains_two_fork_backups_and_running_rollback_image(self):
+        self.run_scenario("healthy", seed_backups=True)
 
 
 if __name__ == "__main__":

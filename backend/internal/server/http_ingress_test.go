@@ -24,6 +24,7 @@ func ingressTestConfig() *config.Config {
 		Server: config.ServerConfig{
 			Host:               "127.0.0.1",
 			ReadHeaderTimeout:  1,
+			ReadBodyTimeout:    1,
 			IdleTimeout:        5,
 			MaxHeaderBytes:     8 * 1024,
 			MaxRequestBodySize: 1024,
@@ -36,6 +37,7 @@ func TestProvideHTTPServerAppliesIngressLimits(t *testing.T) {
 	srv := ProvideHTTPServer(ingressTestConfig(), gin.New())
 	require.Equal(t, 8*1024, srv.MaxHeaderBytes)
 	require.Equal(t, time.Second, srv.ReadHeaderTimeout)
+	require.Equal(t, time.Second, srv.ReadTimeout)
 	require.Equal(t, 5*time.Second, srv.IdleTimeout)
 }
 
@@ -140,6 +142,33 @@ func TestHTTPServerClosesSlowIncompleteHeader(t *testing.T) {
 	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 	_, err = bufio.NewReader(conn).ReadByte()
 	require.Error(t, err)
+}
+
+func TestHTTPServerClosesSlowIncompleteBody(t *testing.T) {
+	r := gin.New()
+	r.POST("/", func(c *gin.Context) {
+		if _, err := io.ReadAll(c.Request.Body); err != nil {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		c.Status(http.StatusOK)
+	})
+	srv := ProvideHTTPServer(ingressTestConfig(), r)
+	addr, stop := serveIngressTestServer(t, srv)
+	defer stop()
+
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	_, err = io.WriteString(conn, "POST / HTTP/1.1\r\nHost: test\r\nContent-Length: 100\r\n\r\npartial")
+	require.NoError(t, err)
+	time.Sleep(1200 * time.Millisecond)
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	resp, readErr := http.ReadResponse(bufio.NewReader(conn), nil)
+	if readErr == nil {
+		defer func() { _ = resp.Body.Close() }()
+		require.Contains(t, []int{http.StatusBadRequest, http.StatusRequestTimeout}, resp.StatusCode)
+	}
 }
 
 func TestHTTPServerGlobalBodyLimit(t *testing.T) {
