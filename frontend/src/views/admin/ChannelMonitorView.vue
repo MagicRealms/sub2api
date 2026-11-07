@@ -56,10 +56,12 @@
           v-model:provider="providerFilter"
           v-model:enabled="enabledFilter"
           :loading="loading"
+          :resetting="resettingHistory"
           @reload="reload"
           @create="openCreateDialog"
           @manage-templates="showTemplateManager = true"
           @search-input="handleSearch"
+          @reset-all-history="openResetHistory(null)"
         />
       </template>
 
@@ -105,10 +107,12 @@
               :row="row"
               :running="runningId === row.id"
               :duplicating="duplicatingIds.has(row.id)"
+              :resetting="resettingHistory"
               @run="handleRunNow"
               @duplicate="handleDuplicate"
               @edit="openEditDialog"
               @delete="handleDelete"
+              @reset-history="openResetHistory"
             />
           </template>
 
@@ -153,6 +157,16 @@
       :show="showRunResult"
       :results="runResults"
       @close="showRunResult = false"
+    />
+
+    <ConfirmDialog
+      :show="showResetHistoryDialog"
+      :title="t(resetTarget ? 'admin.channelMonitor.resetHistory' : 'admin.channelMonitor.resetAllHistory')"
+      :message="resetHistoryMessage"
+      :confirm-text="t(resettingHistory ? 'common.loading' : 'common.confirm')"
+      :danger="true"
+      @confirm="confirmResetHistory"
+      @cancel="closeResetHistory"
     />
 
     <ConfirmDialog
@@ -230,6 +244,51 @@ const deleting = ref<ChannelMonitor | null>(null)
 const showRunResult = ref(false)
 const runResults = ref<CheckResult[]>([])
 const duplicatingIds = reactive(new Set<number>())
+const showResetHistoryDialog = ref(false)
+const resettingHistory = ref(false)
+const resetTarget = ref<ChannelMonitor | null>(null)
+let resetOperationKey = ''
+const newResetOperationKey = () => `channel-monitor-history-reset-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`
+const resetHistoryMessage = computed(() => resetTarget.value
+  ? t('admin.channelMonitor.resetHistoryConfirm', { name: resetTarget.value.name })
+  : t('admin.channelMonitor.resetAllHistoryConfirm'))
+
+function openResetHistory(row: ChannelMonitor | null) {
+  if (resettingHistory.value) return
+  resetTarget.value = row
+  resetOperationKey = newResetOperationKey()
+  showResetHistoryDialog.value = true
+}
+
+function closeResetHistory() {
+  if (!resettingHistory.value) showResetHistoryDialog.value = false
+}
+
+async function confirmResetHistory() {
+  if (resettingHistory.value || !showResetHistoryDialog.value) return
+  resettingHistory.value = true
+  try {
+    await adminAPI.channelMonitor.resetHistory(resetTarget.value?.id ?? null, resetOperationKey)
+    showResetHistoryDialog.value = false
+    showRunResult.value = false
+    runResults.value = []
+    appStore.showSuccess(t('admin.channelMonitor.resetHistorySuccess'))
+    await reload()
+  } catch (err: unknown) {
+    // apiClient returns normalized errors; retain the operation key while an
+    // earlier request may still commit so a retry cannot clear fresh checks.
+    const apiError = err as { reason?: string; response?: { data?: { reason?: string } } }
+    const reason = apiError?.reason ?? apiError?.response?.data?.reason
+    if (reason === 'MONITOR_CHECK_RUNNING') resetOperationKey = newResetOperationKey()
+    appStore.showError(reason === 'MONITOR_CHECK_RUNNING'
+      ? t('admin.channelMonitor.resetHistoryBusy')
+      : reason === 'IDEMPOTENCY_IN_PROGRESS' || reason === 'IDEMPOTENCY_RETRY_BACKOFF'
+        ? t('admin.channelMonitor.resetHistoryPending')
+      : extractApiErrorMessage(err, t('admin.channelMonitor.resetHistoryFailed')))
+  } finally {
+    resettingHistory.value = false
+  }
+}
 
 let abortController: AbortController | null = null
 let searchTimeout: ReturnType<typeof setTimeout> | null = null

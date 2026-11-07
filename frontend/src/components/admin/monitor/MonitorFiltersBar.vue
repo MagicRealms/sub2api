@@ -56,6 +56,15 @@
         <Icon name="plus" size="md" class="mr-2" />
         {{ t('admin.channelMonitor.createButton') }}
       </button>
+      <button
+        data-testid="monitor-reset-all-history"
+        @click="$emit('reset-all-history')"
+        :disabled="loading || resetting"
+        class="btn btn-secondary text-amber-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-amber-400"
+      >
+        <Icon name="clock" size="md" class="mr-2" />
+        {{ t('admin.channelMonitor.resetAllHistory') }}
+      </button>
     </div>
   </div>
 </template>
@@ -81,6 +90,7 @@ import {
 
 defineProps<{
   loading: boolean
+  resetting?: boolean
 }>()
 
 defineEmits<{
@@ -88,6 +98,7 @@ defineEmits<{
   (e: 'create'): void
   (e: 'manage-templates'): void
   (e: 'search-input'): void
+  (e: 'reset-all-history'): void
 }>()
 
 const search = defineModel<string>('search', { required: true })

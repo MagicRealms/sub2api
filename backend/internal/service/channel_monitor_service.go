@@ -38,6 +38,7 @@ type ChannelMonitorRepository interface {
 
 	// 历史记录
 	ListHistory(ctx context.Context, monitorID int64, model string, limit int) ([]*ChannelMonitorHistoryEntry, error)
+	ResetHistory(ctx context.Context, monitorID int64) (*ChannelMonitorHistoryResetResult, error)
 
 	// 用户视图聚合
 	ListLatestPerModel(ctx context.Context, monitorID int64) ([]*ChannelMonitorLatest, error)

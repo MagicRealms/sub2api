@@ -28,6 +28,15 @@
       <span class="text-xs">{{ t('common.edit') }}</span>
     </button>
     <button
+      data-testid="monitor-reset-history"
+      @click="$emit('reset-history', row)"
+      :disabled="running || resetting"
+      class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-amber-900/20 dark:hover:text-amber-400"
+    >
+      <Icon name="clock" size="sm" />
+      <span class="text-xs">{{ t('admin.channelMonitor.resetHistory') }}</span>
+    </button>
+    <button
       @click="$emit('delete', row)"
       class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
     >
@@ -47,6 +56,7 @@ const props = defineProps<{
   row: ChannelMonitor
   running: boolean
   duplicating: boolean
+  resetting?: boolean
 }>()
 
 defineEmits<{
@@ -54,6 +64,7 @@ defineEmits<{
   (e: 'duplicate', row: ChannelMonitor): void
   (e: 'edit', row: ChannelMonitor): void
   (e: 'delete', row: ChannelMonitor): void
+  (e: 'reset-history', row: ChannelMonitor): void
 }>()
 
 const { t } = useI18n()

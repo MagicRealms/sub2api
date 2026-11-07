@@ -335,6 +335,20 @@ export async function runNow(id: number): Promise<RunNowResponse> {
   return data
 }
 
+export interface ResetHistoryResponse {
+  monitors_reset: number
+  history_deleted: number
+  rollups_deleted: number
+}
+
+export async function resetHistory(id: number | null, operationKey: string): Promise<ResetHistoryResponse> {
+  const path = id === null ? '/admin/channel-monitors/reset-history' : `/admin/channel-monitors/${id}/reset-history`
+  const { data } = await apiClient.post<ResetHistoryResponse>(path, undefined, {
+    headers: { 'Idempotency-Key': operationKey },
+  })
+  return data
+}
+
 /**
  * List historical check results for a monitor.
  */
@@ -357,6 +371,7 @@ export const channelMonitorAPI = {
   update,
   del,
   runNow,
+  resetHistory,
   listHistory,
 }
 
