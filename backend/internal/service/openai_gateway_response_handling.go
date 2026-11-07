@@ -513,6 +513,14 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				suppressCurrentEvent = true
 			}
 			observer.ObserveOpenAI(dataBytes, eventType)
+			if eventType == "response.incomplete" {
+				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
+				if err := s.handleOpenAIIncompleteResponse(c, account, resp, false, eventType, dataBytes,
+					responsesSemanticOutputSeen || openAIStreamClientOutputStarted(c, clientOutputStarted), mappedModel); err != nil {
+					streamEarlyErr = err
+					return
+				}
+			}
 			// 初始上游 data 的 type 只解析一次：原始值保持终止事件的精确匹配，规范化值供后续分支复用。
 			if openAIStreamEventIsTerminalWithType(data, eventType) {
 				sawTerminalEvent = true
@@ -1666,6 +1674,10 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		}
 	}
 
+	if err := s.handleOpenAIIncompleteResponse(c, account, resp, false, "", body,
+		openAIStreamClientOutputStarted(c, false), mappedModel); err != nil {
+		return nil, err
+	}
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
 	if !usageOK {
 		if bodyLooksLikeSSE {
@@ -1779,6 +1791,12 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			}
 		}
 		finalResponse = supplementCompactionItemFromSSE(c, finalResponse, bodyText)
+		if terminalType == "response.incomplete" {
+			if err := s.handleOpenAIIncompleteResponse(c, account, resp, false, terminalType, finalResponse,
+				openAIStreamClientOutputStarted(c, false) || openAIIncompleteSSEHasOutput(bodyText), mappedModel); err != nil {
+				return nil, err
+			}
+		}
 		body = finalResponse
 		if originalModel != mappedModel {
 			body = s.replaceModelInResponseBody(body, mappedModel, originalModel)

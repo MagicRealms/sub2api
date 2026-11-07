@@ -2033,6 +2033,13 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				}
 			}
 			eventType := effectiveOpenAISSEEventType(dataBytes, rawEventType)
+			if eventType == "response.incomplete" {
+				s.parseSSEUsageBytesWithType(dataBytes, eventType, usage)
+				if err := s.handleOpenAIIncompleteResponse(c, account, resp, true, eventType, dataBytes,
+					semanticOutputSeen || openAIStreamClientOutputStarted(c, clientOutputStarted), mappedModel); err != nil {
+					return resultWithUsage(), err
+				}
+			}
 			createdAtTracker.Observe(dataBytes, eventType)
 			if codexFailureTerminal && sawBareError && !sawResponseFailed && eventType != "response.failed" {
 				suppressCurrentEvent = true
@@ -2310,6 +2317,10 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 		return s.handlePassthroughSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 	}
 
+	if err := s.handleOpenAIIncompleteResponse(c, account, resp, true, "", body,
+		openAIStreamClientOutputStarted(c, false), mappedModel); err != nil {
+		return nil, err
+	}
 	usage := &OpenAIUsage{}
 	usageParsed := false
 	if len(body) > 0 {
@@ -2395,6 +2406,12 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 			}
 		}
 		finalResponse = supplementCompactionItemFromSSE(c, finalResponse, bodyText)
+		if terminalType == "response.incomplete" {
+			if err := s.handleOpenAIIncompleteResponse(c, account, resp, true, terminalType, finalResponse,
+				openAIStreamClientOutputStarted(c, false) || openAIIncompleteSSEHasOutput(bodyText), mappedModel); err != nil {
+				return nil, err
+			}
+		}
 		body = finalResponse
 		if originalModel != "" && mappedModel != "" && originalModel != mappedModel {
 			body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
