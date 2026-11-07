@@ -360,3 +360,34 @@ func (h *APIKeyHandler) GetUserGroupRates(c *gin.Context) {
 
 	response.Success(c, rates)
 }
+
+// ResetDisplayUsage POST /api/v1/keys/:id/reset-usage (administrator's own keys).
+func (h *APIKeyHandler) ResetDisplayUsage(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	role, _ := middleware2.GetUserRoleFromContext(c)
+	if role != service.RoleAdmin {
+		response.Forbidden(c, "Administrator access required")
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid key ID")
+		return
+	}
+	var req struct {
+		Period string `json:"period" binding:"required,oneof=today total"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "period must be today or total")
+		return
+	}
+	if err := h.apiKeyService.ResetDisplayUsage(c.Request.Context(), id, subject.UserID, req.Period); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"period": req.Period})
+}

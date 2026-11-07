@@ -59,7 +59,8 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 			}
 			return
 		}
-		if len(key.OrderedGroupIDs()) < 2 {
+		probeGroupID, pinnedProbe := service.InternalMonitorProbeGroup(c.Request.Context(), key.ID)
+		if len(key.OrderedGroupIDs()) < 2 && !pinnedProbe {
 			c.Next()
 			return
 		}
@@ -73,6 +74,20 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"type": "api_error", "message": "Group route policy is temporarily unavailable"}})
 			return
+		}
+		if pinnedProbe {
+			if key.User == nil || !key.User.IsAdmin() {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": gin.H{"message": "Administrator-owned monitor key required"}})
+				return
+			}
+			var selected []*service.Group
+			for _, group := range groups {
+				if group.ID == probeGroupID {
+					selected = []*service.Group{group}
+					break
+				}
+			}
+			groups = selected
 		}
 		if len(groups) == 0 {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": gin.H{"type": "group_not_allowed", "message": "No selected group is available to this key"}})

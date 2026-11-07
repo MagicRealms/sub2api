@@ -41,6 +41,7 @@ func newSSRFSafeHTTPClient(timeout time.Duration) *http.Client {
 // CheckOptions 承载一次检测的自定义入参。
 // 所有字段都是可选（零值即等价于"用默认行为"）。
 type CheckOptions struct {
+	LocalRequest func(*http.Request) (*http.Response, error)
 	// APIMode 仅对 OpenAI provider 生效；空串等同 chat_completions。
 	APIMode string
 	// ExtraHeaders 用户自定义 HTTP 头（merge 到 adapter 默认 headers，用户优先）。
@@ -83,6 +84,14 @@ func runCheckForModel(ctx context.Context, provider, endpoint, apiKey, model str
 		res.Status = MonitorStatusError
 		bodySnippet := truncateForErrorBody(rawBody)
 		res.Message = truncateMessage(sanitizeErrorMessage(fmt.Sprintf("upstream HTTP %d: %s", statusCode, bodySnippet)))
+		return res
+	}
+
+	// A tiny output budget must never turn an explicitly truncated/failed response
+	// into a healthy probe merely because it contains the expected number.
+	if reason := monitorIncompleteReason(provider, checkAPIMode(opts), rawBody); reason != "" {
+		res.Status = MonitorStatusFailed
+		res.Message = truncateMessage(sanitizeErrorMessage(reason))
 		return res
 	}
 
@@ -208,7 +217,7 @@ var providerAdapters = map[string]providerAdapter{
 		buildHeaders: func(apiKey string) map[string]string {
 			return map[string]string{"x-goog-api-key": apiKey}
 		},
-		textPath: "candidates.0.content.parts.0.text",
+		extractText: extractGeminiMonitorText,
 	},
 }
 
@@ -254,7 +263,7 @@ var providerOpenAIResponsesAdapter = providerAdapter{
 	buildBody: func(model, prompt string) ([]byte, error) {
 		body := map[string]any{
 			"model":             model,
-			"instructions":      "You are a channel health-check endpoint. Answer the arithmetic challenge exactly and briefly.",
+			"instructions":      "Answer briefly.",
 			"input":             prompt,
 			"max_output_tokens": monitorChallengeMaxTokens,
 			"stream":            false,
@@ -306,7 +315,7 @@ func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt
 	}
 	headers := mergeHeaders(adapter.buildHeaders(apiKey), opts)
 	full := joinURL(endpoint, monitorRequestPath(provider, endpoint, adapter, model))
-	respBytes, status, err := postRawJSON(ctx, full, body, headers)
+	respBytes, status, err := postRawJSONWithOptions(ctx, full, body, headers, opts)
 	if err != nil {
 		return "", "", status, err
 	}
@@ -541,6 +550,12 @@ func hasNonEmptyBodyValue(v any) bool {
 // postRawJSON 发送 POST + 已序列化好的 JSON 字节，限制响应体大小，返回响应字节、HTTP status、错误。
 // adapter 自行 marshal 是为了精确控制字段顺序与类型，所以这里直接收 []byte 而不是 any。
 func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers map[string]string) ([]byte, int, error) {
+	return postRawJSONWithOptions(ctx, fullURL, payload, headers, nil)
+}
+
+func postRawJSONWithOptions(ctx context.Context, fullURL string, payload []byte, headers map[string]string, opts *CheckOptions) ([]byte, int, error) {
+	ctx, cancel := context.WithTimeout(ctx, monitorRequestTimeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, 0, fmt.Errorf("build request: %w", err)
@@ -551,7 +566,12 @@ func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers ma
 		req.Header.Set(k, v)
 	}
 
-	resp, err := monitorHTTPClient.Do(req)
+	var resp *http.Response
+	if opts != nil && opts.LocalRequest != nil {
+		resp, err = opts.LocalRequest(req)
+	} else {
+		resp, err = monitorHTTPClient.Do(req)
+	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("do request: %w", err)
 	}
@@ -695,4 +715,44 @@ func truncateForErrorBody(body string) string {
 		cutoff = 0
 	}
 	return body[:cutoff] + ellipsis
+}
+
+// Only explicit completion failures are rejected here; legacy compatible
+// endpoints that omit termination metadata still require a correct challenge.
+func monitorIncompleteReason(provider, apiMode, body string) string {
+	if provider == MonitorProviderOpenAI && apiMode == MonitorAPIModeResponses {
+		status := gjson.Get(body, "status").String()
+		if status != "" && status != "completed" {
+			return "generation not completed: " + status + " " + gjson.Get(body, "incomplete_details.reason").String()
+		}
+	}
+	if provider == MonitorProviderAnthropic {
+		reason := gjson.Get(body, "stop_reason").String()
+		if reason != "" && reason != "end_turn" && reason != "stop_sequence" {
+			return "generation not completed: " + reason
+		}
+	} else if provider == MonitorProviderGemini {
+		reason := gjson.Get(body, "candidates.0.finishReason").String()
+		if reason != "" && reason != "STOP" {
+			return "generation not completed: " + reason
+		}
+	} else {
+		reason := gjson.Get(body, "choices.0.finish_reason").String()
+		if reason != "" && reason != "stop" {
+			return "generation not completed: " + reason
+		}
+	}
+	return ""
+}
+func extractGeminiMonitorText(body []byte) string {
+	parts := []string{}
+	gjson.GetBytes(body, "candidates.0.content.parts").ForEach(func(_, part gjson.Result) bool {
+		if !part.Get("thought").Bool() {
+			if text := part.Get("text").String(); strings.TrimSpace(text) != "" {
+				parts = append(parts, text)
+			}
+		}
+		return true
+	})
+	return strings.Join(parts, "")
 }

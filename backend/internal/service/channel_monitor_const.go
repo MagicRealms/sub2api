@@ -76,6 +76,7 @@ const (
 	//   quota       - 仅查关联账号用量/余额，零 LLM 成本
 	//   quota_probe - 探活 + 配额并存（配额快照挂到主模型历史行）
 	MonitorCheckModeProbe      = "probe"
+	MonitorCheckModeCatalog    = "catalog"
 	MonitorCheckModeQuota      = "quota"
 	MonitorCheckModeQuotaProbe = "quota_probe"
 

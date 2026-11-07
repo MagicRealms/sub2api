@@ -133,7 +133,7 @@ func answerFromOpenAIRequest(body map[string]any) string {
 	return answerFromChallengePrompt(prompt)
 }
 
-var challengeQuestionRegex = regexp.MustCompile(`Q: (\d+) ([+-]) (\d+) = \?\nA:$`)
+var challengeQuestionRegex = regexp.MustCompile(`^(\d+) ([+-]) (\d+)\? Reply only with the number\.$`)
 
 func answerFromChallengePrompt(prompt string) string {
 	m := challengeQuestionRegex.FindStringSubmatch(prompt)

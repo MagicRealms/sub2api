@@ -1218,3 +1218,24 @@ func (s *APIKeyService) UpdateRateLimitUsage(ctx context.Context, apiKeyID int64
 	}
 	return s.apiKeyRepo.IncrementRateLimitUsage(ctx, apiKeyID, cost)
 }
+
+// ResetDisplayUsage resets an administrator's own key-list statistic only.
+func (s *APIKeyService) ResetDisplayUsage(ctx context.Context, keyID, userID int64, period string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil || !user.IsAdmin() || !user.IsActive() {
+		return ErrGroupNotAllowed
+	}
+	if period != "today" && period != "total" {
+		return infraerrors.BadRequest("INVALID_USAGE_PERIOD", "period must be today or total")
+	}
+	repo, ok := s.apiKeyRepo.(interface {
+		ResetDisplayUsage(context.Context, int64, int64, string) error
+	})
+	if !ok {
+		return fmt.Errorf("usage display reset unavailable")
+	}
+	return repo.ResetDisplayUsage(ctx, keyID, userID, period)
+}

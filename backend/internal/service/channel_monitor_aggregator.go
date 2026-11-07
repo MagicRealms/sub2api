@@ -60,6 +60,10 @@ func (s *ChannelMonitorService) ListUserView(ctx context.Context) ([]*UserMonito
 	if err != nil {
 		return nil, fmt.Errorf("list enabled monitors: %w", err)
 	}
+	monitors, err = s.filterLocalMonitorVisibility(ctx, monitors)
+	if err != nil {
+		return nil, err
+	}
 	if len(monitors) == 0 {
 		return []*UserMonitorView{}, nil
 	}
@@ -134,7 +138,11 @@ func (s *ChannelMonitorService) GetUserDetail(ctx context.Context, id int64) (*U
 	if err != nil {
 		return nil, err
 	}
-	if !m.Enabled {
+	visible, visibilityErr := s.filterLocalMonitorVisibility(ctx, []*ChannelMonitor{m})
+	if visibilityErr != nil {
+		return nil, visibilityErr
+	}
+	if len(visible) == 0 || !m.Enabled {
 		return nil, ErrChannelMonitorNotFound
 	}
 
@@ -232,6 +240,7 @@ func buildUserViewFromSummary(
 ) *UserMonitorView {
 	view := &UserMonitorView{
 		ID:               m.ID,
+		CheckMode:        m.CheckMode,
 		Name:             m.Name,
 		Provider:         m.Provider,
 		GroupName:        m.GroupName,

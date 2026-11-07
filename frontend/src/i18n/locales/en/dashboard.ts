@@ -66,6 +66,11 @@ export default {
 
   // API Keys
   keys: {
+    resetTodayUsage: "Reset today",
+    resetTotalUsage: "Reset total",
+    resetDisplayUsageConfirm: "Reset displayed usage for “{name}”? Starts statistics from now. Billing history, balance, quota and rate limits remain unchanged.",
+    usageResetSuccess: "Usage display reset",
+    usageResetFailed: "Failed to reset usage",
     routing: {
       hint: 'Select up to 16 groups across providers. Selection order sets priority; use the arrows to reorder.',
       priority: 'Priority {order}',

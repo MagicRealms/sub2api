@@ -105,6 +105,34 @@ func (_c *APIKeyCreate) SetGroupIds(v []int64) *APIKeyCreate {
 	return _c
 }
 
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (_c *APIKeyCreate) SetUsageTodayResetAt(v time.Time) *APIKeyCreate {
+	_c.mutation.SetUsageTodayResetAt(v)
+	return _c
+}
+
+// SetNillableUsageTodayResetAt sets the "usage_today_reset_at" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableUsageTodayResetAt(v *time.Time) *APIKeyCreate {
+	if v != nil {
+		_c.SetUsageTodayResetAt(*v)
+	}
+	return _c
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (_c *APIKeyCreate) SetUsageTotalResetAt(v time.Time) *APIKeyCreate {
+	_c.mutation.SetUsageTotalResetAt(v)
+	return _c
+}
+
+// SetNillableUsageTotalResetAt sets the "usage_total_reset_at" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableUsageTotalResetAt(v *time.Time) *APIKeyCreate {
+	if v != nil {
+		_c.SetUsageTotalResetAt(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *APIKeyCreate) SetStatus(v string) *APIKeyCreate {
 	_c.mutation.SetStatus(v)
@@ -541,6 +569,14 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
 		_node.GroupIds = value
 	}
+	if value, ok := _c.mutation.UsageTodayResetAt(); ok {
+		_spec.SetField(apikey.FieldUsageTodayResetAt, field.TypeTime, value)
+		_node.UsageTodayResetAt = &value
+	}
+	if value, ok := _c.mutation.UsageTotalResetAt(); ok {
+		_spec.SetField(apikey.FieldUsageTotalResetAt, field.TypeTime, value)
+		_node.UsageTotalResetAt = &value
+	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 		_node.Status = value
@@ -806,6 +842,42 @@ func (u *APIKeyUpsert) UpdateGroupIds() *APIKeyUpsert {
 // ClearGroupIds clears the value of the "group_ids" field.
 func (u *APIKeyUpsert) ClearGroupIds() *APIKeyUpsert {
 	u.SetNull(apikey.FieldGroupIds)
+	return u
+}
+
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (u *APIKeyUpsert) SetUsageTodayResetAt(v time.Time) *APIKeyUpsert {
+	u.Set(apikey.FieldUsageTodayResetAt, v)
+	return u
+}
+
+// UpdateUsageTodayResetAt sets the "usage_today_reset_at" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsageTodayResetAt() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsageTodayResetAt)
+	return u
+}
+
+// ClearUsageTodayResetAt clears the value of the "usage_today_reset_at" field.
+func (u *APIKeyUpsert) ClearUsageTodayResetAt() *APIKeyUpsert {
+	u.SetNull(apikey.FieldUsageTodayResetAt)
+	return u
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (u *APIKeyUpsert) SetUsageTotalResetAt(v time.Time) *APIKeyUpsert {
+	u.Set(apikey.FieldUsageTotalResetAt, v)
+	return u
+}
+
+// UpdateUsageTotalResetAt sets the "usage_total_reset_at" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateUsageTotalResetAt() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldUsageTotalResetAt)
+	return u
+}
+
+// ClearUsageTotalResetAt clears the value of the "usage_total_reset_at" field.
+func (u *APIKeyUpsert) ClearUsageTotalResetAt() *APIKeyUpsert {
+	u.SetNull(apikey.FieldUsageTotalResetAt)
 	return u
 }
 
@@ -1252,6 +1324,48 @@ func (u *APIKeyUpsertOne) UpdateGroupIds() *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) ClearGroupIds() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearGroupIds()
+	})
+}
+
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (u *APIKeyUpsertOne) SetUsageTodayResetAt(v time.Time) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsageTodayResetAt(v)
+	})
+}
+
+// UpdateUsageTodayResetAt sets the "usage_today_reset_at" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsageTodayResetAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsageTodayResetAt()
+	})
+}
+
+// ClearUsageTodayResetAt clears the value of the "usage_today_reset_at" field.
+func (u *APIKeyUpsertOne) ClearUsageTodayResetAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearUsageTodayResetAt()
+	})
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (u *APIKeyUpsertOne) SetUsageTotalResetAt(v time.Time) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsageTotalResetAt(v)
+	})
+}
+
+// UpdateUsageTotalResetAt sets the "usage_total_reset_at" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateUsageTotalResetAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsageTotalResetAt()
+	})
+}
+
+// ClearUsageTotalResetAt clears the value of the "usage_total_reset_at" field.
+func (u *APIKeyUpsertOne) ClearUsageTotalResetAt() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearUsageTotalResetAt()
 	})
 }
 
@@ -1911,6 +2025,48 @@ func (u *APIKeyUpsertBulk) UpdateGroupIds() *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) ClearGroupIds() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.ClearGroupIds()
+	})
+}
+
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (u *APIKeyUpsertBulk) SetUsageTodayResetAt(v time.Time) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsageTodayResetAt(v)
+	})
+}
+
+// UpdateUsageTodayResetAt sets the "usage_today_reset_at" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsageTodayResetAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsageTodayResetAt()
+	})
+}
+
+// ClearUsageTodayResetAt clears the value of the "usage_today_reset_at" field.
+func (u *APIKeyUpsertBulk) ClearUsageTodayResetAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearUsageTodayResetAt()
+	})
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (u *APIKeyUpsertBulk) SetUsageTotalResetAt(v time.Time) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetUsageTotalResetAt(v)
+	})
+}
+
+// UpdateUsageTotalResetAt sets the "usage_total_reset_at" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateUsageTotalResetAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateUsageTotalResetAt()
+	})
+}
+
+// ClearUsageTotalResetAt clears the value of the "usage_total_reset_at" field.
+func (u *APIKeyUpsertBulk) ClearUsageTotalResetAt() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.ClearUsageTotalResetAt()
 	})
 }
 

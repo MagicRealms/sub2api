@@ -80,7 +80,9 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
-		WithUser().
+		WithUser(func(q *dbent.UserQuery) {
+			q.WithAllowedGroups(func(gq *dbent.GroupQuery) { gq.Select(group.FieldID) })
+		}).
 		WithGroup().
 		Only(ctx)
 	if err != nil {
@@ -1099,4 +1101,29 @@ func apiKeyHasRouteGroup(groupID int64) predicate.APIKey {
 	return apikey.Or(apikey.GroupIDEQ(groupID), predicate.APIKey(func(selector *entsql.Selector) {
 		selector.Where(sqljson.ValueContains(apikey.FieldGroupIds, groupID))
 	}))
+}
+
+// ResetDisplayUsage only advances display anchors, never monetary/limit counters.
+// Ownership and a current administrator role are checked again atomically.
+func (r *apiKeyRepository) ResetDisplayUsage(ctx context.Context, id, ownerID int64, period string) error {
+	column := "usage_today_reset_at"
+	if period == "total" {
+		column = "usage_total_reset_at"
+	} else if period != "today" {
+		return fmt.Errorf("invalid usage period")
+	}
+	result, err := r.sql.ExecContext(ctx, `UPDATE api_keys SET `+column+` = clock_timestamp(), updated_at = clock_timestamp()
+ WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
+ AND EXISTS (SELECT 1 FROM users WHERE id = $2 AND role = 'admin' AND status = 'active' AND deleted_at IS NULL)`, id, ownerID)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n != 1 {
+		return service.ErrAPIKeyNotFound
+	}
+	return nil
 }

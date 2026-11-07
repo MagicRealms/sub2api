@@ -138,6 +138,46 @@ func (_u *APIKeyUpdate) ClearGroupIds() *APIKeyUpdate {
 	return _u
 }
 
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (_u *APIKeyUpdate) SetUsageTodayResetAt(v time.Time) *APIKeyUpdate {
+	_u.mutation.SetUsageTodayResetAt(v)
+	return _u
+}
+
+// SetNillableUsageTodayResetAt sets the "usage_today_reset_at" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableUsageTodayResetAt(v *time.Time) *APIKeyUpdate {
+	if v != nil {
+		_u.SetUsageTodayResetAt(*v)
+	}
+	return _u
+}
+
+// ClearUsageTodayResetAt clears the value of the "usage_today_reset_at" field.
+func (_u *APIKeyUpdate) ClearUsageTodayResetAt() *APIKeyUpdate {
+	_u.mutation.ClearUsageTodayResetAt()
+	return _u
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (_u *APIKeyUpdate) SetUsageTotalResetAt(v time.Time) *APIKeyUpdate {
+	_u.mutation.SetUsageTotalResetAt(v)
+	return _u
+}
+
+// SetNillableUsageTotalResetAt sets the "usage_total_reset_at" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableUsageTotalResetAt(v *time.Time) *APIKeyUpdate {
+	if v != nil {
+		_u.SetUsageTotalResetAt(*v)
+	}
+	return _u
+}
+
+// ClearUsageTotalResetAt clears the value of the "usage_total_reset_at" field.
+func (_u *APIKeyUpdate) ClearUsageTotalResetAt() *APIKeyUpdate {
+	_u.mutation.ClearUsageTotalResetAt()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *APIKeyUpdate) SetStatus(v string) *APIKeyUpdate {
 	_u.mutation.SetStatus(v)
@@ -622,6 +662,18 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.GroupIdsCleared() {
 		_spec.ClearField(apikey.FieldGroupIds, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.UsageTodayResetAt(); ok {
+		_spec.SetField(apikey.FieldUsageTodayResetAt, field.TypeTime, value)
+	}
+	if _u.mutation.UsageTodayResetAtCleared() {
+		_spec.ClearField(apikey.FieldUsageTodayResetAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.UsageTotalResetAt(); ok {
+		_spec.SetField(apikey.FieldUsageTotalResetAt, field.TypeTime, value)
+	}
+	if _u.mutation.UsageTotalResetAtCleared() {
+		_spec.ClearField(apikey.FieldUsageTotalResetAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)
 	}
@@ -951,6 +1003,46 @@ func (_u *APIKeyUpdateOne) AppendGroupIds(v []int64) *APIKeyUpdateOne {
 // ClearGroupIds clears the value of the "group_ids" field.
 func (_u *APIKeyUpdateOne) ClearGroupIds() *APIKeyUpdateOne {
 	_u.mutation.ClearGroupIds()
+	return _u
+}
+
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (_u *APIKeyUpdateOne) SetUsageTodayResetAt(v time.Time) *APIKeyUpdateOne {
+	_u.mutation.SetUsageTodayResetAt(v)
+	return _u
+}
+
+// SetNillableUsageTodayResetAt sets the "usage_today_reset_at" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableUsageTodayResetAt(v *time.Time) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetUsageTodayResetAt(*v)
+	}
+	return _u
+}
+
+// ClearUsageTodayResetAt clears the value of the "usage_today_reset_at" field.
+func (_u *APIKeyUpdateOne) ClearUsageTodayResetAt() *APIKeyUpdateOne {
+	_u.mutation.ClearUsageTodayResetAt()
+	return _u
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (_u *APIKeyUpdateOne) SetUsageTotalResetAt(v time.Time) *APIKeyUpdateOne {
+	_u.mutation.SetUsageTotalResetAt(v)
+	return _u
+}
+
+// SetNillableUsageTotalResetAt sets the "usage_total_reset_at" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableUsageTotalResetAt(v *time.Time) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetUsageTotalResetAt(*v)
+	}
+	return _u
+}
+
+// ClearUsageTotalResetAt clears the value of the "usage_total_reset_at" field.
+func (_u *APIKeyUpdateOne) ClearUsageTotalResetAt() *APIKeyUpdateOne {
+	_u.mutation.ClearUsageTotalResetAt()
 	return _u
 }
 
@@ -1467,6 +1559,18 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.GroupIdsCleared() {
 		_spec.ClearField(apikey.FieldGroupIds, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.UsageTodayResetAt(); ok {
+		_spec.SetField(apikey.FieldUsageTodayResetAt, field.TypeTime, value)
+	}
+	if _u.mutation.UsageTodayResetAtCleared() {
+		_spec.ClearField(apikey.FieldUsageTodayResetAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.UsageTotalResetAt(); ok {
+		_spec.SetField(apikey.FieldUsageTotalResetAt, field.TypeTime, value)
+	}
+	if _u.mutation.UsageTotalResetAtCleared() {
+		_spec.ClearField(apikey.FieldUsageTotalResetAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(apikey.FieldStatus, field.TypeString, value)

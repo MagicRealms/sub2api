@@ -22,6 +22,7 @@ export interface MonitorTimelinePoint {
 }
 
 export interface UserMonitorView {
+  check_mode?: string
   id: number
   name: string
   provider: Provider

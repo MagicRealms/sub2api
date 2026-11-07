@@ -75,6 +75,7 @@ export function useChannelMonitorFormat() {
   }
 
   function checkModeLabel(m: CheckMode | string): string {
+    if (m === 'catalog') return t('admin.channelMonitor.form.checkModeCatalog')
     if (m === 'probe' || m === 'quota' || m === 'quota_probe') {
       return t(`monitorCommon.checkMode.${m}`)
     }

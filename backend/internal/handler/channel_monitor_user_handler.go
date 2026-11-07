@@ -7,6 +7,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -52,6 +53,7 @@ func (h *ChannelMonitorUserHandler) quotaVisible(c *gin.Context) bool {
 // --- Response ---
 
 type channelMonitorUserListItem struct {
+	CheckMode            string                               `json:"check_mode"`
 	ID                   int64                                `json:"id"`
 	Name                 string                               `json:"name"`
 	Provider             string                               `json:"provider"`
@@ -115,6 +117,7 @@ func userMonitorViewToItem(v *service.UserMonitorView, includeQuota bool) channe
 	}
 	item := channelMonitorUserListItem{
 		ID:                   v.ID,
+		CheckMode:            v.CheckMode,
 		Name:                 v.Name,
 		Provider:             v.Provider,
 		GroupName:            v.GroupName,
@@ -162,7 +165,8 @@ func (h *ChannelMonitorUserHandler) List(c *gin.Context) {
 		response.Success(c, gin.H{"items": []channelMonitorUserListItem{}})
 		return
 	}
-	views, err := h.monitorService.ListUserView(c.Request.Context())
+	subject, _ := middleware.GetAuthSubjectFromContext(c)
+	views, err := h.monitorService.ListUserViewForUser(c.Request.Context(), subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -186,7 +190,8 @@ func (h *ChannelMonitorUserHandler) GetStatus(c *gin.Context) {
 	if !ok {
 		return
 	}
-	detail, err := h.monitorService.GetUserDetail(c.Request.Context(), id)
+	subject, _ := middleware.GetAuthSubjectFromContext(c)
+	detail, err := h.monitorService.GetUserDetailForUser(c.Request.Context(), id, subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

@@ -93,6 +93,34 @@ func (_c *ChannelMonitorCreate) SetNillableAccountID(v *int64) *ChannelMonitorCr
 	return _c
 }
 
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (_c *ChannelMonitorCreate) SetLocalAPIKeyID(v int64) *ChannelMonitorCreate {
+	_c.mutation.SetLocalAPIKeyID(v)
+	return _c
+}
+
+// SetNillableLocalAPIKeyID sets the "local_api_key_id" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableLocalAPIKeyID(v *int64) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetLocalAPIKeyID(*v)
+	}
+	return _c
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (_c *ChannelMonitorCreate) SetProbeGroupID(v int64) *ChannelMonitorCreate {
+	_c.mutation.SetProbeGroupID(v)
+	return _c
+}
+
+// SetNillableProbeGroupID sets the "probe_group_id" field if the given value is not nil.
+func (_c *ChannelMonitorCreate) SetNillableProbeGroupID(v *int64) *ChannelMonitorCreate {
+	if v != nil {
+		_c.SetProbeGroupID(*v)
+	}
+	return _c
+}
+
 // SetAPIMode sets the "api_mode" field.
 func (_c *ChannelMonitorCreate) SetAPIMode(v string) *ChannelMonitorCreate {
 	_c.mutation.SetAPIMode(v)
@@ -521,6 +549,14 @@ func (_c *ChannelMonitorCreate) createSpec() (*ChannelMonitor, *sqlgraph.CreateS
 		_spec.SetField(channelmonitor.FieldAccountID, field.TypeInt64, value)
 		_node.AccountID = &value
 	}
+	if value, ok := _c.mutation.LocalAPIKeyID(); ok {
+		_spec.SetField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64, value)
+		_node.LocalAPIKeyID = &value
+	}
+	if value, ok := _c.mutation.ProbeGroupID(); ok {
+		_spec.SetField(channelmonitor.FieldProbeGroupID, field.TypeInt64, value)
+		_node.ProbeGroupID = &value
+	}
 	if value, ok := _c.mutation.APIMode(); ok {
 		_spec.SetField(channelmonitor.FieldAPIMode, field.TypeString, value)
 		_node.APIMode = value
@@ -747,6 +783,54 @@ func (u *ChannelMonitorUpsert) AddAccountID(v int64) *ChannelMonitorUpsert {
 // ClearAccountID clears the value of the "account_id" field.
 func (u *ChannelMonitorUpsert) ClearAccountID() *ChannelMonitorUpsert {
 	u.SetNull(channelmonitor.FieldAccountID)
+	return u
+}
+
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (u *ChannelMonitorUpsert) SetLocalAPIKeyID(v int64) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldLocalAPIKeyID, v)
+	return u
+}
+
+// UpdateLocalAPIKeyID sets the "local_api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateLocalAPIKeyID() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldLocalAPIKeyID)
+	return u
+}
+
+// AddLocalAPIKeyID adds v to the "local_api_key_id" field.
+func (u *ChannelMonitorUpsert) AddLocalAPIKeyID(v int64) *ChannelMonitorUpsert {
+	u.Add(channelmonitor.FieldLocalAPIKeyID, v)
+	return u
+}
+
+// ClearLocalAPIKeyID clears the value of the "local_api_key_id" field.
+func (u *ChannelMonitorUpsert) ClearLocalAPIKeyID() *ChannelMonitorUpsert {
+	u.SetNull(channelmonitor.FieldLocalAPIKeyID)
+	return u
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (u *ChannelMonitorUpsert) SetProbeGroupID(v int64) *ChannelMonitorUpsert {
+	u.Set(channelmonitor.FieldProbeGroupID, v)
+	return u
+}
+
+// UpdateProbeGroupID sets the "probe_group_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsert) UpdateProbeGroupID() *ChannelMonitorUpsert {
+	u.SetExcluded(channelmonitor.FieldProbeGroupID)
+	return u
+}
+
+// AddProbeGroupID adds v to the "probe_group_id" field.
+func (u *ChannelMonitorUpsert) AddProbeGroupID(v int64) *ChannelMonitorUpsert {
+	u.Add(channelmonitor.FieldProbeGroupID, v)
+	return u
+}
+
+// ClearProbeGroupID clears the value of the "probe_group_id" field.
+func (u *ChannelMonitorUpsert) ClearProbeGroupID() *ChannelMonitorUpsert {
+	u.SetNull(channelmonitor.FieldProbeGroupID)
 	return u
 }
 
@@ -1098,6 +1182,62 @@ func (u *ChannelMonitorUpsertOne) UpdateAccountID() *ChannelMonitorUpsertOne {
 func (u *ChannelMonitorUpsertOne) ClearAccountID() *ChannelMonitorUpsertOne {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.ClearAccountID()
+	})
+}
+
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (u *ChannelMonitorUpsertOne) SetLocalAPIKeyID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetLocalAPIKeyID(v)
+	})
+}
+
+// AddLocalAPIKeyID adds v to the "local_api_key_id" field.
+func (u *ChannelMonitorUpsertOne) AddLocalAPIKeyID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddLocalAPIKeyID(v)
+	})
+}
+
+// UpdateLocalAPIKeyID sets the "local_api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateLocalAPIKeyID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateLocalAPIKeyID()
+	})
+}
+
+// ClearLocalAPIKeyID clears the value of the "local_api_key_id" field.
+func (u *ChannelMonitorUpsertOne) ClearLocalAPIKeyID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearLocalAPIKeyID()
+	})
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (u *ChannelMonitorUpsertOne) SetProbeGroupID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetProbeGroupID(v)
+	})
+}
+
+// AddProbeGroupID adds v to the "probe_group_id" field.
+func (u *ChannelMonitorUpsertOne) AddProbeGroupID(v int64) *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddProbeGroupID(v)
+	})
+}
+
+// UpdateProbeGroupID sets the "probe_group_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertOne) UpdateProbeGroupID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateProbeGroupID()
+	})
+}
+
+// ClearProbeGroupID clears the value of the "probe_group_id" field.
+func (u *ChannelMonitorUpsertOne) ClearProbeGroupID() *ChannelMonitorUpsertOne {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearProbeGroupID()
 	})
 }
 
@@ -1652,6 +1792,62 @@ func (u *ChannelMonitorUpsertBulk) UpdateAccountID() *ChannelMonitorUpsertBulk {
 func (u *ChannelMonitorUpsertBulk) ClearAccountID() *ChannelMonitorUpsertBulk {
 	return u.Update(func(s *ChannelMonitorUpsert) {
 		s.ClearAccountID()
+	})
+}
+
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) SetLocalAPIKeyID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetLocalAPIKeyID(v)
+	})
+}
+
+// AddLocalAPIKeyID adds v to the "local_api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) AddLocalAPIKeyID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddLocalAPIKeyID(v)
+	})
+}
+
+// UpdateLocalAPIKeyID sets the "local_api_key_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateLocalAPIKeyID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateLocalAPIKeyID()
+	})
+}
+
+// ClearLocalAPIKeyID clears the value of the "local_api_key_id" field.
+func (u *ChannelMonitorUpsertBulk) ClearLocalAPIKeyID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearLocalAPIKeyID()
+	})
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (u *ChannelMonitorUpsertBulk) SetProbeGroupID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.SetProbeGroupID(v)
+	})
+}
+
+// AddProbeGroupID adds v to the "probe_group_id" field.
+func (u *ChannelMonitorUpsertBulk) AddProbeGroupID(v int64) *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.AddProbeGroupID(v)
+	})
+}
+
+// UpdateProbeGroupID sets the "probe_group_id" field to the value that was provided on create.
+func (u *ChannelMonitorUpsertBulk) UpdateProbeGroupID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.UpdateProbeGroupID()
+	})
+}
+
+// ClearProbeGroupID clears the value of the "probe_group_id" field.
+func (u *ChannelMonitorUpsertBulk) ClearProbeGroupID() *ChannelMonitorUpsertBulk {
+	return u.Update(func(s *ChannelMonitorUpsert) {
+		s.ClearProbeGroupID()
 	})
 }
 

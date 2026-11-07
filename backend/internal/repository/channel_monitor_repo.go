@@ -54,7 +54,8 @@ func (r *channelMonitorRepository) Create(ctx context.Context, m *service.Channe
 		SetCreatedBy(m.CreatedBy).
 		SetExtraHeaders(channelMonitorHeadersForPersistence(m)).
 		SetBodyOverrideMode(defaultBodyModeRepo(m.BodyOverrideMode)).
-		SetCheckMode(defaultCheckModeRepo(m.CheckMode))
+		SetCheckMode(defaultCheckModeRepo(m.CheckMode)).
+		SetNillableLocalAPIKeyID(m.LocalAPIKeyID).SetNillableProbeGroupID(m.ProbeGroupID)
 	if m.TemplateID != nil {
 		builder = builder.SetTemplateID(*m.TemplateID)
 	}
@@ -126,6 +127,16 @@ func (r *channelMonitorRepository) Update(ctx context.Context, m *service.Channe
 		SetExtraHeaders(channelMonitorHeadersForPersistence(m)).
 		SetBodyOverrideMode(defaultBodyModeRepo(m.BodyOverrideMode)).
 		SetCheckMode(defaultCheckModeRepo(m.CheckMode))
+	if m.LocalAPIKeyID != nil {
+		updater.SetLocalAPIKeyID(*m.LocalAPIKeyID)
+	} else {
+		updater.ClearLocalAPIKeyID()
+	}
+	if m.ProbeGroupID != nil {
+		updater.SetProbeGroupID(*m.ProbeGroupID)
+	} else {
+		updater.ClearProbeGroupID()
+	}
 	if m.TemplateID != nil {
 		updater = updater.SetTemplateID(*m.TemplateID)
 	} else {
@@ -771,6 +782,8 @@ func entToServiceMonitor(row *dbent.ChannelMonitor) *service.ChannelMonitor {
 	delete(headers, service.ChannelMonitorDuplicateOperationIDMetadataKey)
 	out := &service.ChannelMonitor{
 		ID:                   row.ID,
+		LocalAPIKeyID:        row.LocalAPIKeyID,
+		ProbeGroupID:         row.ProbeGroupID,
 		Name:                 row.Name,
 		Provider:             string(row.Provider),
 		APIMode:              defaultAPIModeRepo(row.APIMode),

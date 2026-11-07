@@ -47,6 +47,10 @@ func (APIKey) Fields() []ent.Field {
 		field.JSON("group_ids", []int64{}).
 			Optional().
 			Comment("Ordered group routes; group_id remains the first route for compatibility"),
+		field.Time("usage_today_reset_at").Optional().Nillable().
+			Comment("Display-only daily usage reset; never changes billing or quotas"),
+		field.Time("usage_total_reset_at").Optional().Nillable().
+			Comment("Display-only lifetime usage reset; never changes billing or quotas"),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),

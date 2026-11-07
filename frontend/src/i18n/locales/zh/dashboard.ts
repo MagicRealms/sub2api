@@ -66,6 +66,11 @@ export default {
 
   // API Keys
   keys: {
+    resetTodayUsage: "重置当日",
+    resetTotalUsage: "重置总量",
+    resetDisplayUsageConfirm: "重置密钥“{name}”的显示用量？仅从现在重新统计，不删除账单、不返还余额，也不重置配额或限流。",
+    usageResetSuccess: "用量统计已重置",
+    usageResetFailed: "重置用量失败",
     routing: {
       hint: '可跨平台选择多个分组，按勾选先后编号；使用箭头调整优先级。最多选择 16 个分组。',
       priority: '第 {order} 优先级',

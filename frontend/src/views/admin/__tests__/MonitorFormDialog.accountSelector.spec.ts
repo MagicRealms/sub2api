@@ -11,12 +11,16 @@ const {
   accountsGetById,
   monitorCreate,
   monitorUpdate,
+  listMyKeys,
+  availableGroups,
 } = vi.hoisted(() => ({
   listTemplates: vi.fn(),
   accountsList: vi.fn(),
   accountsGetById: vi.fn(),
   monitorCreate: vi.fn(),
   monitorUpdate: vi.fn(),
+  listMyKeys: vi.fn(),
+  availableGroups: vi.fn(),
 }))
 
 
@@ -47,11 +51,11 @@ vi.mock('@/api/admin', () => ({
 }))
 
 vi.mock('@/api/keys', () => ({
-  keysAPI: { list: vi.fn() },
+  keysAPI: { list: (...args: unknown[]) => listMyKeys(...args) },
 }))
 
 vi.mock('@/api/groups', () => ({
-  userGroupsAPI: { getUserGroupRates: vi.fn() },
+  userGroupsAPI: { getUserGroupRates: vi.fn().mockResolvedValue({}), getAvailable: (...args: unknown[]) => availableGroups(...args) },
 }))
 
 vi.mock('@/stores/app', () => ({
@@ -372,5 +376,25 @@ describe('MonitorFormDialog linked account selector', () => {
       check_mode: 'probe',
       account_id: null,
     }))
+  })
+})
+
+
+describe('local multi-group monitor', () => {
+  it('uses one selected key reference and persists the explicitly selected group', async () => {
+    listTemplates.mockResolvedValue({ items: [] })
+    const groups = [ { id: 6, name: 'Enterprise', platform: 'openai' }, { id: 10, name: 'Pro', platform: 'openai' } ]
+    const key = { id: 77, name: 'monitor', key: 'sk-never-send-to-external', status: 'active', group_id: 6, group_ids: [6, 10], group: groups[0] }
+    listMyKeys.mockResolvedValue({ items: [key], pages: 1 })
+    availableGroups.mockResolvedValue(groups)
+    const wrapper = mountDialog(makeMonitor())
+    const button = wrapper.findAll('button').find(b => b.text() === 'admin.channelMonitor.form.useMyKey')!
+    await button.trigger('click'); await flushPromises()
+    wrapper.findComponent({ name: 'MonitorKeyPickerDialog' }).vm.$emit('pick', key)
+    await nextTick()
+    await wrapper.get('[data-testid="monitor-probe-group"]').setValue('10')
+    await wrapper.get('form').trigger('submit'); await flushPromises()
+    expect(monitorUpdate).toHaveBeenCalledWith(42, expect.objectContaining({ local_api_key_id: 77, probe_group_id: 10, group_name: 'Pro' }))
+    expect(monitorUpdate.mock.calls.at(-1)?.[1]).not.toHaveProperty('api_key')
   })
 })

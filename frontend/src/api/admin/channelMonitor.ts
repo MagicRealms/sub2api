@@ -23,7 +23,7 @@ export type APIMode = 'chat_completions' | 'responses'
  * probe = LLM 探活（默认）；quota = 仅查关联账号用量（零 LLM 成本）；
  * quota_probe = 探活 + 配额快照挂主模型行。
  */
-export type CheckMode = 'probe' | 'quota' | 'quota_probe'
+export type CheckMode = 'probe' | 'quota' | 'quota_probe' | 'catalog'
 
 /** 配额快照中的单个用量窗口（与后端 domain.MonitorQuotaTier 一致）。 */
 export interface MonitorQuotaTier {
@@ -60,6 +60,8 @@ export interface MonitorQuotaSnapshot {
 }
 
 export interface ChannelMonitor {
+  local_api_key_id?: number | null
+  probe_group_id?: number | null
   id: number
   name: string
   provider: Provider
@@ -127,6 +129,8 @@ export interface ListResponse {
 }
 
 export interface CreateParams {
+  local_api_key_id?: number | null
+  probe_group_id?: number | null
   name: string
   provider: Provider
   api_mode?: APIMode

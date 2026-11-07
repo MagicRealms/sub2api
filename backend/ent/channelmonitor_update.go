@@ -107,6 +107,60 @@ func (_u *ChannelMonitorUpdate) ClearAccountID() *ChannelMonitorUpdate {
 	return _u
 }
 
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (_u *ChannelMonitorUpdate) SetLocalAPIKeyID(v int64) *ChannelMonitorUpdate {
+	_u.mutation.ResetLocalAPIKeyID()
+	_u.mutation.SetLocalAPIKeyID(v)
+	return _u
+}
+
+// SetNillableLocalAPIKeyID sets the "local_api_key_id" field if the given value is not nil.
+func (_u *ChannelMonitorUpdate) SetNillableLocalAPIKeyID(v *int64) *ChannelMonitorUpdate {
+	if v != nil {
+		_u.SetLocalAPIKeyID(*v)
+	}
+	return _u
+}
+
+// AddLocalAPIKeyID adds value to the "local_api_key_id" field.
+func (_u *ChannelMonitorUpdate) AddLocalAPIKeyID(v int64) *ChannelMonitorUpdate {
+	_u.mutation.AddLocalAPIKeyID(v)
+	return _u
+}
+
+// ClearLocalAPIKeyID clears the value of the "local_api_key_id" field.
+func (_u *ChannelMonitorUpdate) ClearLocalAPIKeyID() *ChannelMonitorUpdate {
+	_u.mutation.ClearLocalAPIKeyID()
+	return _u
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (_u *ChannelMonitorUpdate) SetProbeGroupID(v int64) *ChannelMonitorUpdate {
+	_u.mutation.ResetProbeGroupID()
+	_u.mutation.SetProbeGroupID(v)
+	return _u
+}
+
+// SetNillableProbeGroupID sets the "probe_group_id" field if the given value is not nil.
+func (_u *ChannelMonitorUpdate) SetNillableProbeGroupID(v *int64) *ChannelMonitorUpdate {
+	if v != nil {
+		_u.SetProbeGroupID(*v)
+	}
+	return _u
+}
+
+// AddProbeGroupID adds value to the "probe_group_id" field.
+func (_u *ChannelMonitorUpdate) AddProbeGroupID(v int64) *ChannelMonitorUpdate {
+	_u.mutation.AddProbeGroupID(v)
+	return _u
+}
+
+// ClearProbeGroupID clears the value of the "probe_group_id" field.
+func (_u *ChannelMonitorUpdate) ClearProbeGroupID() *ChannelMonitorUpdate {
+	_u.mutation.ClearProbeGroupID()
+	return _u
+}
+
 // SetAPIMode sets the "api_mode" field.
 func (_u *ChannelMonitorUpdate) SetAPIMode(v string) *ChannelMonitorUpdate {
 	_u.mutation.SetAPIMode(v)
@@ -575,6 +629,24 @@ func (_u *ChannelMonitorUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.AccountIDCleared() {
 		_spec.ClearField(channelmonitor.FieldAccountID, field.TypeInt64)
 	}
+	if value, ok := _u.mutation.LocalAPIKeyID(); ok {
+		_spec.SetField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedLocalAPIKeyID(); ok {
+		_spec.AddField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64, value)
+	}
+	if _u.mutation.LocalAPIKeyIDCleared() {
+		_spec.ClearField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.ProbeGroupID(); ok {
+		_spec.SetField(channelmonitor.FieldProbeGroupID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedProbeGroupID(); ok {
+		_spec.AddField(channelmonitor.FieldProbeGroupID, field.TypeInt64, value)
+	}
+	if _u.mutation.ProbeGroupIDCleared() {
+		_spec.ClearField(channelmonitor.FieldProbeGroupID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.APIMode(); ok {
 		_spec.SetField(channelmonitor.FieldAPIMode, field.TypeString, value)
 	}
@@ -851,6 +923,60 @@ func (_u *ChannelMonitorUpdateOne) AddAccountID(v int64) *ChannelMonitorUpdateOn
 // ClearAccountID clears the value of the "account_id" field.
 func (_u *ChannelMonitorUpdateOne) ClearAccountID() *ChannelMonitorUpdateOne {
 	_u.mutation.ClearAccountID()
+	return _u
+}
+
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (_u *ChannelMonitorUpdateOne) SetLocalAPIKeyID(v int64) *ChannelMonitorUpdateOne {
+	_u.mutation.ResetLocalAPIKeyID()
+	_u.mutation.SetLocalAPIKeyID(v)
+	return _u
+}
+
+// SetNillableLocalAPIKeyID sets the "local_api_key_id" field if the given value is not nil.
+func (_u *ChannelMonitorUpdateOne) SetNillableLocalAPIKeyID(v *int64) *ChannelMonitorUpdateOne {
+	if v != nil {
+		_u.SetLocalAPIKeyID(*v)
+	}
+	return _u
+}
+
+// AddLocalAPIKeyID adds value to the "local_api_key_id" field.
+func (_u *ChannelMonitorUpdateOne) AddLocalAPIKeyID(v int64) *ChannelMonitorUpdateOne {
+	_u.mutation.AddLocalAPIKeyID(v)
+	return _u
+}
+
+// ClearLocalAPIKeyID clears the value of the "local_api_key_id" field.
+func (_u *ChannelMonitorUpdateOne) ClearLocalAPIKeyID() *ChannelMonitorUpdateOne {
+	_u.mutation.ClearLocalAPIKeyID()
+	return _u
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (_u *ChannelMonitorUpdateOne) SetProbeGroupID(v int64) *ChannelMonitorUpdateOne {
+	_u.mutation.ResetProbeGroupID()
+	_u.mutation.SetProbeGroupID(v)
+	return _u
+}
+
+// SetNillableProbeGroupID sets the "probe_group_id" field if the given value is not nil.
+func (_u *ChannelMonitorUpdateOne) SetNillableProbeGroupID(v *int64) *ChannelMonitorUpdateOne {
+	if v != nil {
+		_u.SetProbeGroupID(*v)
+	}
+	return _u
+}
+
+// AddProbeGroupID adds value to the "probe_group_id" field.
+func (_u *ChannelMonitorUpdateOne) AddProbeGroupID(v int64) *ChannelMonitorUpdateOne {
+	_u.mutation.AddProbeGroupID(v)
+	return _u
+}
+
+// ClearProbeGroupID clears the value of the "probe_group_id" field.
+func (_u *ChannelMonitorUpdateOne) ClearProbeGroupID() *ChannelMonitorUpdateOne {
+	_u.mutation.ClearProbeGroupID()
 	return _u
 }
 
@@ -1351,6 +1477,24 @@ func (_u *ChannelMonitorUpdateOne) sqlSave(ctx context.Context) (_node *ChannelM
 	}
 	if _u.mutation.AccountIDCleared() {
 		_spec.ClearField(channelmonitor.FieldAccountID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.LocalAPIKeyID(); ok {
+		_spec.SetField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedLocalAPIKeyID(); ok {
+		_spec.AddField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64, value)
+	}
+	if _u.mutation.LocalAPIKeyIDCleared() {
+		_spec.ClearField(channelmonitor.FieldLocalAPIKeyID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.ProbeGroupID(); ok {
+		_spec.SetField(channelmonitor.FieldProbeGroupID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedProbeGroupID(); ok {
+		_spec.AddField(channelmonitor.FieldProbeGroupID, field.TypeInt64, value)
+	}
+	if _u.mutation.ProbeGroupIDCleared() {
+		_spec.ClearField(channelmonitor.FieldProbeGroupID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.APIMode(); ok {
 		_spec.SetField(channelmonitor.FieldAPIMode, field.TypeString, value)

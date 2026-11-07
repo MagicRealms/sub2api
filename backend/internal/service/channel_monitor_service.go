@@ -5,10 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
@@ -82,6 +85,9 @@ type ChannelMonitorService struct {
 	// 之后构造，构造参数注入会破坏既有依赖顺序）。nil 时 fail-closed：
 	// 配额模式的检测产出「未配置」错误快照，Create/Update 关联账号直接报错。
 	quotaFetcher *ChannelMonitorQuotaFetcher
+	localConfig  atomic.Pointer[localMonitorGateway]
+	probeMu      sync.Mutex
+	probing      map[int64]bool
 }
 
 const maxChannelMonitorNameRunes = 100
@@ -146,6 +152,9 @@ func (s *ChannelMonitorService) Get(ctx context.Context, id int64) (*ChannelMoni
 
 // Create 创建监控（内部加密 api_key）。
 func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCreateParams) (*ChannelMonitor, error) {
+	if err := s.prepareLocalCreate(ctx, &p); err != nil {
+		return nil, err
+	}
 	if err := validateCreateParams(p); err != nil {
 		return nil, err
 	}
@@ -165,6 +174,8 @@ func (s *ChannelMonitorService) Create(ctx context.Context, p ChannelMonitorCrea
 	}
 	m := &ChannelMonitor{
 		Name:             strings.TrimSpace(p.Name),
+		LocalAPIKeyID:    cloneInt64Pointer(p.LocalAPIKeyID),
+		ProbeGroupID:     cloneInt64Pointer(p.ProbeGroupID),
 		Provider:         p.Provider,
 		APIMode:          defaultAPIMode(p.APIMode),
 		Endpoint:         normalizeEndpoint(p.Endpoint),
@@ -249,6 +260,8 @@ func (s *ChannelMonitorService) Duplicate(
 		BodyOverride:         bodyOverride,
 		CheckMode:            defaultCheckMode(source.CheckMode),
 		AccountID:            cloneInt64Pointer(source.AccountID),
+		LocalAPIKeyID:        cloneInt64Pointer(source.LocalAPIKeyID),
+		ProbeGroupID:         cloneInt64Pointer(source.ProbeGroupID),
 		DuplicateOperationID: operationID,
 	}
 	if err := s.repo.Create(ctx, duplicate); err != nil {
@@ -370,6 +383,9 @@ func cloneChannelMonitorJSONMap(source map[string]any) (map[string]any, error) {
 // 按 check_mode 分支：probe 沿用 endpoint+api_key 必填；quota 只需关联账号；
 // quota_probe 两者皆需。
 func validateCreateParams(p ChannelMonitorCreateParams) error {
+	if p.CheckMode == MonitorCheckModeCatalog && p.LocalAPIKeyID == nil {
+		return localProbeInvalid("catalog checks require a local key and group")
+	}
 	if err := validateProvider(p.Provider); err != nil {
 		return err
 	}
@@ -432,8 +448,28 @@ func (s *ChannelMonitorService) Update(ctx context.Context, id int64, p ChannelM
 	if err != nil {
 		return nil, err
 	}
+	wasLocal := existing.LocalAPIKeyID != nil
+	oldLocalKey, oldProbeGroup := cloneInt64Pointer(existing.LocalAPIKeyID), cloneInt64Pointer(existing.ProbeGroupID)
 	if err := applyMonitorUpdate(existing, p); err != nil {
 		return nil, err
+	}
+
+	if existing.CheckMode == MonitorCheckModeCatalog && existing.LocalAPIKeyID == nil {
+		return nil, localProbeInvalid("catalog checks require a local key and group")
+	}
+	if wasLocal && existing.LocalAPIKeyID == nil && (p.APIKey == nil || strings.TrimSpace(*p.APIKey) == "") {
+		return nil, localProbeInvalid("enter a manual API key before removing the local key reference")
+	}
+	// A revoked key must never prevent an administrator from disabling its monitor.
+	skipLocalValidation := !existing.Enabled && wasLocal && sameMonitorID(oldLocalKey, existing.LocalAPIKeyID) && sameMonitorID(oldProbeGroup, existing.ProbeGroupID)
+	if !skipLocalValidation {
+		if err := s.validateLocalMonitor(ctx, existing); err != nil {
+			return nil, err
+		}
+		if existing.LocalAPIKeyID != nil {
+			placeholder := localMonitorKeyPlaceholder
+			p.APIKey = &placeholder
+		}
 	}
 
 	newPlainAPIKey, apiKeyUpdated, err := s.applyAPIKeyUpdate(existing, p.APIKey)
@@ -603,6 +639,18 @@ func (s *ChannelMonitorService) ListHistory(ctx context.Context, id int64, model
 // 按 check_mode 分派：probe（默认，现状探活）/ quota（仅查关联账号配额，
 // 零 LLM 成本）/ quota_probe（探活 + 配额快照挂主模型行）。
 func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*CheckResult, error) {
+	s.probeMu.Lock()
+	if s.probing[id] {
+		s.probeMu.Unlock()
+		return nil, infraerrors.Conflict("MONITOR_CHECK_RUNNING", "a check is already running for this monitor")
+	}
+	if s.probing == nil {
+		s.probing = make(map[int64]bool)
+	}
+	s.probing[id] = true
+	s.probeMu.Unlock()
+	defer func() { s.probeMu.Lock(); delete(s.probing, id); s.probeMu.Unlock() }()
+
 	rt := s.probeRuntime(ctx)
 	if !rt.Enabled {
 		return nil, ErrChannelMonitorDisabled
@@ -615,12 +663,24 @@ func (s *ChannelMonitorService) RunCheck(ctx context.Context, id int64) ([]*Chec
 		return nil, err
 	}
 	checkMode := defaultCheckMode(m.CheckMode)
+	if m.LocalAPIKeyID != nil {
+		if err := s.validateLocalMonitor(ctx, m); err != nil {
+			result := []*CheckResult{{Model: m.PrimaryModel, Status: MonitorStatusError, Message: "Local group probe unavailable: " + sanitizeErrorMessage(err.Error()), CheckedAt: time.Now()}}
+			s.persistCheckResults(ctx, m, result)
+			return result, nil
+		}
+		// The local executor resolves the current credential; do not duplicate it here.
+
+		m.APIKeyDecryptFailed = false
+	}
 	if checkMode != MonitorCheckModeQuota && m.APIKeyDecryptFailed {
 		return nil, ErrChannelMonitorAPIKeyDecryptFailed
 	}
 
 	var results []*CheckResult
 	switch checkMode {
+	case MonitorCheckModeCatalog:
+		results = s.runLocalCatalogCheck(ctx, m)
 	case MonitorCheckModeQuota:
 		results = s.runQuotaOnlyCheck(ctx, m)
 	case MonitorCheckModeQuotaProbe:
@@ -700,7 +760,10 @@ func (s *ChannelMonitorService) runChecksConcurrent(ctx context.Context, m *Chan
 	results := make([]*CheckResult, len(models))
 
 	// ping 共享一次，所有模型记录同一个 ping 延迟。
-	pingMs := pingEndpointOrigin(ctx, m.Endpoint)
+	var pingMs *int
+	if m.LocalAPIKeyID == nil {
+		pingMs = pingEndpointOrigin(ctx, m.Endpoint)
+	}
 
 	// 所有模型共用同一份 CheckOptions（来自监控的快照字段）。
 	opts := &CheckOptions{
@@ -710,6 +773,11 @@ func (s *ChannelMonitorService) runChecksConcurrent(ctx context.Context, m *Chan
 		BodyOverride:     m.BodyOverride,
 	}
 
+	if m.LocalAPIKeyID != nil {
+		opts.LocalRequest = func(req *http.Request) (*http.Response, error) {
+			return s.doLocalProbe(req, *m.LocalAPIKeyID, *m.ProbeGroupID)
+		}
+	}
 	var eg errgroup.Group
 	var mu sync.Mutex
 	for i, model := range models {
@@ -884,6 +952,12 @@ func (s *ChannelMonitorService) decryptInPlace(m *ChannelMonitor) {
 // 行数稍超过 30：这是逐字段平铺的 dispatcher，每个 if 都是 1-3 行的"非 nil 则覆盖"模式，
 // 拆分反而会增加跳转噪音、影响可读性，故保留为单函数。
 func applyMonitorUpdate(existing *ChannelMonitor, p ChannelMonitorUpdateParams) error {
+	if p.LocalAPIKeyID != nil {
+		existing.LocalAPIKeyID = positiveMonitorID(p.LocalAPIKeyID)
+	}
+	if p.ProbeGroupID != nil {
+		existing.ProbeGroupID = positiveMonitorID(p.ProbeGroupID)
+	}
 	providerChanged := false
 	if p.Name != nil {
 		existing.Name = strings.TrimSpace(*p.Name)

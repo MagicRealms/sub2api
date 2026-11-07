@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,8 @@ func NewChannelMonitorHandler(monitorService *service.ChannelMonitorService) *Ch
 // --- Request / Response ---
 
 type channelMonitorCreateRequest struct {
+	LocalAPIKeyID    *int64            `json:"local_api_key_id"`
+	ProbeGroupID     *int64            `json:"probe_group_id"`
 	Name             string            `json:"name" binding:"required,max=100"`
 	Provider         string            `json:"provider" binding:"required,oneof=openai anthropic gemini grok antigravity kimi zhipu deepseek minimax opencode_go"`
 	APIMode          string            `json:"api_mode" binding:"omitempty,oneof=chat_completions responses"`
@@ -57,12 +60,14 @@ type channelMonitorCreateRequest struct {
 
 	// CheckMode: probe（默认）/ quota / quota_probe。quota 模式 endpoint/api_key
 	// 可空（条件必填校验在 service 层按模式分支）。
-	CheckMode string `json:"check_mode" binding:"omitempty,oneof=probe quota quota_probe"`
+	CheckMode string `json:"check_mode" binding:"omitempty,oneof=probe quota quota_probe catalog"`
 	// AccountID: 配额模式关联的账号 ID。
 	AccountID *int64 `json:"account_id"`
 }
 
 type channelMonitorUpdateRequest struct {
+	LocalAPIKeyID    *int64             `json:"local_api_key_id"`
+	ProbeGroupID     *int64             `json:"probe_group_id"`
 	Name             *string            `json:"name" binding:"omitempty,max=100"`
 	Provider         *string            `json:"provider" binding:"omitempty,oneof=openai anthropic gemini grok antigravity kimi zhipu deepseek minimax opencode_go"`
 	APIMode          *string            `json:"api_mode" binding:"omitempty,oneof=chat_completions responses"`
@@ -81,11 +86,13 @@ type channelMonitorUpdateRequest struct {
 	BodyOverride     *map[string]any    `json:"body_override"`
 
 	// CheckMode/AccountID：nil = 不更新；AccountID 指向 0 = 清空关联。
-	CheckMode *string `json:"check_mode" binding:"omitempty,oneof=probe quota quota_probe"`
+	CheckMode *string `json:"check_mode" binding:"omitempty,oneof=probe quota quota_probe catalog"`
 	AccountID *int64  `json:"account_id"`
 }
 
 type channelMonitorResponse struct {
+	LocalAPIKeyID       *int64                               `json:"local_api_key_id"`
+	ProbeGroupID        *int64                               `json:"probe_group_id"`
 	ID                  int64                                `json:"id"`
 	Name                string                               `json:"name"`
 	Provider            string                               `json:"provider"`
@@ -162,7 +169,8 @@ func channelMonitorToResponse(m *service.ChannelMonitor) *channelMonitorResponse
 		headers = map[string]string{}
 	}
 	resp := &channelMonitorResponse{
-		ID:                  m.ID,
+		ID:            m.ID,
+		LocalAPIKeyID: m.LocalAPIKeyID, ProbeGroupID: m.ProbeGroupID,
 		Name:                m.Name,
 		Provider:            m.Provider,
 		APIMode:             m.APIMode,
@@ -336,7 +344,8 @@ func (h *ChannelMonitorHandler) Create(c *gin.Context) {
 	}
 
 	m, err := h.monitorService.Create(c.Request.Context(), service.ChannelMonitorCreateParams{
-		Name:             req.Name,
+		Name:          req.Name,
+		LocalAPIKeyID: req.LocalAPIKeyID, ProbeGroupID: req.ProbeGroupID,
 		Provider:         req.Provider,
 		APIMode:          req.APIMode,
 		Endpoint:         req.Endpoint,
@@ -432,7 +441,8 @@ func (h *ChannelMonitorHandler) Update(c *gin.Context) {
 	}
 
 	m, err := h.monitorService.Update(c.Request.Context(), id, service.ChannelMonitorUpdateParams{
-		Name:             req.Name,
+		Name:          req.Name,
+		LocalAPIKeyID: req.LocalAPIKeyID, ProbeGroupID: req.ProbeGroupID,
 		Provider:         req.Provider,
 		APIMode:          req.APIMode,
 		Endpoint:         req.Endpoint,
@@ -524,4 +534,10 @@ func parseHistoryLimit(raw string) int {
 		return service.MonitorHistoryMaxLimit
 	}
 	return v
+}
+
+// SetLocalProbeGateway supplies the already configured gateway, without a public
+// group-override header or a second network hop through the public reverse proxy.
+func (h *ChannelMonitorHandler) SetLocalProbeGateway(gateway http.Handler, keys *service.APIKeyService) {
+	h.monitorService.SetLocalProbeGateway(gateway, keys)
 }

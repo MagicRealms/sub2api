@@ -90,6 +90,16 @@ func GroupID(v int64) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldGroupID, v))
 }
 
+// UsageTodayResetAt applies equality check predicate on the "usage_today_reset_at" field. It's identical to UsageTodayResetAtEQ.
+func UsageTodayResetAt(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldUsageTodayResetAt, v))
+}
+
+// UsageTotalResetAt applies equality check predicate on the "usage_total_reset_at" field. It's identical to UsageTotalResetAtEQ.
+func UsageTotalResetAt(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldUsageTotalResetAt, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.APIKey {
 	return predicate.APIKey(sql.FieldEQ(FieldStatus, v))
@@ -478,6 +488,106 @@ func GroupIdsIsNil() predicate.APIKey {
 // GroupIdsNotNil applies the NotNil predicate on the "group_ids" field.
 func GroupIdsNotNil() predicate.APIKey {
 	return predicate.APIKey(sql.FieldNotNull(FieldGroupIds))
+}
+
+// UsageTodayResetAtEQ applies the EQ predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldUsageTodayResetAt, v))
+}
+
+// UsageTodayResetAtNEQ applies the NEQ predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtNEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldUsageTodayResetAt, v))
+}
+
+// UsageTodayResetAtIn applies the In predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldUsageTodayResetAt, vs...))
+}
+
+// UsageTodayResetAtNotIn applies the NotIn predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtNotIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldUsageTodayResetAt, vs...))
+}
+
+// UsageTodayResetAtGT applies the GT predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtGT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldUsageTodayResetAt, v))
+}
+
+// UsageTodayResetAtGTE applies the GTE predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtGTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldUsageTodayResetAt, v))
+}
+
+// UsageTodayResetAtLT applies the LT predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtLT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldUsageTodayResetAt, v))
+}
+
+// UsageTodayResetAtLTE applies the LTE predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtLTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldUsageTodayResetAt, v))
+}
+
+// UsageTodayResetAtIsNil applies the IsNil predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldUsageTodayResetAt))
+}
+
+// UsageTodayResetAtNotNil applies the NotNil predicate on the "usage_today_reset_at" field.
+func UsageTodayResetAtNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldUsageTodayResetAt))
+}
+
+// UsageTotalResetAtEQ applies the EQ predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldEQ(FieldUsageTotalResetAt, v))
+}
+
+// UsageTotalResetAtNEQ applies the NEQ predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtNEQ(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNEQ(FieldUsageTotalResetAt, v))
+}
+
+// UsageTotalResetAtIn applies the In predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldIn(FieldUsageTotalResetAt, vs...))
+}
+
+// UsageTotalResetAtNotIn applies the NotIn predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtNotIn(vs ...time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotIn(FieldUsageTotalResetAt, vs...))
+}
+
+// UsageTotalResetAtGT applies the GT predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtGT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGT(FieldUsageTotalResetAt, v))
+}
+
+// UsageTotalResetAtGTE applies the GTE predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtGTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldGTE(FieldUsageTotalResetAt, v))
+}
+
+// UsageTotalResetAtLT applies the LT predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtLT(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLT(FieldUsageTotalResetAt, v))
+}
+
+// UsageTotalResetAtLTE applies the LTE predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtLTE(v time.Time) predicate.APIKey {
+	return predicate.APIKey(sql.FieldLTE(FieldUsageTotalResetAt, v))
+}
+
+// UsageTotalResetAtIsNil applies the IsNil predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtIsNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldIsNull(FieldUsageTotalResetAt))
+}
+
+// UsageTotalResetAtNotNil applies the NotNil predicate on the "usage_total_reset_at" field.
+func UsageTotalResetAtNotNil() predicate.APIKey {
+	return predicate.APIKey(sql.FieldNotNull(FieldUsageTotalResetAt))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

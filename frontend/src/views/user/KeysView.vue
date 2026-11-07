@@ -209,12 +209,24 @@
                 <span class="font-medium text-gray-900 dark:text-white">
                   ${{ (usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4) }}
                 </span>
+                <button v-if="authStore.user?.role === 'admin'" type="button"
+                  :data-testid="`reset-today-usage-${row.id}`" :disabled="resettingUsage"
+                  class="ml-1 text-xs text-primary-600 hover:underline disabled:opacity-50"
+                  @click="resetUsageTarget = { key: row, period: 'today' }">
+                  {{ t('keys.resetTodayUsage') }}
+                </button>
               </div>
               <div class="mt-0.5 flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.total') }}:</span>
                 <span class="font-medium text-gray-900 dark:text-white">
                   ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
                 </span>
+                <button v-if="authStore.user?.role === 'admin'" type="button"
+                  :data-testid="`reset-total-usage-${row.id}`" :disabled="resettingUsage"
+                  class="ml-1 text-xs text-primary-600 hover:underline disabled:opacity-50"
+                  @click="resetUsageTarget = { key: row, period: 'total' }">
+                  {{ t('keys.resetTotalUsage') }}
+                </button>
               </div>
               <!-- Quota progress (if quota is set) -->
               <div v-if="row.quota > 0" class="mt-1.5">
@@ -1004,6 +1016,14 @@
       @cancel="showDeleteDialog = false"
     />
 
+    <ConfirmDialog
+      :show="resetUsageTarget !== null"
+      :title="t(resetUsageTarget?.period === 'today' ? 'keys.resetTodayUsage' : 'keys.resetTotalUsage')"
+      :message="t('keys.resetDisplayUsageConfirm', { name: resetUsageTarget?.key.name })"
+      :confirm-text="t('keys.reset')" :cancel-text="t('common.cancel')" :danger="true"
+      @confirm="resetDisplayUsage" @cancel="resetUsageTarget = null"
+    />
+
     <!-- Reset Quota Confirmation Dialog -->
     <ConfirmDialog
       :show="showResetQuotaDialog"
@@ -1127,6 +1147,7 @@
 </template>
 
 <script setup lang="ts">
+import { useAuthStore } from '@/stores/auth'
 	import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
@@ -1292,6 +1313,22 @@ const loading = ref(false)
 const submitting = ref(false)
 const now = ref(new Date())
 let resetTimer: ReturnType<typeof setInterval> | null = null
+const authStore = useAuthStore()
+const resetUsageTarget = ref<{ key: ApiKey; period: 'today' | 'total' } | null>(null)
+const resettingUsage = ref(false)
+const resetDisplayUsage = async () => {
+  const target = resetUsageTarget.value
+  if (!target || resettingUsage.value) return
+  resettingUsage.value = true
+  try {
+    await keysAPI.resetDisplayUsage(target.key.id, target.period)
+    resetUsageTarget.value = null
+    appStore.showSuccess(t('keys.usageResetSuccess'))
+    await loadApiKeys()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.message || t('keys.usageResetFailed'))
+  } finally { resettingUsage.value = false }
+}
 const usageStats = ref<Record<string, BatchApiKeyUsageStats>>({})
 const userGroupRates = ref<Record<number, number>>({})
 

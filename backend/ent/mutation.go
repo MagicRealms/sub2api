@@ -108,53 +108,55 @@ const (
 // APIKeyMutation represents an operation that mutates the APIKey nodes in the graph.
 type APIKeyMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int64
-	created_at         *time.Time
-	updated_at         *time.Time
-	deleted_at         *time.Time
-	key                *string
-	name               *string
-	group_ids          *[]int64
-	appendgroup_ids    []int64
-	status             *string
-	last_used_at       *time.Time
-	ip_whitelist       *[]string
-	appendip_whitelist []string
-	ip_blacklist       *[]string
-	appendip_blacklist []string
-	quota              *float64
-	addquota           *float64
-	quota_used         *float64
-	addquota_used      *float64
-	expires_at         *time.Time
-	rate_limit_5h      *float64
-	addrate_limit_5h   *float64
-	rate_limit_1d      *float64
-	addrate_limit_1d   *float64
-	rate_limit_7d      *float64
-	addrate_limit_7d   *float64
-	usage_5h           *float64
-	addusage_5h        *float64
-	usage_1d           *float64
-	addusage_1d        *float64
-	usage_7d           *float64
-	addusage_7d        *float64
-	window_5h_start    *time.Time
-	window_1d_start    *time.Time
-	window_7d_start    *time.Time
-	clearedFields      map[string]struct{}
-	user               *int64
-	cleareduser        bool
-	group              *int64
-	clearedgroup       bool
-	usage_logs         map[int64]struct{}
-	removedusage_logs  map[int64]struct{}
-	clearedusage_logs  bool
-	done               bool
-	oldValue           func(context.Context) (*APIKey, error)
-	predicates         []predicate.APIKey
+	op                   Op
+	typ                  string
+	id                   *int64
+	created_at           *time.Time
+	updated_at           *time.Time
+	deleted_at           *time.Time
+	key                  *string
+	name                 *string
+	group_ids            *[]int64
+	appendgroup_ids      []int64
+	usage_today_reset_at *time.Time
+	usage_total_reset_at *time.Time
+	status               *string
+	last_used_at         *time.Time
+	ip_whitelist         *[]string
+	appendip_whitelist   []string
+	ip_blacklist         *[]string
+	appendip_blacklist   []string
+	quota                *float64
+	addquota             *float64
+	quota_used           *float64
+	addquota_used        *float64
+	expires_at           *time.Time
+	rate_limit_5h        *float64
+	addrate_limit_5h     *float64
+	rate_limit_1d        *float64
+	addrate_limit_1d     *float64
+	rate_limit_7d        *float64
+	addrate_limit_7d     *float64
+	usage_5h             *float64
+	addusage_5h          *float64
+	usage_1d             *float64
+	addusage_1d          *float64
+	usage_7d             *float64
+	addusage_7d          *float64
+	window_5h_start      *time.Time
+	window_1d_start      *time.Time
+	window_7d_start      *time.Time
+	clearedFields        map[string]struct{}
+	user                 *int64
+	cleareduser          bool
+	group                *int64
+	clearedgroup         bool
+	usage_logs           map[int64]struct{}
+	removedusage_logs    map[int64]struct{}
+	clearedusage_logs    bool
+	done                 bool
+	oldValue             func(context.Context) (*APIKey, error)
+	predicates           []predicate.APIKey
 }
 
 var _ ent.Mutation = (*APIKeyMutation)(nil)
@@ -596,6 +598,104 @@ func (m *APIKeyMutation) ResetGroupIds() {
 	m.group_ids = nil
 	m.appendgroup_ids = nil
 	delete(m.clearedFields, apikey.FieldGroupIds)
+}
+
+// SetUsageTodayResetAt sets the "usage_today_reset_at" field.
+func (m *APIKeyMutation) SetUsageTodayResetAt(t time.Time) {
+	m.usage_today_reset_at = &t
+}
+
+// UsageTodayResetAt returns the value of the "usage_today_reset_at" field in the mutation.
+func (m *APIKeyMutation) UsageTodayResetAt() (r time.Time, exists bool) {
+	v := m.usage_today_reset_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageTodayResetAt returns the old "usage_today_reset_at" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldUsageTodayResetAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageTodayResetAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageTodayResetAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageTodayResetAt: %w", err)
+	}
+	return oldValue.UsageTodayResetAt, nil
+}
+
+// ClearUsageTodayResetAt clears the value of the "usage_today_reset_at" field.
+func (m *APIKeyMutation) ClearUsageTodayResetAt() {
+	m.usage_today_reset_at = nil
+	m.clearedFields[apikey.FieldUsageTodayResetAt] = struct{}{}
+}
+
+// UsageTodayResetAtCleared returns if the "usage_today_reset_at" field was cleared in this mutation.
+func (m *APIKeyMutation) UsageTodayResetAtCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldUsageTodayResetAt]
+	return ok
+}
+
+// ResetUsageTodayResetAt resets all changes to the "usage_today_reset_at" field.
+func (m *APIKeyMutation) ResetUsageTodayResetAt() {
+	m.usage_today_reset_at = nil
+	delete(m.clearedFields, apikey.FieldUsageTodayResetAt)
+}
+
+// SetUsageTotalResetAt sets the "usage_total_reset_at" field.
+func (m *APIKeyMutation) SetUsageTotalResetAt(t time.Time) {
+	m.usage_total_reset_at = &t
+}
+
+// UsageTotalResetAt returns the value of the "usage_total_reset_at" field in the mutation.
+func (m *APIKeyMutation) UsageTotalResetAt() (r time.Time, exists bool) {
+	v := m.usage_total_reset_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUsageTotalResetAt returns the old "usage_total_reset_at" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldUsageTotalResetAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUsageTotalResetAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUsageTotalResetAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUsageTotalResetAt: %w", err)
+	}
+	return oldValue.UsageTotalResetAt, nil
+}
+
+// ClearUsageTotalResetAt clears the value of the "usage_total_reset_at" field.
+func (m *APIKeyMutation) ClearUsageTotalResetAt() {
+	m.usage_total_reset_at = nil
+	m.clearedFields[apikey.FieldUsageTotalResetAt] = struct{}{}
+}
+
+// UsageTotalResetAtCleared returns if the "usage_total_reset_at" field was cleared in this mutation.
+func (m *APIKeyMutation) UsageTotalResetAtCleared() bool {
+	_, ok := m.clearedFields[apikey.FieldUsageTotalResetAt]
+	return ok
+}
+
+// ResetUsageTotalResetAt resets all changes to the "usage_total_reset_at" field.
+func (m *APIKeyMutation) ResetUsageTotalResetAt() {
+	m.usage_total_reset_at = nil
+	delete(m.clearedFields, apikey.FieldUsageTotalResetAt)
 }
 
 // SetStatus sets the "status" field.
@@ -1599,7 +1699,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 24)
+	fields := make([]string, 0, 26)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -1623,6 +1723,12 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.group_ids != nil {
 		fields = append(fields, apikey.FieldGroupIds)
+	}
+	if m.usage_today_reset_at != nil {
+		fields = append(fields, apikey.FieldUsageTodayResetAt)
+	}
+	if m.usage_total_reset_at != nil {
+		fields = append(fields, apikey.FieldUsageTotalResetAt)
 	}
 	if m.status != nil {
 		fields = append(fields, apikey.FieldStatus)
@@ -1696,6 +1802,10 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.GroupID()
 	case apikey.FieldGroupIds:
 		return m.GroupIds()
+	case apikey.FieldUsageTodayResetAt:
+		return m.UsageTodayResetAt()
+	case apikey.FieldUsageTotalResetAt:
+		return m.UsageTotalResetAt()
 	case apikey.FieldStatus:
 		return m.Status()
 	case apikey.FieldLastUsedAt:
@@ -1753,6 +1863,10 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldGroupID(ctx)
 	case apikey.FieldGroupIds:
 		return m.OldGroupIds(ctx)
+	case apikey.FieldUsageTodayResetAt:
+		return m.OldUsageTodayResetAt(ctx)
+	case apikey.FieldUsageTotalResetAt:
+		return m.OldUsageTotalResetAt(ctx)
 	case apikey.FieldStatus:
 		return m.OldStatus(ctx)
 	case apikey.FieldLastUsedAt:
@@ -1849,6 +1963,20 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupIds(v)
+		return nil
+	case apikey.FieldUsageTodayResetAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageTodayResetAt(v)
+		return nil
+	case apikey.FieldUsageTotalResetAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUsageTotalResetAt(v)
 		return nil
 	case apikey.FieldStatus:
 		v, ok := value.(string)
@@ -2100,6 +2228,12 @@ func (m *APIKeyMutation) ClearedFields() []string {
 	if m.FieldCleared(apikey.FieldGroupIds) {
 		fields = append(fields, apikey.FieldGroupIds)
 	}
+	if m.FieldCleared(apikey.FieldUsageTodayResetAt) {
+		fields = append(fields, apikey.FieldUsageTodayResetAt)
+	}
+	if m.FieldCleared(apikey.FieldUsageTotalResetAt) {
+		fields = append(fields, apikey.FieldUsageTotalResetAt)
+	}
 	if m.FieldCleared(apikey.FieldLastUsedAt) {
 		fields = append(fields, apikey.FieldLastUsedAt)
 	}
@@ -2143,6 +2277,12 @@ func (m *APIKeyMutation) ClearField(name string) error {
 		return nil
 	case apikey.FieldGroupIds:
 		m.ClearGroupIds()
+		return nil
+	case apikey.FieldUsageTodayResetAt:
+		m.ClearUsageTodayResetAt()
+		return nil
+	case apikey.FieldUsageTotalResetAt:
+		m.ClearUsageTotalResetAt()
 		return nil
 	case apikey.FieldLastUsedAt:
 		m.ClearLastUsedAt()
@@ -2196,6 +2336,12 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldGroupIds:
 		m.ResetGroupIds()
+		return nil
+	case apikey.FieldUsageTodayResetAt:
+		m.ResetUsageTodayResetAt()
+		return nil
+	case apikey.FieldUsageTotalResetAt:
+		m.ResetUsageTotalResetAt()
 		return nil
 	case apikey.FieldStatus:
 		m.ResetStatus()
@@ -14701,6 +14847,10 @@ type ChannelMonitorMutation struct {
 	check_mode              *string
 	account_id              *int64
 	addaccount_id           *int64
+	local_api_key_id        *int64
+	addlocal_api_key_id     *int64
+	probe_group_id          *int64
+	addprobe_group_id       *int64
 	api_mode                *string
 	endpoint                *string
 	api_key_encrypted       *string
@@ -15079,6 +15229,146 @@ func (m *ChannelMonitorMutation) ResetAccountID() {
 	m.account_id = nil
 	m.addaccount_id = nil
 	delete(m.clearedFields, channelmonitor.FieldAccountID)
+}
+
+// SetLocalAPIKeyID sets the "local_api_key_id" field.
+func (m *ChannelMonitorMutation) SetLocalAPIKeyID(i int64) {
+	m.local_api_key_id = &i
+	m.addlocal_api_key_id = nil
+}
+
+// LocalAPIKeyID returns the value of the "local_api_key_id" field in the mutation.
+func (m *ChannelMonitorMutation) LocalAPIKeyID() (r int64, exists bool) {
+	v := m.local_api_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLocalAPIKeyID returns the old "local_api_key_id" field's value of the ChannelMonitor entity.
+// If the ChannelMonitor object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelMonitorMutation) OldLocalAPIKeyID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLocalAPIKeyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLocalAPIKeyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLocalAPIKeyID: %w", err)
+	}
+	return oldValue.LocalAPIKeyID, nil
+}
+
+// AddLocalAPIKeyID adds i to the "local_api_key_id" field.
+func (m *ChannelMonitorMutation) AddLocalAPIKeyID(i int64) {
+	if m.addlocal_api_key_id != nil {
+		*m.addlocal_api_key_id += i
+	} else {
+		m.addlocal_api_key_id = &i
+	}
+}
+
+// AddedLocalAPIKeyID returns the value that was added to the "local_api_key_id" field in this mutation.
+func (m *ChannelMonitorMutation) AddedLocalAPIKeyID() (r int64, exists bool) {
+	v := m.addlocal_api_key_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearLocalAPIKeyID clears the value of the "local_api_key_id" field.
+func (m *ChannelMonitorMutation) ClearLocalAPIKeyID() {
+	m.local_api_key_id = nil
+	m.addlocal_api_key_id = nil
+	m.clearedFields[channelmonitor.FieldLocalAPIKeyID] = struct{}{}
+}
+
+// LocalAPIKeyIDCleared returns if the "local_api_key_id" field was cleared in this mutation.
+func (m *ChannelMonitorMutation) LocalAPIKeyIDCleared() bool {
+	_, ok := m.clearedFields[channelmonitor.FieldLocalAPIKeyID]
+	return ok
+}
+
+// ResetLocalAPIKeyID resets all changes to the "local_api_key_id" field.
+func (m *ChannelMonitorMutation) ResetLocalAPIKeyID() {
+	m.local_api_key_id = nil
+	m.addlocal_api_key_id = nil
+	delete(m.clearedFields, channelmonitor.FieldLocalAPIKeyID)
+}
+
+// SetProbeGroupID sets the "probe_group_id" field.
+func (m *ChannelMonitorMutation) SetProbeGroupID(i int64) {
+	m.probe_group_id = &i
+	m.addprobe_group_id = nil
+}
+
+// ProbeGroupID returns the value of the "probe_group_id" field in the mutation.
+func (m *ChannelMonitorMutation) ProbeGroupID() (r int64, exists bool) {
+	v := m.probe_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProbeGroupID returns the old "probe_group_id" field's value of the ChannelMonitor entity.
+// If the ChannelMonitor object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ChannelMonitorMutation) OldProbeGroupID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProbeGroupID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProbeGroupID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProbeGroupID: %w", err)
+	}
+	return oldValue.ProbeGroupID, nil
+}
+
+// AddProbeGroupID adds i to the "probe_group_id" field.
+func (m *ChannelMonitorMutation) AddProbeGroupID(i int64) {
+	if m.addprobe_group_id != nil {
+		*m.addprobe_group_id += i
+	} else {
+		m.addprobe_group_id = &i
+	}
+}
+
+// AddedProbeGroupID returns the value that was added to the "probe_group_id" field in this mutation.
+func (m *ChannelMonitorMutation) AddedProbeGroupID() (r int64, exists bool) {
+	v := m.addprobe_group_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearProbeGroupID clears the value of the "probe_group_id" field.
+func (m *ChannelMonitorMutation) ClearProbeGroupID() {
+	m.probe_group_id = nil
+	m.addprobe_group_id = nil
+	m.clearedFields[channelmonitor.FieldProbeGroupID] = struct{}{}
+}
+
+// ProbeGroupIDCleared returns if the "probe_group_id" field was cleared in this mutation.
+func (m *ChannelMonitorMutation) ProbeGroupIDCleared() bool {
+	_, ok := m.clearedFields[channelmonitor.FieldProbeGroupID]
+	return ok
+}
+
+// ResetProbeGroupID resets all changes to the "probe_group_id" field.
+func (m *ChannelMonitorMutation) ResetProbeGroupID() {
+	m.probe_group_id = nil
+	m.addprobe_group_id = nil
+	delete(m.clearedFields, channelmonitor.FieldProbeGroupID)
 }
 
 // SetAPIMode sets the "api_mode" field.
@@ -15930,7 +16220,7 @@ func (m *ChannelMonitorMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ChannelMonitorMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 23)
 	if m.created_at != nil {
 		fields = append(fields, channelmonitor.FieldCreatedAt)
 	}
@@ -15948,6 +16238,12 @@ func (m *ChannelMonitorMutation) Fields() []string {
 	}
 	if m.account_id != nil {
 		fields = append(fields, channelmonitor.FieldAccountID)
+	}
+	if m.local_api_key_id != nil {
+		fields = append(fields, channelmonitor.FieldLocalAPIKeyID)
+	}
+	if m.probe_group_id != nil {
+		fields = append(fields, channelmonitor.FieldProbeGroupID)
 	}
 	if m.api_mode != nil {
 		fields = append(fields, channelmonitor.FieldAPIMode)
@@ -16014,6 +16310,10 @@ func (m *ChannelMonitorMutation) Field(name string) (ent.Value, bool) {
 		return m.CheckMode()
 	case channelmonitor.FieldAccountID:
 		return m.AccountID()
+	case channelmonitor.FieldLocalAPIKeyID:
+		return m.LocalAPIKeyID()
+	case channelmonitor.FieldProbeGroupID:
+		return m.ProbeGroupID()
 	case channelmonitor.FieldAPIMode:
 		return m.APIMode()
 	case channelmonitor.FieldEndpoint:
@@ -16065,6 +16365,10 @@ func (m *ChannelMonitorMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldCheckMode(ctx)
 	case channelmonitor.FieldAccountID:
 		return m.OldAccountID(ctx)
+	case channelmonitor.FieldLocalAPIKeyID:
+		return m.OldLocalAPIKeyID(ctx)
+	case channelmonitor.FieldProbeGroupID:
+		return m.OldProbeGroupID(ctx)
 	case channelmonitor.FieldAPIMode:
 		return m.OldAPIMode(ctx)
 	case channelmonitor.FieldEndpoint:
@@ -16145,6 +16449,20 @@ func (m *ChannelMonitorMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAccountID(v)
+		return nil
+	case channelmonitor.FieldLocalAPIKeyID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLocalAPIKeyID(v)
+		return nil
+	case channelmonitor.FieldProbeGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProbeGroupID(v)
 		return nil
 	case channelmonitor.FieldAPIMode:
 		v, ok := value.(string)
@@ -16262,6 +16580,12 @@ func (m *ChannelMonitorMutation) AddedFields() []string {
 	if m.addaccount_id != nil {
 		fields = append(fields, channelmonitor.FieldAccountID)
 	}
+	if m.addlocal_api_key_id != nil {
+		fields = append(fields, channelmonitor.FieldLocalAPIKeyID)
+	}
+	if m.addprobe_group_id != nil {
+		fields = append(fields, channelmonitor.FieldProbeGroupID)
+	}
 	if m.addinterval_seconds != nil {
 		fields = append(fields, channelmonitor.FieldIntervalSeconds)
 	}
@@ -16281,6 +16605,10 @@ func (m *ChannelMonitorMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case channelmonitor.FieldAccountID:
 		return m.AddedAccountID()
+	case channelmonitor.FieldLocalAPIKeyID:
+		return m.AddedLocalAPIKeyID()
+	case channelmonitor.FieldProbeGroupID:
+		return m.AddedProbeGroupID()
 	case channelmonitor.FieldIntervalSeconds:
 		return m.AddedIntervalSeconds()
 	case channelmonitor.FieldJitterSeconds:
@@ -16302,6 +16630,20 @@ func (m *ChannelMonitorMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddAccountID(v)
+		return nil
+	case channelmonitor.FieldLocalAPIKeyID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLocalAPIKeyID(v)
+		return nil
+	case channelmonitor.FieldProbeGroupID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProbeGroupID(v)
 		return nil
 	case channelmonitor.FieldIntervalSeconds:
 		v, ok := value.(int)
@@ -16335,6 +16677,12 @@ func (m *ChannelMonitorMutation) ClearedFields() []string {
 	if m.FieldCleared(channelmonitor.FieldAccountID) {
 		fields = append(fields, channelmonitor.FieldAccountID)
 	}
+	if m.FieldCleared(channelmonitor.FieldLocalAPIKeyID) {
+		fields = append(fields, channelmonitor.FieldLocalAPIKeyID)
+	}
+	if m.FieldCleared(channelmonitor.FieldProbeGroupID) {
+		fields = append(fields, channelmonitor.FieldProbeGroupID)
+	}
 	if m.FieldCleared(channelmonitor.FieldGroupName) {
 		fields = append(fields, channelmonitor.FieldGroupName)
 	}
@@ -16363,6 +16711,12 @@ func (m *ChannelMonitorMutation) ClearField(name string) error {
 	switch name {
 	case channelmonitor.FieldAccountID:
 		m.ClearAccountID()
+		return nil
+	case channelmonitor.FieldLocalAPIKeyID:
+		m.ClearLocalAPIKeyID()
+		return nil
+	case channelmonitor.FieldProbeGroupID:
+		m.ClearProbeGroupID()
 		return nil
 	case channelmonitor.FieldGroupName:
 		m.ClearGroupName()
@@ -16401,6 +16755,12 @@ func (m *ChannelMonitorMutation) ResetField(name string) error {
 		return nil
 	case channelmonitor.FieldAccountID:
 		m.ResetAccountID()
+		return nil
+	case channelmonitor.FieldLocalAPIKeyID:
+		m.ResetLocalAPIKeyID()
+		return nil
+	case channelmonitor.FieldProbeGroupID:
+		m.ResetProbeGroupID()
 		return nil
 	case channelmonitor.FieldAPIMode:
 		m.ResetAPIMode()

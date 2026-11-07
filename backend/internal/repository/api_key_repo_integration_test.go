@@ -651,3 +651,19 @@ func (s *APIKeyRepoSuite) TestDeleteWithAudit_NotFound() {
 	err := s.repo.DeleteWithAudit(s.ctx, 999999)
 	s.Require().ErrorIs(err, service.ErrAPIKeyNotFound)
 }
+
+func (s *APIKeyRepoSuite) TestGetByIDLoadsCurrentExclusiveGroupAuthorization() {
+	user := s.mustCreateUser("local-probe-permission@test.com")
+	group := s.mustCreateGroup("local-probe-exclusive")
+	s.Require().NoError(s.client.Group.UpdateOneID(group.ID).SetIsExclusive(true).Exec(s.ctx))
+	s.Require().NoError(s.client.User.UpdateOneID(user.ID).AddAllowedGroupIDs(group.ID).Exec(s.ctx))
+	key := &service.APIKey{UserID: user.ID, Key: "sk-local-probe-authorized", Name: "probe", Status: service.StatusActive, GroupID: &group.ID, GroupIDs: []int64{group.ID}}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().Contains(got.User.AllowedGroups, group.ID)
+	s.Require().NoError(s.client.User.UpdateOneID(user.ID).ClearAllowedGroups().Exec(s.ctx))
+	got, err = s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().NotContains(got.User.AllowedGroups, group.ID)
+}

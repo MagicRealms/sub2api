@@ -43,10 +43,11 @@
       </span>
     </div>
 
+    <p v-if="item.check_mode === 'catalog'" class="mt-2 text-xs text-amber-700 dark:text-amber-400">{{ t('admin.channelMonitor.form.catalogStatusHint') }}</p>
     <!-- Metrics -->
     <MonitorMetricPair
       primary-icon="bolt"
-      :primary-label="t('monitorCommon.dialogLatency')"
+      :primary-label="item.check_mode === 'catalog' ? t('admin.channelMonitor.form.catalogLatency') : t('monitorCommon.dialogLatency')"
       :primary-value="formatLatency(item.primary_latency_ms)"
       primary-unit="ms"
       secondary-icon="globe"

@@ -36,6 +36,10 @@ type APIKey struct {
 	GroupID *int64 `json:"group_id,omitempty"`
 	// Ordered group routes; group_id remains the first route for compatibility
 	GroupIds []int64 `json:"group_ids,omitempty"`
+	// Display-only daily usage reset; never changes billing or quotas
+	UsageTodayResetAt *time.Time `json:"usage_today_reset_at,omitempty"`
+	// Display-only lifetime usage reset; never changes billing or quotas
+	UsageTotalResetAt *time.Time `json:"usage_total_reset_at,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Last usage time of this API key
@@ -131,7 +135,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus:
 			values[i] = new(sql.NullString)
-		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
+		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldUsageTodayResetAt, apikey.FieldUsageTotalResetAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -205,6 +209,20 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				if err := json.Unmarshal(*value, &_m.GroupIds); err != nil {
 					return fmt.Errorf("unmarshal field group_ids: %w", err)
 				}
+			}
+		case apikey.FieldUsageTodayResetAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_today_reset_at", values[i])
+			} else if value.Valid {
+				_m.UsageTodayResetAt = new(time.Time)
+				*_m.UsageTodayResetAt = value.Time
+			}
+		case apikey.FieldUsageTotalResetAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field usage_total_reset_at", values[i])
+			} else if value.Valid {
+				_m.UsageTotalResetAt = new(time.Time)
+				*_m.UsageTotalResetAt = value.Time
 			}
 		case apikey.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -389,6 +407,16 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("group_ids=")
 	builder.WriteString(fmt.Sprintf("%v", _m.GroupIds))
+	builder.WriteString(", ")
+	if v := _m.UsageTodayResetAt; v != nil {
+		builder.WriteString("usage_today_reset_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.UsageTotalResetAt; v != nil {
+		builder.WriteString("usage_total_reset_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

@@ -32,6 +32,9 @@ const {
   nextStep: vi.fn(),
 }))
 
+const { authState, resetUsage } = vi.hoisted(() => ({ authState: { user: { role: 'user' } }, resetUsage: vi.fn() }))
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => authState }))
+
 const messages: Record<string, string> = {
   'common.actions': 'Actions',
   'common.name': 'Name',
@@ -61,6 +64,7 @@ const messages: Record<string, string> = {
 vi.mock('@/api', () => ({
   keysAPI: {
     list: listKeys,
+    resetDisplayUsage: (...args: unknown[]) => resetUsage(...args),
     create: vi.fn(),
     update: updateKey,
     delete: vi.fn(),
@@ -174,6 +178,7 @@ const DataTableStub = {
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
         <slot name="cell-actions" :row="row" />
+        <div data-test="usage"><slot name="cell-usage" :row="row" /></div>
         <div data-test="current-concurrency">
           <slot name="cell-current_concurrency" :value="row.current_concurrency" :row="row" />
         </div>
@@ -268,6 +273,8 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 
 describe('user KeysView column settings', () => {
   beforeEach(() => {
+    authState.user.role = 'user'
+    resetUsage.mockReset()
     localStorage.clear()
 
     listKeys.mockReset()
@@ -650,5 +657,32 @@ describe('user KeysView column settings', () => {
       expect(wrapper.find('[data-tour="key-form-provider"]').exists()).toBe(false)
       expect(optionIds(wrapper)).toHaveLength(12)
     })
+  })
+})
+
+
+describe('administrator usage display reset', () => {
+  it('does not show reset actions to ordinary users', async () => {
+    authState.user.role = 'user'
+    listKeys.mockResolvedValue({ items: [createApiKey()], total: 1, pages: 1, page: 1, page_size: 10 })
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-testid="reset-today-usage-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="reset-total-usage-1"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it('requires confirmation and posts only the chosen statistic', async () => {
+    authState.user.role = 'admin'
+    listKeys.mockResolvedValue({ items: [createApiKey()], total: 1, pages: 1, page: 1, page_size: 10 })
+    resetUsage.mockResolvedValue(undefined)
+    const wrapper = await mountView()
+    await wrapper.get('[data-testid="reset-total-usage-1"]').trigger('click')
+    expect(resetUsage).not.toHaveBeenCalled()
+    const dialog = wrapper.findAllComponents({ name: 'ConfirmDialog' }).find(d => d.props('show') && String(d.props('title')).includes('resetTotalUsage'))!
+    expect(dialog).toBeTruthy()
+    dialog.vm.$emit('confirm')
+    await flushPromises()
+    expect(resetUsage).toHaveBeenCalledWith(1, 'total')
+    expect(updateKey).not.toHaveBeenCalledWith(1, { reset_quota: true })
+    wrapper.unmount()
   })
 })

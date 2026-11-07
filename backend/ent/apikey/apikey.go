@@ -31,6 +31,10 @@ const (
 	FieldGroupID = "group_id"
 	// FieldGroupIds holds the string denoting the group_ids field in the database.
 	FieldGroupIds = "group_ids"
+	// FieldUsageTodayResetAt holds the string denoting the usage_today_reset_at field in the database.
+	FieldUsageTodayResetAt = "usage_today_reset_at"
+	// FieldUsageTotalResetAt holds the string denoting the usage_total_reset_at field in the database.
+	FieldUsageTotalResetAt = "usage_total_reset_at"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
@@ -105,6 +109,8 @@ var Columns = []string{
 	FieldName,
 	FieldGroupID,
 	FieldGroupIds,
+	FieldUsageTodayResetAt,
+	FieldUsageTotalResetAt,
 	FieldStatus,
 	FieldLastUsedAt,
 	FieldIPWhitelist,
@@ -214,6 +220,16 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
+}
+
+// ByUsageTodayResetAt orders the results by the usage_today_reset_at field.
+func ByUsageTodayResetAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsageTodayResetAt, opts...).ToFunc()
+}
+
+// ByUsageTotalResetAt orders the results by the usage_total_reset_at field.
+func ByUsageTotalResetAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUsageTotalResetAt, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

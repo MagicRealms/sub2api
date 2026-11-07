@@ -428,6 +428,13 @@ func (s *UsageService) GetAPIKeyDailyUsage(ctx context.Context, userID, apiKeyID
 
 // GetBatchAPIKeyUsageStats returns today/total actual_cost for given api keys.
 func (s *UsageService) GetBatchAPIKeyUsageStats(ctx context.Context, apiKeyIDs []int64, startTime, endTime time.Time) (map[int64]*usagestats.BatchAPIKeyUsageStats, error) {
+	if startTime.IsZero() && endTime.IsZero() {
+		if repo, ok := s.usageRepo.(interface {
+			GetBatchAPIKeyDisplayUsageStats(context.Context, []int64) (map[int64]*usagestats.BatchAPIKeyUsageStats, error)
+		}); ok {
+			return repo.GetBatchAPIKeyDisplayUsageStats(ctx, apiKeyIDs)
+		}
+	}
 	stats, err := s.usageRepo.GetBatchAPIKeyUsageStats(ctx, apiKeyIDs, startTime, endTime)
 	if err != nil {
 		return nil, fmt.Errorf("get batch api key usage stats: %w", err)

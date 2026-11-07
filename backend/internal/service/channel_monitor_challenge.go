@@ -7,17 +7,8 @@ import (
 	"strconv"
 )
 
-// monitorChallengePromptTemplate 1:1 复刻 BingZi-233/check-cx 的 few-shot 模板。
-const monitorChallengePromptTemplate = `Calculate and respond with ONLY the number, nothing else.
-
-Q: 3 + 5 = ?
-A: 8
-
-Q: 12 - 7 = ?
-A: 5
-
-Q: %d %s %d = ?
-A:`
+// A fresh arithmetic challenge verifies generation with a minimal input budget.
+const monitorChallengePromptTemplate = `%d %s %d? Reply only with the number.`
 
 // monitorChallengeNumberRegex 提取响应中的所有整数（含负号）。
 var monitorChallengeNumberRegex = regexp.MustCompile(`-?\d+`)
@@ -31,7 +22,7 @@ type monitorChallenge struct {
 // generateChallenge 生成一次随机算术 challenge：
 //   - 随机两个 [monitorChallengeMin, monitorChallengeMax] 整数
 //   - 50% 加 / 50% 减；减法用 max - min 保证非负
-//   - 渲染 few-shot 模板
+//   - 渲染最小算术问题
 //
 // 不强求加密随机：math/rand/v2 足够分散，避免 crypto/rand 的开销。
 func generateChallenge() monitorChallenge {

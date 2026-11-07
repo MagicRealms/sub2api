@@ -52,6 +52,8 @@ func (ChannelMonitor) Fields() []ent.Field {
 		field.Int64("account_id").
 			Optional().
 			Nillable(),
+		field.Int64("local_api_key_id").Optional().Nillable(),
+		field.Int64("probe_group_id").Optional().Nillable(),
 		field.String("api_mode").
 			Default("chat_completions").
 			MaxLen(32).

@@ -159,7 +159,12 @@ export async function toggleStatus(id: number, status: 'active' | 'inactive'): P
   return update(id, { status })
 }
 
+export async function resetDisplayUsage(id: number, period: 'today' | 'total'): Promise<void> {
+  await apiClient.post(`/keys/${id}/reset-usage`, { period })
+}
+
 export const keysAPI = {
+  resetDisplayUsage,
   list,
   getById,
   create,

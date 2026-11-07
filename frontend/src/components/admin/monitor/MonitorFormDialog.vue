@@ -99,8 +99,8 @@
       <div v-if="usesProbePart">
         <label class="input-label">{{ t('admin.channelMonitor.form.endpoint') }} <span class="text-red-500">*</span></label>
         <div class="flex gap-2">
-          <input v-model="form.endpoint" data-testid="monitor-endpoint" type="text" required class="input flex-1" :placeholder="t('admin.channelMonitor.form.endpointPlaceholder')" />
-          <button type="button" @click="useCurrentDomain" class="btn btn-secondary whitespace-nowrap">
+          <input v-model="form.endpoint" :disabled="form.local_api_key_id !== null" data-testid="monitor-endpoint" type="text" required class="input flex-1" :placeholder="t('admin.channelMonitor.form.endpointPlaceholder')" />
+          <button type="button" @click="useCurrentDomain" :disabled="form.local_api_key_id !== null" class="btn btn-secondary whitespace-nowrap">
             {{ t('admin.channelMonitor.form.useCurrentDomain') }}
           </button>
         </div>
@@ -116,7 +116,8 @@
           <input
             v-model="form.api_key"
             type="password"
-            :required="!editing"
+            :disabled="form.local_api_key_id !== null"
+            :required="!editing && form.local_api_key_id === null"
             class="input flex-1"
             :placeholder="editing ? t('admin.channelMonitor.form.apiKeyEditPlaceholder') : t('admin.channelMonitor.form.apiKeyPlaceholder')"
           />
@@ -124,7 +125,19 @@
             {{ t('admin.channelMonitor.form.useMyKey') }}
           </button>
         </div>
-        <p v-if="editing && editing.api_key_masked" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
+        <p v-if="editing && editing.api_key_masked && !form.local_api_key_id" class="mt-1 text-xs text-gray-400">{{ editing.api_key_masked }}</p>
+      </div>
+
+      <div v-if="usesProbePart && form.local_api_key_id" class="rounded-lg border border-primary-200 bg-primary-50/50 p-3 dark:border-primary-800 dark:bg-primary-900/10" data-testid="monitor-local-group">
+        <div class="mb-2 flex items-center justify-between gap-2 text-sm">
+          <span>{{ t('admin.channelMonitor.form.selectedLocalKey') }}: {{ selectedLocalKey?.name || `#${form.local_api_key_id}` }}</span>
+          <button type="button" class="text-xs text-primary-600 hover:underline" @click="detachLocalKey">{{ t('admin.channelMonitor.form.manualKey') }}</button>
+        </div>
+        <label class="input-label">{{ t('admin.channelMonitor.form.probeGroup') }}</label>
+        <select v-model.number="form.probe_group_id" required class="input" data-testid="monitor-probe-group" @change="chooseProbeGroup">
+          <option v-for="group in probeGroupOptions" :key="group.id" :value="group.id">{{ group.name }}</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.probeGroupHint') }}</p>
       </div>
 
       <div v-if="usesProbePart">
@@ -237,6 +250,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
+import { monitorKeyGroups } from '@/utils/monitorKeyRoutes'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -324,6 +338,8 @@ const myActiveKeys = ref<ApiKey[]>([])
 const userGroupRates = ref<Record<number, number>>({})
 
 interface MonitorForm {
+  local_api_key_id: number | null
+  probe_group_id: number | null
   name: string
   provider: Provider
   api_mode: APIMode
@@ -346,6 +362,8 @@ interface MonitorForm {
 
 const form = reactive<MonitorForm>({
   name: '',
+  local_api_key_id: null,
+  probe_group_id: null,
   provider: PROVIDER_ANTHROPIC,
   api_mode: API_MODE_CHAT_COMPLETIONS,
   check_mode: CHECK_MODE_PROBE,
@@ -365,10 +383,26 @@ const form = reactive<MonitorForm>({
 })
 
 // quota / quota_probe 需要关联账号；probe / quota_probe 需要探活字段。
-const usesQuotaMode = computed(() => form.check_mode !== CHECK_MODE_PROBE)
+const usesQuotaMode = computed(() => form.check_mode === CHECK_MODE_QUOTA || form.check_mode === CHECK_MODE_QUOTA_PROBE)
 const usesProbePart = computed(() => form.check_mode !== CHECK_MODE_QUOTA)
 const requestURL = computed(() => monitorRequestURL(form.endpoint, form.provider, form.api_mode))
 const myKeyGroups = ref<Group[]>([])
+const selectedLocalKey = computed(() => myActiveKeys.value.find(k => k.id === form.local_api_key_id))
+const probeGroupOptions = computed(() => selectedLocalKey.value
+  ? monitorKeyGroups(selectedLocalKey.value, myKeyGroups.value).filter(g => g.platform === form.provider || g.platform === 'composite')
+  : [])
+function chooseProbeGroup() {
+  const group = probeGroupOptions.value.find(g => g.id === form.probe_group_id)
+  if (group) {
+    form.group_name = group.name
+    if (!form.name.trim()) form.name = group.name
+  }
+}
+function detachLocalKey() {
+  form.local_api_key_id = null
+  form.probe_group_id = null
+  form.api_key = ''
+}
 
 // jitter 上限与后端校验一致：interval - jitter 不得低于最小检测间隔 15 秒。
 const maxJitterSeconds = computed<number>(() => Math.max(0, (form.interval_seconds || 0) - 15))
@@ -505,6 +539,7 @@ interface CheckModeOption {
 }
 
 const checkModeOptions = computed<CheckModeOption[]>(() => [
+  { value: 'catalog', label: t('admin.channelMonitor.form.checkModeCatalog'), hint: t('admin.channelMonitor.form.checkModeCatalogHint'), disabled: form.provider === PROVIDER_ANTIGRAVITY },
   {
     value: CHECK_MODE_PROBE,
     label: t('admin.channelMonitor.form.checkModeProbe'),
@@ -717,6 +752,8 @@ function selectProvider(provider: Provider) {
 watch(() => form.provider, () => {
   if (suppressFormWatchers) return
   form.api_key = ''
+  form.local_api_key_id = null
+  form.probe_group_id = null
   if (form.provider !== PROVIDER_OPENAI) {
     form.api_mode = API_MODE_CHAT_COMPLETIONS
   }
@@ -733,6 +770,8 @@ watch(() => form.api_mode, () => {
 function resetForm() {
   suppressFormWatchers = true
   form.name = ''
+  form.local_api_key_id = null
+  form.probe_group_id = null
   form.provider = PROVIDER_ANTHROPIC
   form.api_mode = API_MODE_CHAT_COMPLETIONS
   form.check_mode = CHECK_MODE_PROBE
@@ -757,6 +796,8 @@ function resetForm() {
 function loadFromMonitor(m: ChannelMonitor) {
   suppressFormWatchers = true
   form.name = m.name
+  form.local_api_key_id = m.local_api_key_id ?? null
+  form.probe_group_id = m.probe_group_id ?? null
   form.provider = m.provider
   form.api_mode = normalizeAPIMode(m.api_mode)
   form.check_mode = m.check_mode || CHECK_MODE_PROBE
@@ -783,7 +824,7 @@ watch(
   ([show, m]) => {
     if (!show) return
     void loadTemplates()
-    if (m) loadFromMonitor(m)
+    if (m) { loadFromMonitor(m); if (m.local_api_key_id) void loadMyKeys() }
     else resetForm()
   },
   { immediate: true },
@@ -794,8 +835,9 @@ function useCurrentDomain() {
   if (form.provider === PROVIDER_OPENAI) form.api_mode = API_MODE_RESPONSES
 }
 
-async function openMyKeyPicker() {
-  showKeyPicker.value = true
+async function openMyKeyPicker() { showKeyPicker.value = true; await loadMyKeys() }
+
+async function loadMyKeys() {
   if (myKeysLoading.value) return
   myKeysLoading.value = true
   try {
@@ -825,14 +867,20 @@ async function openMyKeyPicker() {
 }
 
 function pickMyKey(k: ApiKey) {
-  form.api_key = k.key
-  if (!form.endpoint.trim()) useCurrentDomain()
+  form.local_api_key_id = k.id
+  form.api_key = ''
+  useCurrentDomain()
+  const groups = monitorKeyGroups(k, myKeyGroups.value).filter(g => g.platform === form.provider || g.platform === 'composite')
+  form.probe_group_id = groups[0]?.id ?? null
+  chooseProbeGroup()
   showKeyPicker.value = false
 }
 
 function buildPayload(): CreateParams {
   return {
     name: form.name.trim(),
+    local_api_key_id: usesProbePart.value ? form.local_api_key_id : null,
+    probe_group_id: usesProbePart.value ? form.probe_group_id : null,
     provider: form.provider,
     api_mode: form.provider === PROVIDER_OPENAI ? form.api_mode : API_MODE_CHAT_COMPLETIONS,
     check_mode: form.check_mode,
@@ -872,7 +920,7 @@ async function handleSubmit() {
     const target = editing.value
     if (target) {
       const { api_key, ...rest } = buildPayload()
-      const req: UpdateParams = { ...rest }
+      const req: UpdateParams = { ...rest, local_api_key_id: rest.local_api_key_id ?? 0, probe_group_id: rest.probe_group_id ?? 0 }
       // Only send api_key if user typed a new value
       if (api_key) req.api_key = api_key
       // template_id=null 用 clear_template=true 明确告诉后端清空（pointer 语义）

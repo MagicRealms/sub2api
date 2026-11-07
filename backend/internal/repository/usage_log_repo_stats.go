@@ -1097,3 +1097,31 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 	}
 	return resp, nil
 }
+
+// GetBatchAPIKeyDisplayUsageStats is deliberately separate from financial reports.
+// Lifetime means lifetime, not the dashboard's default 30-day query window.
+func (r *usageLogRepository) GetBatchAPIKeyDisplayUsageStats(ctx context.Context, ids []int64) (map[int64]*BatchAPIKeyUsageStats, error) {
+	ids = normalizePositiveInt64IDs(ids)
+	result := make(map[int64]*BatchAPIKeyUsageStats, len(ids))
+	if len(ids) == 0 {
+		return result, nil
+	}
+	rows, err := r.sql.QueryContext(ctx, `SELECT k.id,
+ COALESCE(SUM(ul.actual_cost) FILTER (WHERE ul.created_at >= COALESCE(k.usage_total_reset_at, '-infinity'::timestamptz)), 0),
+ COALESCE(SUM(ul.actual_cost) FILTER (WHERE ul.created_at >= GREATEST($2::timestamptz, COALESCE(k.usage_today_reset_at, '-infinity'::timestamptz))), 0)
+ FROM api_keys k LEFT JOIN usage_logs ul ON ul.api_key_id = k.id
+ AND ul.created_at >= LEAST(COALESCE(k.usage_total_reset_at, '-infinity'::timestamptz), GREATEST($2::timestamptz, COALESCE(k.usage_today_reset_at, '-infinity'::timestamptz)))
+ WHERE k.id = ANY($1) AND k.deleted_at IS NULL GROUP BY k.id`, pq.Array(ids), timezone.Today())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		stat := &BatchAPIKeyUsageStats{}
+		if err := rows.Scan(&stat.APIKeyID, &stat.TotalActualCost, &stat.TodayActualCost); err != nil {
+			return nil, err
+		}
+		result[stat.APIKeyID] = stat
+	}
+	return result, rows.Err()
+}
