@@ -1,6 +1,6 @@
 <template>
   <article
-    class="plaza-model-card flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-5 shadow-card transition-shadow hover:shadow-card-hover dark:border-dark-700/70 dark:bg-dark-800/70"
+    class="plaza-model-card card-hover flex h-full min-w-0 flex-col overflow-hidden p-5"
     :style="{ '--plaza-accent': platformAccentColor(entry.platform) }"
     :data-model="entry.name"
     data-test="plaza-model-card"
@@ -18,7 +18,7 @@
       </button>
     </div>
 
-    <div class="mt-5">
+    <div class="mt-5 border-t border-[#e9f1ee] pt-4 dark:border-dark-700">
       <label :for="selectId" class="mb-2 flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-dark-400">
         <span>{{ t('modelPlaza.cards.availableGroups') }}</span>
         <span>{{ entry.variants.length }}</span>
@@ -35,7 +35,7 @@
       <span class="ml-auto text-gray-500 dark:text-dark-400" data-test="model-rate">{{ t('modelPlaza.cards.effectiveRate') }} <strong class="font-semibold text-gray-700 dark:text-gray-200">{{ rate }}×</strong></span>
     </div>
 
-    <div class="flex flex-1 flex-col rounded-xl bg-gray-50 p-3.5 dark:bg-dark-900/50" aria-live="polite" aria-atomic="true">
+    <div class="flex flex-1 flex-col rounded-xl border border-[#e9f1ee] bg-[#f7fbf9] p-3.5 dark:border-dark-700 dark:bg-dark-900/50" aria-live="polite" aria-atomic="true">
       <p class="mb-3 text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.basePrice') }}<span v-if="tokenBilling" class="float-right">{{ t('modelPlaza.table.unitPerMillion') }}</span></p>
       <dl v-if="tokenBilling" class="grid grid-cols-2 gap-3">
         <div><dt class="text-[11px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.input') }}</dt><dd class="mt-1 break-all font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-input-price">{{ tokenPrice(tokenPrices?.input_price) }}</dd></div>

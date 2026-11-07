@@ -1,17 +1,23 @@
 <template>
-  <div class="card p-4">
-    <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-      {{ t('admin.dashboard.tokenUsageTrend') }}
-    </h3>
-    <div v-if="loading" class="flex h-48 items-center justify-center">
+  <div class="sunworld-chart-card">
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <div>
+        <p class="sunworld-kicker">{{ t('dashboard.tokenUsageTrend') }}</p>
+        <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+          {{ t('admin.dashboard.tokenUsageTrend') }}
+        </h3>
+      </div>
+      <span class="rounded-lg bg-sun-50 px-2 py-1 text-[10px] font-medium text-sun-700 dark:bg-sun-900/25 dark:text-sun-300">TOKENS</span>
+    </div>
+    <div v-if="loading" class="flex h-56 items-center justify-center">
       <LoadingSpinner />
     </div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-48">
+    <div v-else-if="trendData.length > 0 && chartData" class="h-56">
       <Line :data="chartData" :options="lineOptions" />
     </div>
     <div
       v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      class="flex h-56 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
     >
       {{ t('admin.dashboard.noDataAvailable') }}
     </div>
@@ -59,13 +65,13 @@ const isDarkMode = computed(() => {
 })
 
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#e5e7eb' : '#374151',
-  grid: isDarkMode.value ? '#374151' : '#e5e7eb',
-  input: '#3b82f6',
-  output: '#10b981',
-  cacheCreation: '#f59e0b',
-  cacheRead: '#06b6d4',
-  cacheHitRate: '#8b5cf6'
+  text: isDarkMode.value ? '#c7d8d8' : '#49615c',
+  grid: isDarkMode.value ? 'rgba(125, 164, 163, 0.16)' : 'rgba(82, 137, 126, 0.13)',
+  input: '#278a7a',
+  output: '#d86658',
+  cacheCreation: '#dc9632',
+  cacheRead: '#559bb4',
+  cacheHitRate: '#8a73b8'
 }))
 
 const chartData = computed(() => {
@@ -78,7 +84,9 @@ const chartData = computed(() => {
         label: 'Input',
         data: props.trendData.map((d) => d.input_tokens),
         borderColor: chartColors.value.input,
-        backgroundColor: `${chartColors.value.input}20`,
+        backgroundColor: `${chartColors.value.input}18`,
+        pointRadius: 1.5,
+        pointHoverRadius: 4,
         fill: true,
         tension: 0.3
       },
@@ -86,7 +94,9 @@ const chartData = computed(() => {
         label: 'Output',
         data: props.trendData.map((d) => d.output_tokens),
         borderColor: chartColors.value.output,
-        backgroundColor: `${chartColors.value.output}20`,
+        backgroundColor: `${chartColors.value.output}16`,
+        pointRadius: 1.5,
+        pointHoverRadius: 4,
         fill: true,
         tension: 0.3
       },
@@ -94,7 +104,8 @@ const chartData = computed(() => {
         label: 'Cache Creation',
         data: props.trendData.map((d) => d.cache_creation_tokens),
         borderColor: chartColors.value.cacheCreation,
-        backgroundColor: `${chartColors.value.cacheCreation}20`,
+        backgroundColor: `${chartColors.value.cacheCreation}14`,
+        pointRadius: 1,
         fill: true,
         tension: 0.3
       },
@@ -102,7 +113,8 @@ const chartData = computed(() => {
         label: 'Cache Read',
         data: props.trendData.map((d) => d.cache_read_tokens),
         borderColor: chartColors.value.cacheRead,
-        backgroundColor: `${chartColors.value.cacheRead}20`,
+        backgroundColor: `${chartColors.value.cacheRead}14`,
+        pointRadius: 1,
         fill: true,
         tension: 0.3
       },
@@ -113,7 +125,8 @@ const chartData = computed(() => {
           return totalPromptTokens > 0 ? (d.cache_read_tokens / totalPromptTokens) * 100 : 0
         }),
         borderColor: chartColors.value.cacheHitRate,
-        backgroundColor: `${chartColors.value.cacheHitRate}20`,
+        backgroundColor: `${chartColors.value.cacheHitRate}14`,
+        pointRadius: 1,
         borderDash: [5, 5],
         fill: false,
         tension: 0.3,
@@ -165,7 +178,8 @@ const lineOptions = computed(() => ({
   scales: {
     x: {
       grid: {
-        color: chartColors.value.grid
+        color: chartColors.value.grid,
+        drawBorder: false
       },
       ticks: {
         color: chartColors.value.text,
@@ -176,7 +190,8 @@ const lineOptions = computed(() => ({
     },
     y: {
       grid: {
-        color: chartColors.value.grid
+        color: chartColors.value.grid,
+        drawBorder: false
       },
       ticks: {
         color: chartColors.value.text,

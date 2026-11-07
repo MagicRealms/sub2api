@@ -1,14 +1,14 @@
 <template>
   <div class="space-y-3" data-test="ordered-group-selector">
     <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('keys.routing.hint') }}</p>
-    <ol v-if="modelValue.length" class="space-y-2" aria-live="polite">
-      <li v-for="(id, index) in modelValue" :key="id" class="flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 p-2 dark:border-primary-800 dark:bg-primary-900/20" :data-route-id="id">
+    <ol v-if="modelValue.length" class="space-y-1.5" aria-live="polite">
+      <li v-for="(id, index) in modelValue" :key="id" class="flex min-w-0 items-center gap-2 rounded-xl border border-primary-200 bg-primary-50/70 p-2 dark:border-primary-800 dark:bg-primary-900/20" :data-route-id="id">
         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white" :aria-label="t('keys.routing.priority', { order: index + 1 })">{{ index + 1 }}</span>
-        <span class="min-w-0 flex-1 text-sm font-medium text-gray-900 dark:text-white">{{ findOption(id)?.label ?? `#${id}` }}</span>
-        <span class="text-xs text-gray-500">{{ findOption(id)?.userRate ?? findOption(id)?.rate ?? '—' }}×</span>
-        <button type="button" class="rounded p-1 disabled:opacity-30" :disabled="disabled || index === 0" :aria-label="t('keys.routing.moveUp')" @click="move(index, -1)">↑</button>
-        <button type="button" class="rounded p-1 disabled:opacity-30" :disabled="disabled || index === modelValue.length - 1" :aria-label="t('keys.routing.moveDown')" @click="move(index, 1)">↓</button>
-        <button type="button" class="rounded p-1 text-gray-500" :disabled="disabled" :aria-label="t('common.remove')" @click="toggle(id)">×</button>
+        <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white" :title="findOption(id)?.label ?? `#${id}`">{{ findOption(id)?.label ?? `#${id}` }}</span>
+        <span class="shrink-0 text-xs text-gray-500">{{ findOption(id)?.userRate ?? findOption(id)?.rate ?? '—' }}×</span>
+        <button type="button" class="rounded-lg p-1 text-gray-500 transition hover:bg-white/70 hover:text-primary-600 disabled:opacity-30 dark:hover:bg-dark-800" :disabled="disabled || index === 0" :aria-label="t('keys.routing.moveUp')" @click="move(index, -1)">↑</button>
+        <button type="button" class="rounded-lg p-1 text-gray-500 transition hover:bg-white/70 hover:text-primary-600 disabled:opacity-30 dark:hover:bg-dark-800" :disabled="disabled || index === modelValue.length - 1" :aria-label="t('keys.routing.moveDown')" @click="move(index, 1)">↓</button>
+        <button type="button" class="rounded-lg p-1 text-gray-500 transition hover:bg-white/70 hover:text-coral-600" :disabled="disabled" :aria-label="t('common.remove')" @click="toggle(id)">×</button>
       </li>
     </ol>
     <div class="max-h-60 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-1.5 dark:border-dark-600">

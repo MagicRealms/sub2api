@@ -1,10 +1,9 @@
 <template>
   <div class="space-y-5">
-    <div class="relative overflow-hidden rounded-2xl border border-gray-200/70 bg-white/70 px-5 py-6 dark:border-dark-700/70 dark:bg-dark-800/60 sm:px-7">
-      <div aria-hidden="true" class="pointer-events-none absolute -right-16 -top-28 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl"></div>
+    <div class="sunworld-panel relative overflow-hidden px-5 py-6 sm:px-7">
       <div class="relative flex flex-wrap items-center justify-between gap-6">
         <div>
-          <div class="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary-600 dark:text-primary-400"><Icon name="grid" size="sm" />MODEL CATALOG</div>
+          <div class="sunworld-kicker mb-2 flex items-center gap-2"><Icon name="grid" size="sm" />MODEL CATALOG</div>
           <h1 v-if="!embedded" class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
           <p :class="!embedded ? 'mt-2' : ''" class="text-sm leading-6 text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.intro') }}</p>
         </div>

@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Date Range Filter -->
-    <div class="card p-4">
+    <div class="sunworld-panel p-3.5 sm:p-4">
       <div class="flex flex-wrap items-center gap-4">
         <div class="flex items-center gap-2">
           <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.timeRange') }}:</span>
@@ -22,17 +22,23 @@
     <!-- Charts Grid -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <!-- Model Distribution Chart -->
-      <div class="card relative overflow-hidden p-4">
+      <div class="sunworld-chart-card">
         <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-sm dark:bg-dark-800/50">
           <LoadingSpinner size="md" />
         </div>
-        <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
-        <div class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-          <div class="h-48 w-48 shrink-0">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p class="sunworld-kicker">{{ t('dashboard.modelDistribution') }}</p>
+            <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
+          </div>
+          <Icon name="chart" size="md" class="text-primary-500/70" />
+        </div>
+        <div class="flex flex-col items-center gap-5 sm:flex-row sm:gap-6">
+          <div class="h-44 w-44 shrink-0 rounded-full bg-primary-50/60 p-2 dark:bg-primary-900/10">
             <Doughnut v-if="modelData" :data="modelData" :options="doughnutOptions" />
             <div v-else class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noDataAvailable') }}</div>
           </div>
-          <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto">
+          <div class="max-h-48 w-full min-w-0 flex-1 overflow-auto rounded-xl border border-[#e9f1ee] bg-white/55 px-3 dark:border-dark-700 dark:bg-dark-900/30">
             <table class="w-full text-xs">
               <thead>
                 <tr class="text-gray-500 dark:text-gray-400">
@@ -44,7 +50,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="model in models" :key="model.model" class="border-t border-gray-100 dark:border-dark-700">
+                <tr v-for="model in models" :key="model.model" class="sunworld-table-row">
                   <td class="max-w-[100px] truncate py-1.5 font-medium text-gray-900 dark:text-white" :title="model.model">{{ model.model }}</td>
                   <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatNumber(model.requests) }}</td>
                   <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatTokens(model.total_tokens) }}</td>
@@ -67,6 +73,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import Icon from '@/components/icons/Icon.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import { Doughnut } from 'vue-chartjs'
@@ -84,7 +91,10 @@ const modelData = computed(() => !props.models?.length ? null : {
   labels: props.models.map((m: ModelStat) => m.model),
   datasets: [{
     data: props.models.map((m: ModelStat) => m.total_tokens),
-    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+    backgroundColor: ['#278a7a', '#d86658', '#dc9632', '#559bb4', '#8a73b8', '#e58b70', '#6fa7a2', '#9ab85b'],
+    borderColor: 'transparent',
+    borderWidth: 3,
+    hoverOffset: 6
   }]
 })
 

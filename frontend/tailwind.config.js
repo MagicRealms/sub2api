@@ -5,19 +5,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 主色调 - Teal/Cyan 青色系
+        // 太阳新世界：海玻璃主色，搭配日光与珊瑚辅助色。
         primary: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e'
+          50: '#effcf8',
+          100: '#d8f5eb',
+          200: '#b7eadc',
+          300: '#8bd8c6',
+          400: '#5fc0ae',
+          500: '#36a894',
+          600: '#278a7a',
+          700: '#1f6f65',
+          800: '#1b5953',
+          900: '#164945',
+          950: '#0b2d2b'
+        },
+        sun: {
+          50: '#fffaf0',
+          100: '#fff0c9',
+          200: '#ffe09a',
+          300: '#faca67',
+          400: '#f2b84b',
+          500: '#dc9632',
+          600: '#bc7625',
+          700: '#985a21',
+          800: '#7d4a21',
+          900: '#693e1f'
+        },
+        coral: {
+          50: '#fff5f1',
+          100: '#ffe3d8',
+          200: '#ffc7b4',
+          300: '#f9a58e',
+          400: '#ec836e',
+          500: '#d86658',
+          600: '#b94e45',
+          700: '#983f3b',
+          800: '#7d3735',
+          900: '#693330'
         },
         // 辅助色 - 深蓝灰
         accent: {
@@ -75,12 +99,12 @@ export default {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-primary': 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
-        'gradient-dark': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        'gradient-primary': 'linear-gradient(135deg, #36a894 0%, #278a7a 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #1c3038 0%, #101c25 100%)',
         'gradient-glass':
           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
         'mesh-gradient':
-          'radial-gradient(at 40% 20%, rgba(20, 184, 166, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.08) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(20, 184, 166, 0.08) 0px, transparent 50%)'
+          'linear-gradient(135deg, rgba(54, 168, 148, 0.08), transparent 42%), linear-gradient(315deg, rgba(242, 184, 75, 0.06), transparent 38%), linear-gradient(rgba(31, 111, 101, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(31, 111, 101, 0.035) 1px, transparent 1px)'
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -118,8 +142,8 @@ export default {
           '100%': { backgroundPosition: '200% 0' }
         },
         glow: {
-          '0%': { boxShadow: '0 0 20px rgba(20, 184, 166, 0.25)' },
-          '100%': { boxShadow: '0 0 30px rgba(20, 184, 166, 0.4)' }
+          '0%': { boxShadow: '0 0 20px rgba(54, 168, 148, 0.18)' },
+          '100%': { boxShadow: '0 0 30px rgba(242, 184, 75, 0.24)' }
         }
       },
       backdropBlur: {

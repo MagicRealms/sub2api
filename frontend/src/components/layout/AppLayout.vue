@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-dark-950">
+  <div class="sunworld-shell min-h-screen">
     <!-- Background Decoration -->
-    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient"></div>
+    <div class="pointer-events-none fixed inset-0 bg-mesh-gradient bg-[size:24px_24px] opacity-60 dark:opacity-40"></div>
 
     <!-- Sidebar -->
     <AppSidebar />
@@ -15,7 +15,7 @@
       <AppHeader />
 
       <!-- Main Content -->
-      <main class="p-4 md:p-6 lg:p-8">
+      <main class="relative p-4 md:p-6 lg:p-8">
         <slot />
       </main>
     </div>

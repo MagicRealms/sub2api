@@ -1,5 +1,5 @@
 <template>
-  <div :class="flat ? '' : 'card overflow-hidden'">
+  <div :class="[flat ? '' : 'card overflow-hidden', 'usage-focus-table']">
     <div
       v-if="showIpGeoToolbar"
       class="flex items-center justify-end gap-2 border-b border-gray-200 px-4 py-2 dark:border-dark-700"
@@ -34,7 +34,7 @@
               @click="$emit('userClick', row.user_id, row.user?.email)"
               :title="t('admin.usage.clickToViewBalance')"
             >
-              {{ row.user.email }}
+              <span class="inline-block max-w-[11rem] truncate align-bottom" :title="row.user.email">{{ row.user.email }}</span>
             </button>
             <span v-else class="font-medium text-gray-900 dark:text-white">-</span>
             <span v-if="row.user?.deleted_at" class="ml-1 inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-rose-100 text-rose-600 ring-1 ring-inset ring-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:ring-rose-500/30">
@@ -45,11 +45,11 @@
         </template>
 
         <template #cell-api_key="{ row }">
-          <span class="text-sm text-gray-900 dark:text-white">{{ row.api_key?.name || '-' }}</span>
+            <span class="inline-block max-w-[10rem] truncate text-sm text-gray-900 dark:text-white" :title="row.api_key?.name || undefined">{{ row.api_key?.name || '-' }}</span>
         </template>
 
         <template #cell-account="{ row }">
-          <span class="text-sm text-gray-900 dark:text-white">{{ row.account?.name || '-' }}</span>
+          <span class="inline-block max-w-[10rem] truncate text-sm text-gray-900 dark:text-white" :title="row.account?.name || undefined">{{ row.account?.name || '-' }}</span>
         </template>
 
         <template #cell-model="{ row }">

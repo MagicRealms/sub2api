@@ -162,10 +162,10 @@
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                 :title="t('keys.clickToChangeGroup')"
               >
-                <span v-if="keyRouteIDs(row).length" class="flex flex-wrap items-center gap-1.5">
-                  <span v-for="(id, index) in keyRouteIDs(row)" :key="id" class="inline-flex items-center gap-1 rounded-md border border-gray-200 px-1.5 py-1 dark:border-dark-600">
-                    <GroupBadge :name="groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)" :platform="groupOptions.find(group => group.value === id)?.platform ?? row.group?.platform" :rate-multiplier="groupOptions.find(group => group.value === id)?.rate" :user-rate-multiplier="userGroupRates[id]" />
-                    <span class="text-xs font-bold text-primary-600 dark:text-primary-400">#{{ index + 1 }}</span>
+                <span v-if="keyRouteIDs(row).length" class="flex min-w-0 max-w-[min(70vw,26rem)] items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-hide" :title="keyRouteIDs(row).map((id, index) => `${index + 1}. ${groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)}`).join(' → ')">
+                  <span v-for="(id, index) in keyRouteIDs(row)" :key="id" class="inline-flex max-w-[12rem] shrink-0 items-center gap-1 rounded-lg border border-primary-100 bg-primary-50/60 px-1.5 py-1 dark:border-primary-800/70 dark:bg-primary-900/20">
+                    <span class="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] font-bold text-white">{{ index + 1 }}</span>
+                    <GroupBadge class="max-w-[9.5rem]" :name="groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)" :platform="groupOptions.find(group => group.value === id)?.platform ?? row.group?.platform" :rate-multiplier="groupOptions.find(group => group.value === id)?.rate" :user-rate-multiplier="userGroupRates[id]" />
                   </span>
                 </span>
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{

@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-3 rounded-2xl border border-gray-200/70 bg-white/60 p-4 dark:border-dark-700/70 dark:bg-dark-800/40">
+  <div class="sunworld-panel space-y-3 p-3.5 sm:p-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <div class="relative min-w-0 flex-1 sm:min-w-[200px]">
         <Icon name="search" size="sm" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500" />
