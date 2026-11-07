@@ -54,6 +54,7 @@ type AdminUser struct {
 }
 
 type APIKey struct {
+	GroupIDs    []int64    `json:"group_ids"`
 	ID          int64      `json:"id"`
 	UserID      int64      `json:"user_id"`
 	Key         string     `json:"key"`

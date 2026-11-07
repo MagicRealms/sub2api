@@ -69,6 +69,7 @@ type APIKeyUpdateFields struct {
 	Status    bool
 	Quota     bool
 	GroupID   bool
+	GroupIDs  bool
 	ExpiresAt bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
 	QuotaUsed bool
@@ -215,6 +216,7 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
+	GroupIDs    []int64  `json:"group_ids"`
 	Name        string   `json:"name"`
 	GroupID     *int64   `json:"group_id"`
 	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
@@ -233,6 +235,7 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
+	GroupIDs    *[]int64  `json:"group_ids"`
 	Name        *string   `json:"name"`
 	GroupID     *int64    `json:"group_id"`
 	Status      *string   `json:"status"`
@@ -516,18 +519,14 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 验证分组权限（如果指定了分组）
-	if req.GroupID != nil {
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-
-		// 检查用户是否可以绑定该分组
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
+	groupIDs, err := normalizeAPIKeyGroupRoutes(req.GroupID, req.GroupIDs)
+	if err != nil {
+		return nil, err
 	}
+	if err := s.validateAPIKeyGroupRoutes(ctx, user, groupIDs); err != nil {
+		return nil, err
+	}
+	req.GroupID = firstAPIKeyGroupID(groupIDs)
 
 	var key string
 
@@ -574,6 +573,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		Key:         key,
 		Name:        html.EscapeString(req.Name),
 		GroupID:     req.GroupID,
+		GroupIDs:    groupIDs,
 		Status:      StatusActive,
 		IPWhitelist: req.IPWhitelist,
 		IPBlacklist: req.IPBlacklist,
@@ -833,24 +833,27 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		fields.Name = true
 	}
 
-	if req.GroupID != nil {
-		// 验证分组权限
+	if req.GroupIDs != nil || req.GroupID != nil {
 		user, err := s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
-
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
+		var ids []int64
+		if req.GroupIDs != nil {
+			ids, err = normalizeAPIKeyGroupRoutes(req.GroupID, *req.GroupIDs)
+		} else if apiKey.GroupID != nil && *apiKey.GroupID == *req.GroupID {
+			ids = apiKey.OrderedGroupIDs()
+		} else {
+			ids, err = normalizeAPIKeyGroupRoutes(req.GroupID, nil)
+		}
 		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
+			return nil, err
 		}
-
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
+		if err := s.validateAPIKeyGroupRoutes(ctx, user, ids); err != nil {
+			return nil, err
 		}
-
-		apiKey.GroupID = req.GroupID
-		fields.GroupID = true
+		apiKey.GroupID, apiKey.GroupIDs = firstAPIKeyGroupID(ids), ids
+		fields.GroupID, fields.GroupIDs = true, true
 	}
 
 	if req.Status != nil {

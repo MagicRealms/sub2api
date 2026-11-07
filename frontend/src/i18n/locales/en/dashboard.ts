@@ -66,6 +66,14 @@ export default {
 
   // API Keys
   keys: {
+    routing: {
+      hint: 'Select up to 16 groups across providers. Selection order sets priority; use the arrows to reorder.',
+      priority: 'Priority {order}',
+      moveUp: 'Increase priority',
+      moveDown: 'Decrease priority',
+      billingHint: 'The first group supporting the model is tried first, followed by later groups on failure. Billing uses the higher charge of the initial and actual groups. Image and other independent models choose their own initial group.'
+    },
+
     title: 'API Keys',
     description: 'Manage your API keys and access tokens',
     searchPlaceholder: 'Search name or key...',

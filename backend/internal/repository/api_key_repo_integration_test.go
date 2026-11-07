@@ -33,6 +33,49 @@ func TestAPIKeyRepoSuite(t *testing.T) {
 	suite.Run(t, new(APIKeyRepoSuite))
 }
 
+func (s *APIKeyRepoSuite) TestOrderedRoutesRoundTripMigrationAndRemoval() {
+	user := s.mustCreateUser("ordered-routes@test.com")
+	first := s.mustCreateGroup("ordered-first")
+	second := s.mustCreateGroup("ordered-second")
+	third := s.mustCreateGroup("ordered-third")
+	key := &service.APIKey{UserID: user.ID, Key: "sk-ordered-integration", Name: "Ordered", Status: service.StatusActive,
+		GroupID: &first.ID, GroupIDs: []int64{first.ID, second.ID, third.ID}, QuotaUsed: 7}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+	got, err := s.repo.GetByKeyForAuth(s.ctx, key.Key)
+	s.Require().NoError(err)
+	s.Require().Equal(key.GroupIDs, got.GroupIDs)
+	count, err := s.repo.CountByGroupID(s.ctx, second.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), count)
+	keys, err := s.repo.ListKeysByGroupID(s.ctx, second.ID)
+	s.Require().NoError(err)
+	s.Require().Contains(keys, key.Key)
+
+	// Replacing a secondary group deduplicates without changing priority or quota.
+	affected, err := s.repo.UpdateGroupIDByUserAndGroup(s.ctx, user.ID, second.ID, third.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), affected)
+	got, err = s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().Equal([]int64{first.ID, third.ID}, got.GroupIDs)
+	s.Require().Equal(first.ID, *got.GroupID)
+	s.Require().Equal(float64(7), got.QuotaUsed)
+
+	affected, err = s.repo.ClearGroupIDByGroupID(s.ctx, first.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(1), affected)
+	got, err = s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().Equal([]int64{third.ID}, got.GroupIDs)
+	s.Require().Equal(third.ID, *got.GroupID)
+	_, err = s.repo.ClearGroupIDByGroupID(s.ctx, third.ID)
+	s.Require().NoError(err)
+	got, err = s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().Empty(got.GroupIDs)
+	s.Require().Nil(got.GroupID)
+}
+
 // --- Create / GetByID / GetByKey ---
 
 func (s *APIKeyRepoSuite) TestCreate() {

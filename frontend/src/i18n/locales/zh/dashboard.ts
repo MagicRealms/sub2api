@@ -66,6 +66,14 @@ export default {
 
   // API Keys
   keys: {
+    routing: {
+      hint: '可跨平台选择多个分组，按勾选先后编号；使用箭头调整优先级。最多选择 16 个分组。',
+      priority: '第 {order} 优先级',
+      moveUp: '提高优先级',
+      moveDown: '降低优先级',
+      billingHint: '按顺序选择首个支持该模型的分组，失败后依次尝试后续分组。按初始分组与实际调用分组中较高的费用计费，切换不降价；独立图片等模型单独确定起始分组。'
+    },
+
     title: 'API 密钥',
     description: '管理您的 API 密钥和访问令牌',
     searchPlaceholder: '搜索名称或Key...',

@@ -22,6 +22,8 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
+	"github.com/Wei-Shaw/sub2api/ent/predicate"
 )
 
 type apiKeyRepository struct {
@@ -49,6 +51,7 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetName(key.Name).
 		SetStatus(key.Status).
 		SetNillableGroupID(key.GroupID).
+		SetGroupIds(key.GroupIDs).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
 		SetQuotaUsed(key.QuotaUsed).
@@ -134,6 +137,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldID,
 			apikey.FieldUserID,
 			apikey.FieldGroupID,
+			apikey.FieldGroupIds,
 			apikey.FieldName,
 			apikey.FieldStatus,
 			apikey.FieldIPWhitelist,
@@ -302,6 +306,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 			builder.ClearWindow7dStart()
 		}
 	}
+	if fields.GroupIDs {
+		builder.SetGroupIds(key.GroupIDs)
+	}
 	if fields.GroupID {
 		if key.GroupID != nil {
 			builder.SetGroupID(*key.GroupID)
@@ -451,7 +458,7 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 		if *filters.GroupID == 0 {
 			q = q.Where(apikey.GroupIDIsNil())
 		} else {
-			q = q.Where(apikey.GroupIDEQ(*filters.GroupID))
+			q = q.Where(apiKeyHasRouteGroup(*filters.GroupID))
 		}
 	}
 
@@ -623,7 +630,7 @@ func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, e
 }
 
 func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]service.APIKey, *pagination.PaginationResult, error) {
-	q := r.activeQuery().Where(apikey.GroupIDEQ(groupID))
+	q := r.activeQuery().Where(apiKeyHasRouteGroup(groupID))
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -721,28 +728,56 @@ func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyw
 	return outKeys, nil
 }
 
-// ClearGroupIDByGroupID 将指定分组的所有 API Key 的 group_id 设为 nil
+// ClearGroupIDByGroupID removes a deleted group from every ordered route and
+// promotes the next route. Legacy single-group keys retain their nil binding.
 func (r *apiKeyRepository) ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	n, err := r.client.APIKey.Update().
-		Where(apikey.GroupIDEQ(groupID), apikey.DeletedAtIsNil()).
-		ClearGroupID().
-		Save(ctx)
-	return int64(n), err
+	client := clientFromContext(ctx, r.client)
+	result, err := client.ExecContext(ctx, `
+ UPDATE api_keys a SET
+ group_id = CASE WHEN group_id = $1 THEN (
+   SELECT value::bigint FROM jsonb_array_elements_text(
+     CASE WHEN jsonb_typeof(a.group_ids) = 'array' THEN a.group_ids ELSE '[]'::jsonb END
+   ) WITH ORDINALITY route(value, position)
+   WHERE value::bigint <> $1 ORDER BY position LIMIT 1
+ ) ELSE group_id END,
+ group_ids = CASE WHEN jsonb_typeof(group_ids) = 'array' THEN (
+   SELECT COALESCE(jsonb_agg(value::bigint ORDER BY position), '[]'::jsonb)
+   FROM jsonb_array_elements_text(a.group_ids) WITH ORDINALITY route(value, position)
+   WHERE value::bigint <> $1
+ ) ELSE group_ids END,
+ updated_at = now()
+ WHERE deleted_at IS NULL AND (group_id = $1 OR group_ids @> jsonb_build_array($1::bigint))`, groupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
 func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
 	client := clientFromContext(ctx, r.client)
-	n, err := client.APIKey.Update().
-		Where(apikey.UserIDEQ(userID), apikey.GroupIDEQ(oldGroupID), apikey.DeletedAtIsNil()).
-		SetGroupID(newGroupID).
-		Save(ctx)
-	return int64(n), err
+	result, err := client.ExecContext(ctx, `
+ UPDATE api_keys a SET
+ group_id = CASE WHEN group_id = $2 THEN $3 ELSE group_id END,
+ group_ids = CASE WHEN jsonb_typeof(group_ids) = 'array' THEN (
+   SELECT COALESCE(jsonb_agg(mapped_id ORDER BY first_position), '[]'::jsonb)
+   FROM (SELECT CASE WHEN value::bigint = $2 THEN $3 ELSE value::bigint END mapped_id,
+                min(position) first_position
+         FROM jsonb_array_elements_text(a.group_ids) WITH ORDINALITY route(value, position)
+         GROUP BY CASE WHEN value::bigint = $2 THEN $3 ELSE value::bigint END) ordered_routes
+ ) ELSE group_ids END,
+ updated_at = now()
+ WHERE user_id = $1 AND deleted_at IS NULL
+ AND (group_id = $2 OR group_ids @> jsonb_build_array($2::bigint))`, userID, oldGroupID, newGroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // CountByGroupID 获取分组的 API Key 数量
 func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
-	count, err := r.activeQuery().Where(apikey.GroupIDEQ(groupID)).Count(ctx)
+	count, err := r.activeQuery().Where(apiKeyHasRouteGroup(groupID)).Count(ctx)
 	return int64(count), err
 }
 
@@ -759,7 +794,7 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 
 func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	keys, err := r.activeQuery().
-		Where(apikey.GroupIDEQ(groupID)).
+		Where(apiKeyHasRouteGroup(groupID)).
 		Select(apikey.FieldKey).
 		Strings(ctx)
 	if err != nil {
@@ -898,6 +933,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		CreatedAt:     m.CreatedAt,
 		UpdatedAt:     m.UpdatedAt,
 		GroupID:       m.GroupID,
+		GroupIDs:      append([]int64(nil), m.GroupIds...),
 		Quota:         m.Quota,
 		QuotaUsed:     m.QuotaUsed,
 		ExpiresAt:     m.ExpiresAt,
@@ -1056,4 +1092,11 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// Every bound group participates in filtering and group-policy invalidation.
+func apiKeyHasRouteGroup(groupID int64) predicate.APIKey {
+	return apikey.Or(apikey.GroupIDEQ(groupID), predicate.APIKey(func(selector *entsql.Selector) {
+		selector.Where(sqljson.ValueContains(apikey.FieldGroupIds, groupID))
+	}))
 }

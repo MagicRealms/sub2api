@@ -372,6 +372,19 @@ func TestAdminService_AdminUpdateAPIKeyGroupID_SameGroup_Idempotent(t *testing.T
 	require.Equal(t, []string{"sk-test"}, cache.keys)
 }
 
+func TestAdminService_AdminUpdateAPIKeyGroupID_ReplacesAllOrderedRoutes(t *testing.T) {
+	existing := &APIKey{ID: 1, Key: "sk-test", GroupID: int64Ptr(10), GroupIDs: []int64{10, 20}}
+	repo := &apiKeyRepoStubForGroupUpdate{key: existing}
+	svc := &adminServiceImpl{apiKeyRepo: repo, groupRepo: &groupRepoStubForGroupUpdate{group: &Group{ID: 30, Status: StatusActive}}}
+	got, err := svc.AdminUpdateAPIKeyGroupID(context.Background(), 1, int64Ptr(30))
+	require.NoError(t, err)
+	require.Equal(t, []int64{30}, got.APIKey.GroupIDs)
+	got, err = svc.AdminUpdateAPIKeyGroupID(context.Background(), 1, int64Ptr(0))
+	require.NoError(t, err)
+	require.Empty(t, got.APIKey.GroupIDs)
+	require.Nil(t, got.APIKey.GroupID)
+}
+
 func TestAdminService_AdminUpdateAPIKeyGroupID_GroupNotFound(t *testing.T) {
 	existing := &APIKey{ID: 1, Key: "sk-test"}
 	apiKeyRepo := &apiKeyRepoStubForGroupUpdate{key: existing}

@@ -772,6 +772,7 @@ func logResponseModelBillingApplied(component string, account *Account, requestI
 // recordUsageCore 是 RecordUsage 的核心实现。
 func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsageCoreInput) error {
 	result := input.Result
+	MarkAPIKeyGroupRouteBilled(ctx)
 	apiKey := input.APIKey
 	user := input.User
 	account := input.Account
@@ -830,6 +831,8 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		}
 	}
 
+	multiplier, imageMultiplier = orderedRoutingRecordedMultipliers(cost, multiplier, imageMultiplier)
+
 	// 判断计费方式：订阅模式 vs 余额模式
 	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 	billingType := BillingTypeBalance
@@ -856,7 +859,7 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 				CacheReadTokens:     result.Usage.CacheReadInputTokens,
 				ImageOutputTokens:   result.Usage.ImageOutputTokens,
 			},
-			cost.TotalCost-cacheStorageCost, pricingAt,
+			orderedRouteAccountTotal(cost)-cacheStorageCost, pricingAt,
 			accountStatsLongContextPricingEnabled(nil),
 		)
 		addCacheStorageToAccountStatsCost(usageLog, cacheStorageCost)
@@ -908,6 +911,10 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 // recordUsageMultipliers 返回 token / 图片售价倍率（用户专属 > 分组默认 > 系统默认，token 倍率叠加高峰因子）
 // 与计价时刻；pricingAt 为零值时取当前时刻。
 func (s *GatewayService) recordUsageMultipliers(ctx context.Context, apiKey *APIKey, user *User, pricingAt time.Time) (float64, float64, time.Time) {
+	if apiKey != nil && !apiKey.RoutingPricingAt.IsZero() {
+		pricingAt = apiKey.RoutingPricingAt
+	}
+
 	multiplier := 1.0
 	if s.cfg != nil {
 		multiplier = s.cfg.Default.RateMultiplier
@@ -1012,7 +1019,7 @@ func addCacheStorageToAccountStatsCost(usageLog *UsageLog, storageCost float64) 
 }
 
 // calculateRecordUsageCost 根据请求类型计算费用。
-func (s *GatewayService) calculateRecordUsageCost(
+func (s *GatewayService) calculateRecordUsageCostForGroup(
 	ctx context.Context,
 	result *ForwardResult,
 	apiKey *APIKey,

@@ -127,6 +127,9 @@ func (s *OpenAIGatewayService) ResolveUserGroupRateMultiplier(ctx context.Contex
 // openAIUsagePricingAt 返回本次用量记录使用的定价时刻：优先请求级 PricingAt
 // （与利润门 D 同源同刻），未装配时回退记录时刻（既有行为）。
 func openAIUsagePricingAt(input *OpenAIRecordUsageInput) time.Time {
+	if input != nil && input.APIKey != nil && !input.APIKey.RoutingPricingAt.IsZero() {
+		return input.APIKey.RoutingPricingAt
+	}
 	if input != nil && !input.PricingAt.IsZero() {
 		return input.PricingAt
 	}
@@ -164,6 +167,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		s.rateLimitService.ResetOpenAI403Counter(ctx, input.Account.ID)
 	}
 
+	MarkAPIKeyGroupRouteBilled(ctx)
 	apiKey := input.APIKey
 	user := input.User
 	account := input.Account
@@ -302,7 +306,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	// Free Fast changes only the customer charge. Keep priority TotalCost and
 	// service_tier for upstream accounting, but evaluate ActualCost once more at
 	// the Standard tier using the same channel, peak, and long-context policy.
-	if groupBillsOpenAIFastAtStandard(apiKey, billingAccount, serviceTier) {
+	if orderedRoutingFloorKey(apiKey) == nil && groupBillsOpenAIFastAtStandard(apiKey, billingAccount, serviceTier) {
 		standardCost, standardErr := s.calculateOpenAIRecordUsageCost(
 			ctx,
 			result,
@@ -327,6 +331,8 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 			cost.ActualCost = standardCost.ActualCost
 		}
 	}
+
+	multiplier, imageMultiplier = orderedRoutingRecordedMultipliers(cost, multiplier, imageMultiplier)
 
 	// Determine billing type
 	isSubscriptionBilling := subscription != nil && apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
@@ -487,7 +493,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if apiKey.GroupID != nil {
 		applyAccountStatsCost(ctx, usageLog, s.channelService, s.billingService,
 			account.ID, *apiKey.GroupID, result.UpstreamModel, result.Model,
-			tokens, cost.TotalCost, pricingAt,
+			tokens, orderedRouteAccountTotal(cost), pricingAt,
 			accountStatsLongContextPricingEnabled(longContextBillingGate) && !modelLongContextExempt,
 		)
 	}
@@ -575,7 +581,7 @@ func openAISubscriptionLongContextExempt(account *Account, result *OpenAIForward
 	return openai.IsGPT61SolModelSpelling(model) || openai.IsGPT61TerraModelSpelling(model)
 }
 
-func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
+func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCostForGroup(
 	ctx context.Context,
 	result *OpenAIForwardResult,
 	apiKey *APIKey,
