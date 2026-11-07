@@ -165,7 +165,7 @@ export default {
     useKey: '使用密钥',
     useKeyModal: {
       routeExampleTitle: '选择接入配置示例',
-      routeExampleHint: '同一个 Key 可用于以下分组。切换仅更换客户端配置示例；实际请求仍按模型和已保存的分组顺序路由，不改变计费规则。',
+      routeExampleHint: '同一个 Key 可用于以下分组。切换仅更换客户端配置示例；HTTP 对话按模型和已保存的分组顺序路由，不改变计费规则。WebSocket 和有状态异步接口仍只使用首分组。',
       title: '使用 API 密钥',
       description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行。',
       copy: '复制',

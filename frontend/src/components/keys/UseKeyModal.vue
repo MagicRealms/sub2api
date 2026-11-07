@@ -320,6 +320,7 @@ interface FileConfig {
 const props = defineProps<Props>()
 const selectedRouteID = ref<number | null>(null)
 const selectedRoute = computed(() => props.routeGroups?.find(group => group.id === selectedRouteID.value) ?? props.routeGroups?.[0])
+const supportsWebSocketExample = computed(() => !props.routeGroups?.length || selectedRoute.value?.id === props.routeGroups[0]?.id)
 const effectivePlatform = computed(() => selectedRoute.value?.platform ?? props.platform)
 const effectiveClaudeCodeOnly = computed(() => selectedRoute.value ? Boolean(selectedRoute.value.claude_code_only) : props.claudeCodeOnly)
 const effectiveAllowMessagesDispatch = computed(() => selectedRoute.value ? Boolean(selectedRoute.value.allow_messages_dispatch) : props.allowMessagesDispatch)
@@ -388,7 +389,7 @@ const defaultClientTab = computed(() => {
   }
 })
 
-watch(() => [effectivePlatform.value, effectiveClaudeCodeOnly.value], () => {
+watch(() => [selectedRoute.value?.id, effectivePlatform.value, effectiveClaudeCodeOnly.value], () => {
   activeTab.value = 'unix'
   activeClientTab.value = defaultClientTab.value
   codexAuthMode.value = 'api-key'
@@ -485,8 +486,10 @@ const clientTabs = computed((): TabConfig[] => {
     case 'openai': {
       const tabs: TabConfig[] = [
         { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
-        { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon },
       ]
+      if (supportsWebSocketExample.value) {
+        tabs.push({ id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon })
+      }
       if (effectiveAllowMessagesDispatch.value) {
         tabs.push({ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon })
       }
@@ -753,7 +756,7 @@ const comment = (value: string) => wrapToken('text-slate-500', value)
 const currentFiles = computed((): FileConfig[] => {
   const baseUrl = props.baseUrl || window.location.origin
   const apiKey = props.apiKey
-  const baseRoot = baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+  const baseRoot = baseUrl.trim().replace(/\/+$/, '').replace(/\/v1$/, '')
   const ensureV1 = (value: string) => {
     const trimmed = value.replace(/\/+$/, '')
     return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
@@ -1058,7 +1061,7 @@ windows_wsl_setup_acknowledged = true
 name = "OpenAI"
 base_url = "${baseUrl}"
 ${codexModelCatalogMode.value === 'remote' ? `model_catalog_url = "${escapeTomlBasicString(buildCodexModelCatalogUrl(baseUrl))}"\n` : ''}wire_api = "responses"
-${generateCodexProviderAuthConfig(apiKey)}
+${supportsWebSocketExample.value ? '' : 'supports_websockets = false\n'}${generateCodexProviderAuthConfig(apiKey)}
 
 [features]
 ${codexModelCatalogMode.value === 'remote' ? 'api_key_model_discovery = true\n' : ''}${codexAuthMode.value === 'api-key' ? 'image_generation = true\n' : ''}goals = true`

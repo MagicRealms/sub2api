@@ -165,7 +165,7 @@ export default {
     useKey: 'Use Key',
     useKeyModal: {
       routeExampleTitle: 'Choose a connection example',
-      routeExampleHint: 'The same key works with these groups. This only changes the client example; requests still route by model and saved group order, with the same billing rules.',
+      routeExampleHint: 'The same key works with these groups. This only changes the client example; HTTP completions route by model and saved group order with the same billing rules. WebSocket and stateful asynchronous APIs still use the primary group only.',
       title: 'Use API Key',
       description:
         'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',

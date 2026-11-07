@@ -22,6 +22,9 @@ displays their saved order. Reopening the picker refreshes keys and groups.
 
 The normal key usage dialog also offers a configuration example for each selected
 group. Changing the example never changes saved route priority or billing.
+WebSocket and stateful asynchronous APIs retain the primary group. Secondary
+group examples therefore do not offer the WebSocket transport, and selecting a
+different group resets the client tab even when both groups share a provider.
 
 ## Probe cost and interpretation
 

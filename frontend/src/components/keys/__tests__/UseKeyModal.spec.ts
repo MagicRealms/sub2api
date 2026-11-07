@@ -36,10 +36,10 @@ function readBlobAsText(blob: Blob): Promise<string> {
 }
 
 describe('UseKeyModal', () => {
-  it('switches a multi-group key from GPT to Claude and uses the Anthropic root URL', async () => {
+  it.each(['/v1', '/v1/', '/v1///'])('switches a multi-group key from GPT to Claude and normalizes the Anthropic root URL (%s)', async (suffix) => {
     const wrapper = mount(UseKeyModal, {
       props: {
-        show: true, apiKey: 'sk-mixed-test', baseUrl: 'https://example.com/v1', platform: 'openai',
+        show: true, apiKey: 'sk-mixed-test', baseUrl: 'https://example.com' + suffix, platform: 'openai',
         routeGroups: [
           { id: 1, name: 'GPT first', platform: 'openai', claude_code_only: false },
           { id: 2, name: 'Claude second', platform: 'anthropic', claude_code_only: false },
@@ -57,6 +57,33 @@ describe('UseKeyModal', () => {
     expect(wrapper.find('pre code').text()).toContain('sk-mixed-test')
     await wrapper.get('[data-testid="key-guide-route"]').setValue('1')
     expect(wrapper.text()).toContain('keys.useKeyModal.openai.description')
+    wrapper.unmount()
+  })
+
+  it('resets transport when selecting a secondary group and reserves WebSocket examples for the primary', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true, apiKey: 'sk-mixed-test', baseUrl: 'https://example.com/v1', platform: 'openai',
+        routeGroups: [
+          { id: 1, name: 'GPT first', platform: 'openai' },
+          { id: 2, name: 'GPT second', platform: 'openai' },
+        ] as Group[],
+      },
+      global: { stubs: {
+        BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+        Icon: { template: '<span />' },
+      } },
+    })
+    const websocketTab = () => wrapper.findAll('button').find(button => button.text().trim() === 'keys.useKeyModal.cliTabs.codexCliWs')
+    expect(websocketTab()).toBeDefined()
+    await websocketTab()!.trigger('click')
+    expect(wrapper.text()).toContain('supports_websockets = true')
+    await wrapper.get('[data-testid="key-guide-route"]').setValue('2')
+    expect(websocketTab()).toBeUndefined()
+    expect(wrapper.text()).toContain('supports_websockets = false')
+    expect(wrapper.text()).not.toContain('supports_websockets = true')
+    await wrapper.get('[data-testid="key-guide-route"]').setValue('1')
+    expect(websocketTab()).toBeDefined()
     wrapper.unmount()
   })
 
