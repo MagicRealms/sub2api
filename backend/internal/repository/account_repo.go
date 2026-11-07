@@ -1317,6 +1317,26 @@ func (r *accountRepository) ListByGroup(ctx context.Context, groupID int64) ([]s
 	return accounts, nil
 }
 
+// Route capability is a configuration projection, not a scheduling decision.
+// Include disabled/overloaded accounts so an outage cannot lower the billing
+// baseline. Avoid the proxy/group/statistics joins of normal account loading.
+func (r *accountRepository) ListConfiguredGroupRouteAccounts(ctx context.Context, groupID int64) ([]service.Account, error) {
+	models, err := r.client.Account.Query().Where(
+		dbaccount.DeletedAtIsNil(),
+		dbaccount.HasAccountGroupsWith(dbaccountgroup.GroupIDEQ(groupID)),
+	).Select(dbaccount.FieldID, dbaccount.FieldPlatform, dbaccount.FieldType,
+		dbaccount.FieldStatus, dbaccount.FieldCredentials, dbaccount.FieldExtra).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	accounts := make([]service.Account, 0, len(models))
+	for _, model := range models {
+		accounts = append(accounts, service.Account{ID: model.ID, Platform: model.Platform,
+			Type: model.Type, Status: model.Status, Credentials: model.Credentials, Extra: model.Extra})
+	}
+	return accounts, nil
+}
+
 func (r *accountRepository) ListActive(ctx context.Context) ([]service.Account, error) {
 	accounts, err := r.client.Account.Query().
 		Where(dbaccount.StatusEQ(service.StatusActive)).

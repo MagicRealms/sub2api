@@ -169,3 +169,62 @@ func TestOrderedKeyAuthSnapshotPreservesRouteOrderAndIsolation(t *testing.T) {
 	routed.GroupIDs[1] = 200
 	require.Equal(t, []int64{6, 20, 16}, snapshot.GroupIDs)
 }
+
+func TestOrderedKeyAccountQuotaUsesServingCost(t *testing.T) {
+	actual := &CostBreakdown{TotalCost: .10, ActualCost: .02}
+	floor := &CostBreakdown{TotalCost: .50, ActualCost: .40}
+	cost := higherOrderedRouteCost(actual, floor, .8, .8)
+	p := &postUsageBillingParams{
+		Cost: cost, User: &User{ID: 1}, APIKey: &APIKey{ID: 2, Quota: 100},
+		Account:               &Account{ID: 3, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Extra: map[string]any{"quota_limit": 100.0}},
+		AccountRateMultiplier: 2,
+	}
+	cmd := buildUsageBillingCommand("ordered-quota", nil, p)
+	require.InDelta(t, .40, cmd.BalanceCost, 1e-12)
+	require.InDelta(t, .20, cmd.AccountQuotaCost, 1e-12, "customer floor must not inflate upstream account consumption")
+}
+
+type orderedBatchGroupRepoTest struct {
+	orderedGroupRepoTest
+	calls *int
+}
+
+func (r orderedBatchGroupRepoTest) GetByIDsLite(_ context.Context, ids []int64) ([]*Group, error) {
+	*r.calls++
+	// Deliberately unordered: the key, not DB order, defines priority.
+	return []*Group{r.groups[2], r.groups[1]}, nil
+}
+func TestOrderedKeyRouteBatchPoliciesPreservePriority(t *testing.T) {
+	calls := 0
+	first := &Group{ID: 1, Status: StatusActive}
+	second := &Group{ID: 2, Status: StatusActive}
+	svc := &APIKeyService{groupRepo: orderedBatchGroupRepoTest{orderedGroupRepoTest{groups: map[int64]*Group{1: first, 2: second}}, &calls}}
+	groups, err := svc.OrderedRouteGroups(context.Background(), &APIKey{GroupIDs: []int64{1, 2}, User: &User{ID: 9}})
+	require.NoError(t, err)
+	require.Equal(t, []*Group{first, second}, groups)
+	require.Equal(t, 1, calls)
+}
+
+type orderedConfiguredModelsRepoTest struct{ orderedModelsRepoTest }
+
+func (r orderedConfiguredModelsRepoTest) ListConfiguredGroupRouteAccounts(context.Context, int64) ([]Account, error) {
+	return []Account{{Platform: PlatformOpenAI, Status: StatusDisabled, Credentials: map[string]any{"model_mapping": map[string]any{"disabled-premium-alias": "premium"}}}}, nil
+}
+func TestOrderedKeyCatalogUsesConfigurationRatherThanActiveAccounts(t *testing.T) {
+	svc := &GatewayService{accountRepo: orderedConfiguredModelsRepoTest{}}
+	models, err := svc.ConfiguredGroupRouteModels(context.Background(), &Group{ID: 1, Platform: PlatformOpenAI}, []string{"fallback-model"})
+	require.NoError(t, err)
+	require.Contains(t, models, "disabled-premium-alias")
+	require.NotContains(t, models, "fallback-model")
+}
+
+func TestOrderedKeyPricingGuardRejectsUnknownButAllowsExplicitFree(t *testing.T) {
+	billing := NewBillingService(&config.Config{}, nil)
+	svc := &GatewayService{billingService: billing, resolver: NewModelPricingResolver(nil, billing)}
+	group := &Group{ID: 1}
+	require.ErrorIs(t, svc.ValidateOrderedGroupModelPricing(context.Background(), group, "unpriced-custom-alias", "/v1/responses"), ErrModelPricingUnavailable)
+	zero := 0.0
+	group.ModelPricing = []ChannelModelPricing{{Models: []string{"unpriced-custom-alias"}, BillingMode: BillingModeToken, InputPrice: &zero, OutputPrice: &zero}}
+	require.NoError(t, svc.ValidateOrderedGroupModelPricing(context.Background(), group, "unpriced-custom-alias", "/v1/responses"))
+	require.NoError(t, svc.ValidateOrderedGroupModelPricing(context.Background(), group, "gpt-image-2.5", "/v1/images/generations"))
+}

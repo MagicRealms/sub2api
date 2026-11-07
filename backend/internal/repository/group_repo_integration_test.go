@@ -51,6 +51,21 @@ func TestGroupRepoSuite(t *testing.T) {
 	suite.Run(t, new(GroupRepoSuite))
 }
 
+func (s *GroupRepoSuite) TestOrderedRouteBatchPolicies() {
+	first := mustCreateGroup(s.T(), s.tx.Client(), &service.Group{Name: "ordered-policy-first", RateMultiplier: .32, IsExclusive: true})
+	second := mustCreateGroup(s.T(), s.tx.Client(), &service.Group{Name: "ordered-policy-second", RateMultiplier: .13})
+	got, err := s.repo.GetByIDsLite(s.ctx, []int64{second.ID, first.ID, 999999999})
+	s.Require().NoError(err)
+	s.Require().Len(got, 2)
+	byID := map[int64]*service.Group{}
+	for _, g := range got {
+		byID[g.ID] = g
+	}
+	s.Equal(.32, byID[first.ID].RateMultiplier)
+	s.True(byID[first.ID].IsExclusive)
+	s.Equal(.13, byID[second.ID].RateMultiplier)
+}
+
 func TestModerationConfigWriteRejectsGroupDeletedAfterValidation(t *testing.T) {
 	ctx := context.Background()
 	client := testEntClient(t)

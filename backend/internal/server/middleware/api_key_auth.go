@@ -310,6 +310,13 @@ func apiKeyHeadersTooLarge(c *gin.Context) bool {
 		len(c.GetHeader("x-goog-api-key")) > service.MaxAPIKeyCredentialBytes
 }
 
+// APIKeyLookupPrecheckBlocked lets pre-auth routing defer to the normal auth
+// response without making a database lookup for already throttled/oversized
+// credentials. It grants no authorization and does not increment failures.
+func APIKeyLookupPrecheckBlocked(c *gin.Context, apiKeyService *service.APIKeyService) bool {
+	return apiKeyHeadersTooLarge(c) || rejectInvalidAuthAbuse(c, apiKeyService)
+}
+
 func hasAPIKeyCredentialInput(c *gin.Context) bool {
 	if c == nil {
 		return false

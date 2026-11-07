@@ -3,13 +3,43 @@ package service
 import (
 	"context"
 	"sort"
+	"strings"
+	"time"
 )
+
+type configuredGroupRouteAccountRepository interface {
+	ListConfiguredGroupRouteAccounts(context.Context, int64) ([]Account, error)
+}
+
+// Fail closed for unpriced token/alias routes before contacting an upstream.
+// Otherwise a successful unpriced fallback could reach the legacy zero-cost
+// recording path and invalidate the ordered key's anti-discount guarantee.
+func (s *GatewayService) ValidateOrderedGroupModelPricing(ctx context.Context, group *Group, model, path string) error {
+	if model == "" || strings.Contains(path, "/images/") || strings.HasSuffix(path, "/alpha/search") ||
+		strings.HasSuffix(path, "count_tokens") || strings.HasSuffix(path, "input_tokens") || strings.HasSuffix(path, ":countTokens") {
+		return nil
+	}
+	if s.billingService == nil {
+		return ErrModelPricingUnavailable
+	}
+	_, err := s.billingService.CalculateTokenCostForRequest(TokenCostRequest{
+		Ctx: ctx, Group: group, Model: model, Tokens: UsageTokens{InputTokens: 1, OutputTokens: 1},
+		RateMultiplier: 1, PricingAt: APIKeyGroupRoutePricingAt(ctx, time.Now()), Resolver: s.resolver,
+	})
+	return err
+}
 
 // Model capability must be independent of temporary scheduling failures. Using
 // only healthy accounts here would silently move a premium-first key's billing
 // baseline to a cheaper group whenever the premium upstream is unavailable.
 func (s *GatewayService) ConfiguredGroupRouteModels(ctx context.Context, group *Group, defaults []string) ([]string, error) {
-	accounts, err := s.accountRepo.ListByGroup(ctx, group.ID)
+	var accounts []Account
+	var err error
+	if repo, ok := s.accountRepo.(configuredGroupRouteAccountRepository); ok {
+		accounts, err = repo.ListConfiguredGroupRouteAccounts(ctx, group.ID)
+	} else {
+		accounts, err = s.accountRepo.ListByGroup(ctx, group.ID)
+	}
 	if err != nil {
 		return nil, err
 	}

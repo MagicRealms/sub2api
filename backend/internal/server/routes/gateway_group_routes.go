@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -33,33 +34,48 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 			c.Next()
 			return
 		}
+		path := c.Request.URL.Path
+		isModels := c.Request.Method == http.MethodGet && (path == "/v1/models" || path == "/models")
+		isModelRead := c.Request.Method == http.MethodGet && (strings.HasPrefix(path, "/v1/models/") || strings.HasPrefix(path, "/models/"))
+		// Reject ineligible paths before auth/catalog lookups or body buffering.
+		if (c.Request.Method == http.MethodPost && !orderedRouteCanReplay(path)) ||
+			(c.Request.Method != http.MethodPost && !isModels && !isModelRead) {
+			c.Next()
+			return
+		}
 		credential := orderedRouteCredential(c.Request)
-		if credential == "" || len(credential) > service.MaxAPIKeyCredentialBytes || c.Query("key") != "" || c.Query("api_key") != "" {
+		if credential == "" || len(credential) > service.MaxAPIKeyCredentialBytes ||
+			(strings.TrimSpace(c.Query("key")) != "" && !orderedRouteGooglePath(path)) || strings.TrimSpace(c.Query("api_key")) != "" ||
+			middleware.APIKeyLookupPrecheckBlocked(c, keys) {
 			c.Next()
 			return
 		}
 		key, err := keys.GetByKey(c.Request.Context(), credential)
-		if err != nil || len(key.OrderedGroupIDs()) < 2 {
+		if err != nil {
+			if errors.Is(err, service.ErrAPIKeyNotFound) {
+				c.Next()
+			} else {
+				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"type": "api_error", "message": "API key authentication is temporarily unavailable"}})
+			}
+			return
+		}
+		if len(key.OrderedGroupIDs()) < 2 {
+			c.Next()
+			return
+		}
+		// Let normal authentication report disabled keys/users before performing
+		// any group or model queries on their behalf.
+		if key.User == nil || !key.User.IsActive() || (!key.IsActive() && key.Status != service.StatusAPIKeyExpired && key.Status != service.StatusAPIKeyQuotaExhausted) {
 			c.Next()
 			return
 		}
 		groups, err := keys.OrderedRouteGroups(c.Request.Context(), key)
-		if err != nil || len(groups) == 0 {
-			c.Next()
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"type": "api_error", "message": "Group route policy is temporarily unavailable"}})
 			return
 		}
-		path := c.Request.URL.Path
-		// Protocol upgrades bind one account for their lifetime. The existing WS
-		// handler retains ownership; frames must never be replayed by HTTP retry.
-		if strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
-			c.Next()
-			return
-		}
-		// Async jobs and other stateful APIs keep their established primary-group
-		// ownership for both creation and polling. Only completion-style requests
-		// and model discovery participate in ordered cross-group routing.
-		if c.Request.Method == http.MethodPost && !orderedRouteCanReplay(path) {
-			c.Next()
+		if len(groups) == 0 {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": gin.H{"type": "group_not_allowed", "message": "No selected group is available to this key"}})
 			return
 		}
 		var body []byte
@@ -88,42 +104,49 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 		if model == "" {
 			model = c.Query("model")
 		}
-		isModels := c.Request.Method == http.MethodGet && (path == "/v1/models" || path == "/models")
-		isModelRead := c.Request.Method == http.MethodGet && (strings.HasPrefix(path, "/v1/models/") || strings.HasPrefix(path, "/models/"))
-		if c.Request.Method != http.MethodPost && !isModels && !isModelRead {
-			c.Next()
-			return
-		}
-		candidates := make([]*service.Group, 0, len(groups))
-		for _, group := range groups {
-			supports, catalogErr := supportsModel(c.Request.Context(), group, model, path)
-			if catalogErr != nil {
-				c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"type": "api_error", "message": "Group model catalog is temporarily unavailable"}})
-				return
-			}
-			if isModels || supports {
-				candidates = append(candidates, group)
-			}
-		}
-		if len(candidates) == 0 {
-			c.Next()
-			return
-		}
 		c.Request = c.Request.WithContext(service.WithAPIKeyGroupRoutePricingAt(c.Request.Context(), time.Now()))
 		replay := orderedRouteCanReplay(path)
-		for index, group := range candidates {
+		var floor *service.Group
+		var pending *orderedRouteResponse
+		for _, group := range groups {
 			if c.Request.Context().Err() != nil {
 				break
+			}
+			// Capability is loaded only as a group is reached. A successful first
+			// route must not depend on every unused fallback's account catalog.
+			if !isModels {
+				supports, catalogErr := supportsModel(c.Request.Context(), group, model, path)
+				if catalogErr != nil {
+					pending = newOrderedRouteResponse(c.Writer)
+					pending.Header().Set("Content-Type", "application/json")
+					pending.WriteHeader(http.StatusServiceUnavailable)
+					message := "Group model catalog is temporarily unavailable"
+					if errors.Is(catalogErr, service.ErrModelPricingUnavailable) {
+						message = "Model pricing is unavailable for the selected group route"
+					}
+					body, _ := json.Marshal(gin.H{"error": gin.H{"type": "api_error", "message": message}})
+					_, _ = pending.Write(body)
+					break
+				}
+				if !supports {
+					continue
+				}
+			}
+			if floor == nil {
+				floor = group
 			}
 			ctx, release := pkghttputil.WithRequestBodyMemoryScope(c.Request.Context())
 			if err := pkghttputil.ReserveRequestBodyMemory(ctx, int64(len(body))); err != nil {
 				release()
-				middleware.RejectRequestBodyReadError(c, "ordered_group_routes", err)
+				pending = newOrderedRouteResponse(c.Writer)
+				pending.Header().Set("Content-Type", "application/json")
+				pending.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = pending.Write([]byte(`{"error":{"type":"api_error","message":"Request body memory budget is temporarily exhausted"}}`))
 				break
 			}
-			ctx = service.WithAPIKeyGroupRoute(ctx, key.ID, group, candidates[0], model)
+			ctx = service.WithAPIKeyGroupRoute(ctx, key.ID, group, floor, model)
 			if isModels {
-				ctx = service.WithAPIKeyRouteDiscovery(ctx, candidates)
+				ctx = service.WithAPIKeyRouteDiscovery(ctx, groups)
 			}
 			req := c.Request.Clone(ctx)
 			req.Body = pkghttputil.NewPrereadBody(bytes.Clone(body))
@@ -131,26 +154,53 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 			response := newOrderedRouteResponse(c.Writer)
 			engine.ServeHTTP(response, req)
 			release()
-			if !replay || service.APIKeyGroupRouteBilled(ctx) || isModels || index == len(candidates)-1 || !response.canRetry() {
-				response.finish()
+			pending = response
+			if !replay || service.APIKeyGroupRouteBilled(ctx) || isModels || !response.canRetry() {
 				break
 			}
+		}
+		if pending != nil {
+			pending.finish()
+		} else if c.Request.Context().Err() == nil {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "invalid_request_error", "code": "model_not_found", "message": "No selected group supports the requested model"}})
 		}
 		c.Abort()
 	}
 }
 
 func orderedRouteCredential(req *http.Request) string {
-	if header := req.Header.Get("Authorization"); header != "" {
-		parts := strings.SplitN(header, " ", 2)
-		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-			return strings.TrimSpace(parts[1])
+	google := orderedRouteGooglePath(req.URL.Path)
+	if google {
+		if key := strings.TrimSpace(req.Header.Get("x-goog-api-key")); key != "" {
+			return key
 		}
 	}
-	if key := req.Header.Get("x-api-key"); key != "" {
+	if header := req.Header.Get("Authorization"); header != "" {
+		if google {
+			header = strings.TrimSpace(header)
+		}
+		parts := strings.SplitN(header, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			if key := strings.TrimSpace(parts[1]); key != "" {
+				return key
+			}
+		}
+	}
+	key := req.Header.Get("x-api-key")
+	if google {
+		key = strings.TrimSpace(key)
+	}
+	if key != "" {
 		return key
 	}
+	if google {
+		return strings.TrimSpace(req.URL.Query().Get("key"))
+	}
 	return req.Header.Get("x-goog-api-key")
+}
+
+func orderedRouteGooglePath(path string) bool {
+	return strings.HasPrefix(path, "/v1beta") || strings.HasPrefix(path, "/antigravity/v1beta")
 }
 
 func orderedRouteCanReplay(path string) bool {
@@ -163,13 +213,17 @@ func orderedRouteCanReplay(path string) bool {
 }
 
 type orderedRouteResponse struct {
-	target        http.ResponseWriter
-	header        http.Header
-	status        int
-	buffer        bytes.Buffer
-	semantic      bool
-	streamError   bool
-	heartbeatSent bool
+	target         http.ResponseWriter
+	header         http.Header
+	status         int
+	buffer         bytes.Buffer
+	semantic       bool
+	streamError    bool
+	heartbeatSent  bool
+	scanOffset     int
+	eventData      []byte
+	eventName      string
+	permanentError bool
 }
 
 func newOrderedRouteResponse(target http.ResponseWriter) *orderedRouteResponse {
@@ -207,6 +261,11 @@ func (w *orderedRouteResponse) Write(data []byte) (int, error) {
 		w.commit()
 		return w.target.Write(data)
 	}
+	// Bound the allocation before copying a potentially huge image/tool frame.
+	if w.buffer.Len()+len(data) > orderedRouteResponseLimit {
+		w.commit()
+		return w.target.Write(data)
+	}
 	n, err := w.buffer.Write(data)
 	w.inspectSSE()
 	if w.semantic || w.buffer.Len() > orderedRouteResponseLimit {
@@ -216,49 +275,85 @@ func (w *orderedRouteResponse) Write(data []byte) (int, error) {
 }
 
 func (w *orderedRouteResponse) inspectSSE() {
-	for _, line := range bytes.Split(w.buffer.Bytes(), []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if !bytes.HasPrefix(line, []byte("data:")) {
-			continue
+	for !w.semantic && w.scanOffset < w.buffer.Len() {
+		remaining := w.buffer.Bytes()[w.scanOffset:]
+		end := bytes.IndexByte(remaining, '\n')
+		if end < 0 {
+			return
 		}
-		data := bytes.TrimSpace(line[len("data:"):])
-		if bytes.Equal(data, []byte("[DONE]")) {
-			if !w.streamError {
-				w.semantic = true
+		line := bytes.TrimSuffix(remaining[:end], []byte("\r"))
+		w.scanOffset += end + 1
+		if len(line) == 0 {
+			if len(w.eventData) > 0 {
+				w.inspectSSEEvent(w.eventData)
 			}
-			continue
+			w.eventData = w.eventData[:0]
+			w.eventName = ""
+		} else if bytes.HasPrefix(line, []byte("event:")) {
+			w.eventName = strings.TrimSpace(string(line[6:]))
+		} else if bytes.HasPrefix(line, []byte("data:")) {
+			if len(w.eventData) > 0 {
+				w.eventData = append(w.eventData, '\n')
+			}
+			w.eventData = append(w.eventData, bytes.TrimPrefix(line[5:], []byte(" "))...)
 		}
-		if !gjson.ValidBytes(data) {
-			continue
-		} // split frames remain buffered
-		typeName := gjson.GetBytes(data, "type").String()
-		switch typeName {
-		case "error", "response.failed", "response.incomplete":
-			w.streamError = true
-		case "response.created", "response.in_progress", "message_start", "ping", "response.content_part.added":
-		case "response.output_item.added":
-			if kind := gjson.GetBytes(data, "item.type").String(); kind != "message" && kind != "reasoning" {
-				w.semantic = true
-			}
-		case "content_block_start":
-			block := gjson.GetBytes(data, "content_block")
-			if block.Get("type").String() == "tool_use" || block.Get("text").String() != "" {
-				w.semantic = true
-			}
-		default:
-			// Empty output deltas are only a prelude. Tool calls, reasoning, text,
-			// images and completed responses irrevocably commit the request.
-			if strings.HasSuffix(typeName, ".delta") && gjson.GetBytes(data, "delta").Type == gjson.String && gjson.GetBytes(data, "delta").String() == "" {
-				continue
-			}
-			if typeName == "" {
-				delta := gjson.GetBytes(data, "choices.0.delta")
-				if delta.Exists() && delta.Get("content").String() == "" && !delta.Get("tool_calls").Exists() && !gjson.GetBytes(data, "choices.0.finish_reason").Exists() {
-					continue
-				}
-			}
+	}
+}
+
+func (w *orderedRouteResponse) inspectSSEEvent(data []byte) {
+	if bytes.Equal(bytes.TrimSpace(data), []byte("[DONE]")) {
+		if !w.streamError {
 			w.semantic = true
 		}
+		return
+	}
+	if !gjson.ValidBytes(data) {
+		// Unknown delivered data is not safe to replay, even if it is not JSON.
+		w.semantic = true
+		return
+	}
+	if len(gjson.GetBytes(data, "response.output").Array()) > 0 || len(gjson.GetBytes(data, "message.content").Array()) > 0 {
+		w.semantic = true
+		return
+	}
+	if w.eventName == "error" || gjson.GetBytes(data, "error").IsObject() {
+		w.streamError = true
+		w.permanentError = w.permanentError || orderedRoutePermanentError(data)
+		return
+	}
+	typeName := gjson.GetBytes(data, "type").String()
+	switch typeName {
+	case "error", "response.failed", "response.incomplete":
+		w.streamError = true
+	case "response.created", "response.in_progress", "message_start", "ping":
+	case "response.content_part.added":
+		part := gjson.GetBytes(data, "part")
+		w.semantic = part.Get("text").String() != "" || part.Get("refusal").String() != ""
+	case "response.output_item.added":
+		item := gjson.GetBytes(data, "item")
+		w.semantic = item.Get("type").String() != "message" && item.Get("type").String() != "reasoning" ||
+			len(item.Get("content").Array()) > 0 || len(item.Get("summary").Array()) > 0
+	case "content_block_start":
+		block := gjson.GetBytes(data, "content_block")
+		if (block.Get("type").String() != "" && block.Get("type").String() != "text") || block.Get("text").String() != "" {
+			w.semantic = true
+		}
+	default:
+		// Empty output deltas are only a prelude. Tool calls, reasoning, text,
+		// images and completed responses irrevocably commit the request.
+		if strings.HasSuffix(typeName, ".delta") && gjson.GetBytes(data, "delta").Type == gjson.String && gjson.GetBytes(data, "delta").String() == "" {
+			return
+		}
+		if typeName == "" {
+			delta := gjson.GetBytes(data, "choices.0.delta")
+			if delta.Exists() && delta.Get("content").String() == "" && delta.Get("reasoning_content").String() == "" && delta.Get("reasoning").String() == "" && delta.Get("refusal").String() == "" && !delta.Get("tool_calls").Exists() && !delta.Get("function_call").Exists() && gjson.GetBytes(data, "choices.0.finish_reason").String() == "" {
+				return
+			}
+		}
+		w.semantic = true
+	}
+	if w.streamError {
+		w.permanentError = w.permanentError || orderedRoutePermanentError(data)
 	}
 }
 
@@ -276,6 +371,8 @@ func (w *orderedRouteResponse) commit() {
 	}
 	w.target.WriteHeader(w.status)
 	_, _ = io.Copy(w.target, &w.buffer)
+	w.buffer = bytes.Buffer{}
+	w.eventData = nil
 }
 
 func (w *orderedRouteResponse) Flush() {
@@ -301,7 +398,7 @@ func (w *orderedRouteResponse) canRetry() bool {
 	if w.semantic {
 		return false
 	}
-	if orderedRoutePermanentError(w.buffer.Bytes()) {
+	if w.permanentError || orderedRoutePermanentError(w.buffer.Bytes()) {
 		return false
 	}
 	if w.streamError {
@@ -345,10 +442,14 @@ func orderedDiscoveryModels(c *gin.Context, gateway *handler.GatewayHandler) boo
 }
 
 func orderedRoutePermanentError(body []byte) bool {
-	fields := []string{"error.code", "error.type", "error.message", "response.error.code", "response.error.type", "response.error.message"}
+	modelMissing := gjson.GetBytes(body, "error.code").String() == "model_not_found" || gjson.GetBytes(body, "code").String() == "model_not_found"
+	fields := []string{"error.code", "error.type", "error.message", "response.error.code", "response.error.type", "response.error.message", "code", "type", "message"}
 	for _, field := range fields {
 		value := strings.ToLower(gjson.GetBytes(body, field).String())
 		for _, blocked := range []string{"cyber", "policy", "content_filter", "safety", "moderation", "invalid_request", "invalid_api_key", "api_key_quota", "api_key_rate", "insufficient_balance", "permission", "access_denied", "group_not_allowed"} {
+			if modelMissing && (field == "error.type" || field == "type") && blocked == "invalid_request" {
+				continue
+			}
 			if strings.Contains(value, blocked) {
 				return true
 			}

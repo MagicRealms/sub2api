@@ -13,6 +13,12 @@ import (
 
 const MaxAPIKeyGroupRoutes = 16
 
+// Optional batch projection keeps request policy fresh without loading account
+// counts once per selected group. Small test repositories retain their fallback.
+type groupRoutePolicyRepository interface {
+	GetByIDsLite(context.Context, []int64) ([]*Group, error)
+}
+
 func (k *APIKey) OrderedGroupIDs() []int64 {
 	if k == nil {
 		return []int64{}
@@ -78,8 +84,27 @@ func (s *APIKeyService) OrderedRouteGroups(ctx context.Context, key *APIKey) ([]
 		return nil, ErrGroupNotAllowed
 	}
 	groups := make([]*Group, 0, len(ids))
+	var byID map[int64]*Group
+	if repo, ok := s.groupRepo.(groupRoutePolicyRepository); ok {
+		loaded, err := repo.GetByIDsLite(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
+		byID = make(map[int64]*Group, len(loaded))
+		for _, group := range loaded {
+			if group != nil {
+				byID[group.ID] = group
+			}
+		}
+	}
 	for _, id := range ids {
-		group, err := s.groupRepo.GetByID(ctx, id)
+		var group *Group
+		var err error
+		if byID != nil {
+			group = byID[id]
+		} else {
+			group, err = s.groupRepo.GetByID(ctx, id)
+		}
 		if errors.Is(err, ErrGroupNotFound) {
 			continue
 		}

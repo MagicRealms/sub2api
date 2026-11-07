@@ -32,7 +32,10 @@ func (h *GatewayHandler) GroupRouteSupportsModel(ctx context.Context, group *ser
 	if err != nil {
 		return false, err
 	}
-	return (service.GroupModelAllowlist{Enabled: true, Models: models}).Allows(model), nil
+	if !(service.GroupModelAllowlist{Enabled: true, Models: models}).Allows(model) {
+		return false, nil
+	}
+	return true, h.gatewayService.ValidateOrderedGroupModelPricing(ctx, group, model, path)
 }
 
 func (h *GatewayHandler) OrderedGroupModels(c *gin.Context, groups []*service.Group) {

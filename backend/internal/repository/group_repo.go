@@ -282,6 +282,18 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 	return groupEntityToService(m), nil
 }
 
+func (r *groupRepository) GetByIDsLite(ctx context.Context, ids []int64) ([]*service.Group, error) {
+	models, err := r.client.Group.Query().Where(group.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groups := make([]*service.Group, 0, len(models))
+	for _, model := range models {
+		groups = append(groups, groupEntityToService(model))
+	}
+	return groups, nil
+}
+
 func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
 	modelPricing, err := json.Marshal(groupIn.ModelPricing)
 	if err != nil {

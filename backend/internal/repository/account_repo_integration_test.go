@@ -146,6 +146,26 @@ func TestAccountRepoSuite(t *testing.T) {
 	suite.Run(t, new(AccountRepoSuite))
 }
 
+func (s *AccountRepoSuite) TestOrderedRouteCapabilityIncludesDisabledAccounts() {
+	group := mustCreateGroup(s.T(), s.client, &service.Group{Name: "ordered-route-catalog"})
+	for _, status := range []string{service.StatusActive, service.StatusDisabled} {
+		account := mustCreateAccount(s.T(), s.client, &service.Account{
+			Name: "ordered-" + status, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, Status: status,
+			Credentials: map[string]any{"model_mapping": map[string]any{"custom-premium": "custom-premium"}},
+		})
+		mustBindAccountToGroup(s.T(), s.client, account.ID, group.ID, 1)
+	}
+	active, err := s.repo.ListByGroup(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Len(active, 1, "scheduler-facing method intentionally filters disabled accounts")
+	configured, err := s.repo.ListConfiguredGroupRouteAccounts(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Len(configured, 2, "billing baseline must survive disabled accounts")
+	for i := range configured {
+		s.Equal("custom-premium", configured[i].GetModelMapping()["custom-premium"])
+	}
+}
+
 // --- Create / GetByID / Update / Delete ---
 
 func (s *AccountRepoSuite) TestCreate() {
