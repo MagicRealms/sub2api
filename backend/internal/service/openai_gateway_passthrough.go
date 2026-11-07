@@ -2033,11 +2033,6 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 				}
 			}
 			eventType := effectiveOpenAISSEEventType(dataBytes, rawEventType)
-			if normalizedData, normalized := normalizeOpenAIIncompleteDetails(dataBytes); normalized {
-				dataBytes = normalizedData
-				trimmedData = strings.TrimSpace(string(normalizedData))
-				line = "data: " + string(normalizedData)
-			}
 			createdAtTracker.Observe(dataBytes, eventType)
 			if codexFailureTerminal && sawBareError && !sawResponseFailed && eventType != "response.failed" {
 				suppressCurrentEvent = true
@@ -2383,11 +2378,6 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 	finalResponse, ok := extractCodexFinalResponse(bodyText)
 	if !ok && terminalOK {
 		finalResponse, ok = extractOpenAINonCompletedTerminalResponse(terminalType, terminalPayload)
-	}
-	if ok {
-		if normalized, changed := normalizeOpenAIIncompleteDetails(finalResponse); changed {
-			finalResponse = normalized
-		}
 	}
 
 	usage := s.parseSSEUsageFromBody(bodyText)
