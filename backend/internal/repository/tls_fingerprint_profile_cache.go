@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -108,7 +109,11 @@ func (c *tlsFingerprintProfileCache) SubscribeUpdates(ctx context.Context, handl
 				return
 			case msg := <-ch:
 				if msg == nil {
-					slog.Warn("tls_fp_profile_cache_subscriber_stopped", "reason", "channel_closed")
+					if ctx.Err() == nil && !errors.Is(c.rdb.Ping(ctx).Err(), redis.ErrClosed) {
+						slog.Warn("tls_fp_profile_cache_subscriber_stopped", "reason", "channel_closed")
+					} else {
+						slog.Debug("tls_fp_profile_cache_subscriber_stopped", "reason", "shutdown")
+					}
 					return
 				}
 				c.localMu.Lock()

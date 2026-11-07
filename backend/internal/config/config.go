@@ -1111,6 +1111,9 @@ type GatewayConfig struct {
 	OpenAIHTTP2 GatewayOpenAIHTTP2Config `mapstructure:"openai_http2"`
 	// Opt-in lossless compression for large replayable requests to the Codex OAuth endpoint.
 	OpenAIRequestGzipEnabled bool `mapstructure:"openai_request_gzip_enabled"`
+	// Exact HTTPS hosts whose /v1/responses endpoint has been verified to
+	// accept gzip uploads. Empty preserves the OAuth-only compression policy.
+	OpenAIRequestGzipHosts []string `mapstructure:"openai_request_gzip_hosts"`
 	// OpenAIProxyStreamCircuit: Responses SSE 代理断流熔断策略。
 	OpenAIProxyStreamCircuit GatewayOpenAIProxyStreamCircuitConfig `mapstructure:"openai_proxy_stream_circuit"`
 	// ProxyTransportRecovery: proxy outage detection and optional temporary direct routing.

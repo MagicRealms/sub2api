@@ -1034,6 +1034,7 @@
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
+      :route-groups="selectedKeyRouteGroups"
       :claude-code-only="selectedKey?.group?.claude_code_only || false"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
@@ -1649,6 +1650,14 @@ const toggleKeyStatus = async (key: ApiKey) => {
 const routeDraft = ref<number[]>([])
 const routeSaving = ref(false)
 const keyRouteIDs = (key: ApiKey): number[] => key.group_ids?.length ? [...key.group_ids] : key.group_id ? [key.group_id] : []
+const selectedKeyRouteGroups = computed(() => {
+  if (!selectedKey.value) return []
+  const key = selectedKey.value
+  return keyRouteIDs(key).flatMap(id => {
+    const group = groups.value.find(group => group.id === id) ?? (key.group?.id === id ? key.group : undefined)
+    return group ? [group] : []
+  })
+})
 watch(() => formData.value.group_ids, (ids) => { formData.value.group_id = ids[0] ?? null }, { deep: true, flush: 'sync' })
 
 const openGroupSelector = (key: ApiKey) => {

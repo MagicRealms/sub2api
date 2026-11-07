@@ -382,102 +382,60 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 	stats := &UserDashboardStats{}
 	today := timezone.Today()
 
-	// API Key 统计
-	if err := scanSingleRow(
-		ctx,
-		r.sql,
-		"SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND deleted_at IS NULL",
-		[]any{userID},
-		&stats.TotalAPIKeys,
+	// Two key counts share one scan; totals, today's counters and rolling rates
+	// share one usage scan and the same snapshot. Keep existing timezone,
+	// placeholder inclusion, and five-minute integer-average semantics.
+	if err := scanSingleRow(ctx, r.sql, `
+		SELECT COUNT(*), COUNT(*) FILTER (WHERE status = $2)
+		FROM api_keys WHERE user_id = $1 AND deleted_at IS NULL`,
+		[]any{userID, service.StatusActive}, &stats.TotalAPIKeys, &stats.ActiveAPIKeys,
 	); err != nil {
 		return nil, err
 	}
-	if err := scanSingleRow(
-		ctx,
-		r.sql,
-		"SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND status = $2 AND deleted_at IS NULL",
-		[]any{userID, service.StatusActive},
-		&stats.ActiveAPIKeys,
-	); err != nil {
-		return nil, err
-	}
-
-	// 累计 Token 统计
-	totalStatsQuery := `
+	combinedStatsQuery := `
 		SELECT
-			COUNT(*) as total_requests,
-			COALESCE(SUM(input_tokens), 0) as total_input_tokens,
-			COALESCE(SUM(output_tokens), 0) as total_output_tokens,
-			COALESCE(SUM(cache_creation_tokens), 0) as total_cache_creation_tokens,
-			COALESCE(SUM(cache_read_tokens), 0) as total_cache_read_tokens,
-			COALESCE(SUM(total_cost), 0) as total_cost,
-			COALESCE(SUM(actual_cost), 0) as total_actual_cost,
-			COALESCE(AVG(duration_ms), 0) as avg_duration_ms
-		FROM usage_logs
-		WHERE user_id = $1
+			COUNT(*),
+			COALESCE(SUM(input_tokens), 0),
+			COALESCE(SUM(output_tokens), 0),
+			COALESCE(SUM(cache_creation_tokens), 0),
+			COALESCE(SUM(cache_read_tokens), 0),
+			COALESCE(SUM(total_cost), 0),
+			COALESCE(SUM(actual_cost), 0),
+			COALESCE(AVG(duration_ms), 0),
+			COUNT(*) FILTER (WHERE created_at >= $2),
+			COALESCE(SUM(input_tokens) FILTER (WHERE created_at >= $2), 0),
+			COALESCE(SUM(output_tokens) FILTER (WHERE created_at >= $2), 0),
+			COALESCE(SUM(cache_creation_tokens) FILTER (WHERE created_at >= $2), 0),
+			COALESCE(SUM(cache_read_tokens) FILTER (WHERE created_at >= $2), 0),
+			COALESCE(SUM(total_cost) FILTER (WHERE created_at >= $2), 0),
+			COALESCE(SUM(actual_cost) FILTER (WHERE created_at >= $2), 0),
+			COUNT(*) FILTER (WHERE created_at >= $3),
+			COALESCE(SUM(input_tokens + output_tokens) FILTER (WHERE created_at >= $3), 0)
+		FROM usage_logs WHERE user_id = $1
 	`
-	if err := scanSingleRow(
-		ctx,
-		r.sql,
-		totalStatsQuery,
-		[]any{userID},
-		&stats.TotalRequests,
-		&stats.TotalInputTokens,
-		&stats.TotalOutputTokens,
-		&stats.TotalCacheCreationTokens,
-		&stats.TotalCacheReadTokens,
-		&stats.TotalCost,
-		&stats.TotalActualCost,
-		&stats.AverageDurationMs,
+	var recentRequests, recentTokens int64
+	if err := scanSingleRow(ctx, r.sql, combinedStatsQuery,
+		[]any{userID, today, time.Now().Add(-5 * time.Minute)},
+		&stats.TotalRequests, &stats.TotalInputTokens, &stats.TotalOutputTokens,
+		&stats.TotalCacheCreationTokens, &stats.TotalCacheReadTokens,
+		&stats.TotalCost, &stats.TotalActualCost, &stats.AverageDurationMs,
+		&stats.TodayRequests, &stats.TodayInputTokens, &stats.TodayOutputTokens,
+		&stats.TodayCacheCreationTokens, &stats.TodayCacheReadTokens,
+		&stats.TodayCost, &stats.TodayActualCost,
+		&recentRequests, &recentTokens,
 	); err != nil {
 		return nil, err
 	}
 	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheCreationTokens + stats.TotalCacheReadTokens
-
-	// 今日 Token 统计
-	todayStatsQuery := `
-		SELECT
-			COUNT(*) as today_requests,
-			COALESCE(SUM(input_tokens), 0) as today_input_tokens,
-			COALESCE(SUM(output_tokens), 0) as today_output_tokens,
-			COALESCE(SUM(cache_creation_tokens), 0) as today_cache_creation_tokens,
-			COALESCE(SUM(cache_read_tokens), 0) as today_cache_read_tokens,
-			COALESCE(SUM(total_cost), 0) as today_cost,
-			COALESCE(SUM(actual_cost), 0) as today_actual_cost
-		FROM usage_logs
-		WHERE user_id = $1 AND created_at >= $2
-	`
-	if err := scanSingleRow(
-		ctx,
-		r.sql,
-		todayStatsQuery,
-		[]any{userID, today},
-		&stats.TodayRequests,
-		&stats.TodayInputTokens,
-		&stats.TodayOutputTokens,
-		&stats.TodayCacheCreationTokens,
-		&stats.TodayCacheReadTokens,
-		&stats.TodayCost,
-		&stats.TodayActualCost,
-	); err != nil {
-		return nil, err
-	}
 	stats.TodayTokens = stats.TodayInputTokens + stats.TodayOutputTokens + stats.TodayCacheCreationTokens + stats.TodayCacheReadTokens
-
-	// 性能指标：RPM 和 TPM（最近1分钟，仅统计该用户的请求）
-	rpm, tpm, err := r.getPerformanceStats(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	stats.Rpm = rpm
-	stats.Tpm = tpm
+	stats.Rpm, stats.Tpm = recentRequests/5, recentTokens/5
 
 	// 按"有效平台"维度拆分（group.platform 优先，否则 account.platform）。
 	// 与 ops 路径口径一致；HAVING 过滤掉无法确定平台的行（避免出现空字符串平台）。
-	// 与上面 totalStatsQuery/todayStatsQuery 的总值可能略微差异，原因有二：
+	// 与上面 combinedStatsQuery 的总值可能略微差异，原因有二：
 	//   1) 无平台归属的极少数行（group/account 都没 platform）会被 HAVING 排除；
 	//   2) usageLogSuccessFilterUL 会把 actual_cost = 0 的失败 placeholder 行排除，
-	//      而 totalStatsQuery/todayStatsQuery 没有这层过滤、会把这些行的 request 计数算进去。
+	//      而 combinedStatsQuery 没有这层过滤、会把这些行的 request 计数算进去。
 	platformQuery := `
 		SELECT
 			` + usageLogEffectivePlatformExpr + ` as platform,

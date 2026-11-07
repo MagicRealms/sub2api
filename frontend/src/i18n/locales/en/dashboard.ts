@@ -164,6 +164,8 @@ export default {
     lastUsedIP: 'Last Used IP',
     useKey: 'Use Key',
     useKeyModal: {
+      routeExampleTitle: 'Choose a connection example',
+      routeExampleHint: 'The same key works with these groups. This only changes the client example; requests still route by model and saved group order, with the same billing rules.',
       title: 'Use API Key',
       description:
         'Add the following environment variables to your terminal profile or run directly in terminal to configure API access.',

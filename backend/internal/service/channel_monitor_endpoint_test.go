@@ -4,12 +4,29 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestMonitorResponsesKeepsReasoningProbeCheap(t *testing.T) {
+	for _, model := range []string{"gpt-6.1-sol", "gpt-5.6-luna", "gpt-4o", "custom-model"} {
+		body, err := providerOpenAIResponsesAdapter.buildBody(model, "1+1?")
+		require.NoError(t, err)
+		var parsed map[string]any
+		require.NoError(t, json.Unmarshal(body, &parsed))
+		require.EqualValues(t, monitorChallengeMaxTokens, parsed["max_output_tokens"])
+		require.Equal(t, false, parsed["store"])
+		if model == "gpt-6.1-sol" || model == "gpt-5.6-luna" {
+			require.Equal(t, map[string]any{"effort": "low"}, parsed["reasoning"])
+		} else {
+			require.NotContains(t, parsed, "reasoning")
+		}
+	}
+}
 
 func TestValidateMonitorEndpoint_BasePath(t *testing.T) {
 	for _, endpoint := range []string{

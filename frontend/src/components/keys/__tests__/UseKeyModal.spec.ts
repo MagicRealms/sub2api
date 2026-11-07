@@ -24,6 +24,7 @@ vi.mock('file-saver', () => ({
 }))
 
 import UseKeyModal from '../UseKeyModal.vue'
+import type { Group } from '@/types'
 
 function readBlobAsText(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -35,6 +36,30 @@ function readBlobAsText(blob: Blob): Promise<string> {
 }
 
 describe('UseKeyModal', () => {
+  it('switches a multi-group key from GPT to Claude and uses the Anthropic root URL', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true, apiKey: 'sk-mixed-test', baseUrl: 'https://example.com/v1', platform: 'openai',
+        routeGroups: [
+          { id: 1, name: 'GPT first', platform: 'openai', claude_code_only: false },
+          { id: 2, name: 'Claude second', platform: 'anthropic', claude_code_only: false },
+        ] as Group[],
+      },
+      global: { stubs: {
+        BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' },
+        Icon: { template: '<span />' },
+      } },
+    })
+    expect(wrapper.find('pre code').text()).toContain('/v1')
+    await wrapper.get('[data-testid="key-guide-route"]').setValue('2')
+    expect(wrapper.find('pre code').text()).toContain('ANTHROPIC_BASE_URL="https://example.com"')
+    expect(wrapper.find('pre code').text()).not.toContain('example.com/v1')
+    expect(wrapper.find('pre code').text()).toContain('sk-mixed-test')
+    await wrapper.get('[data-testid="key-guide-route"]').setValue('1')
+    expect(wrapper.text()).toContain('keys.useKeyModal.openai.description')
+    wrapper.unmount()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
     saveAsMock.mockClear()

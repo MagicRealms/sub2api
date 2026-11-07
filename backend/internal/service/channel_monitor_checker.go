@@ -252,13 +252,21 @@ func newOpenAICompatibleChatAdapter(path string) providerAdapter {
 var providerOpenAIResponsesAdapter = providerAdapter{
 	buildPath: func(string) string { return providerOpenAIResponsesPath },
 	buildBody: func(model, prompt string) ([]byte, error) {
-		return json.Marshal(map[string]any{
+		body := map[string]any{
 			"model":             model,
 			"instructions":      "You are a channel health-check endpoint. Answer the arithmetic challenge exactly and briefly.",
 			"input":             prompt,
 			"max_output_tokens": monitorChallengeMaxTokens,
 			"stream":            false,
-		})
+			"store":             false,
+		}
+		// Keep synthetic checks cheap without changing actual customer requests.
+		// Ordinary models may reject reasoning, so only known reasoning families
+		// receive this default; a configured merge/replace body can override it.
+		if strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6") || strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
+			body["reasoning"] = map[string]string{"effort": "low"}
+		}
+		return json.Marshal(body)
 	},
 	buildHeaders: func(apiKey string) map[string]string {
 		return map[string]string{"Authorization": "Bearer " + apiKey}

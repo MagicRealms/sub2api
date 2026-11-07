@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -41,7 +42,11 @@ func (c *channelCache) SubscribeUpdates(ctx context.Context, handler func()) {
 				return
 			case message, ok := <-messages:
 				if !ok {
-					slog.Warn("channel cache subscriber stopped", "reason", "channel_closed")
+					if ctx.Err() == nil && !errors.Is(c.rdb.Ping(ctx).Err(), redis.ErrClosed) {
+						slog.Warn("channel cache subscriber stopped", "reason", "channel_closed")
+					} else {
+						slog.Debug("channel cache subscriber stopped", "reason", "shutdown")
+					}
 					return
 				}
 				if message != nil {

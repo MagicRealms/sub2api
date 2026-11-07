@@ -104,6 +104,8 @@
             {{ t('admin.channelMonitor.form.useCurrentDomain') }}
           </button>
         </div>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channelMonitor.form.protocolRoutingHint') }}</p>
+        <p v-if="requestURL" data-testid="monitor-request-url" class="mt-1 break-all font-mono text-xs text-gray-500">{{ requestURL }}</p>
       </div>
 
       <div v-if="usesProbePart">
@@ -225,6 +227,7 @@
     :show="showKeyPicker"
     :loading="myKeysLoading"
     :keys="myActiveKeys"
+    :groups="myKeyGroups"
     :provider="form.provider"
     :user-group-rates="userGroupRates"
     @close="showKeyPicker = false"
@@ -240,6 +243,8 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import { keysAPI } from '@/api/keys'
 import { userGroupsAPI } from '@/api/groups'
+import type { Group } from '@/types'
+import { monitorRequestURL } from '@/utils/monitorKeyRoutes'
 import type {
   BodyOverrideMode,
   ChannelMonitor,
@@ -362,6 +367,8 @@ const form = reactive<MonitorForm>({
 // quota / quota_probe 需要关联账号；probe / quota_probe 需要探活字段。
 const usesQuotaMode = computed(() => form.check_mode !== CHECK_MODE_PROBE)
 const usesProbePart = computed(() => form.check_mode !== CHECK_MODE_QUOTA)
+const requestURL = computed(() => monitorRequestURL(form.endpoint, form.provider, form.api_mode))
+const myKeyGroups = ref<Group[]>([])
 
 // jitter 上限与后端校验一致：interval - jitter 不得低于最小检测间隔 15 秒。
 const maxJitterSeconds = computed<number>(() => Math.max(0, (form.interval_seconds || 0) - 15))
@@ -784,18 +791,24 @@ watch(
 
 function useCurrentDomain() {
   form.endpoint = window.location.origin
+  if (form.provider === PROVIDER_OPENAI) form.api_mode = API_MODE_RESPONSES
 }
 
 async function openMyKeyPicker() {
   showKeyPicker.value = true
-  if (myActiveKeys.value.length > 0) return
+  if (myKeysLoading.value) return
   myKeysLoading.value = true
   try {
-    const [res, rates] = await Promise.all([
+    const [res, rates, groups] = await Promise.all([
       keysAPI.list(1, 100, { status: 'active' }),
       userGroupsAPI.getUserGroupRates(),
+      userGroupsAPI.getAvailable(),
     ])
-    const items = res.items || []
+    const items = [...(res.items || [])]
+    for (let page = 2; page <= res.pages; page++) {
+      const next = await keysAPI.list(page, 100, { status: 'active' })
+      items.push(...(next.items || []))
+    }
     const now = Date.now()
     myActiveKeys.value = items.filter(k => {
       if (k.status !== 'active') return false
@@ -803,6 +816,7 @@ async function openMyKeyPicker() {
       return new Date(k.expires_at).getTime() > now
     })
     userGroupRates.value = rates
+    myKeyGroups.value = groups
   } catch (err: unknown) {
     appStore.showError(extractApiErrorMessage(err, t('admin.channelMonitor.form.noActiveKey')))
   } finally {
@@ -812,6 +826,7 @@ async function openMyKeyPicker() {
 
 function pickMyKey(k: ApiKey) {
   form.api_key = k.key
+  if (!form.endpoint.trim()) useCurrentDomain()
   showKeyPicker.value = false
 }
 

@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	openAIRequestCompressionMinBytes = 256 << 10
-	openAIRequestCompressionMaxBytes = 64 << 20
+	openAIRequestCompressionMinBytes   = 256 << 10
+	openAIRequestCompressionMaxBytes   = 64 << 20
+	verifiedRequestCompressionMinBytes = 64 << 10
 )
 
 // Compression is optional: under CPU/memory pressure send the original request
@@ -38,12 +39,27 @@ func (s *httpUpstreamService) compressOpenAIRequest(req *http.Request, profile s
 	if s.cfg == nil || !s.cfg.Gateway.OpenAIRequestGzipEnabled || profile != service.HTTPUpstreamProfileOpenAI || req == nil || req.URL == nil {
 		return req
 	}
-	// This endpoint was verified with both production OAuth accounts. Do not
-	// assume arbitrary OpenAI-compatible providers support compressed uploads.
-	if req.Method != http.MethodPost || req.URL.Scheme != "https" || req.URL.Host != "chatgpt.com" || req.URL.Path != "/backend-api/codex/responses" || req.URL.RawQuery != "" ||
-		req.Header.Get("Chatgpt-Account-Id") == "" || !strings.HasPrefix(req.Header.Get("Authorization"), "Bearer ") ||
+	// Third-party uploads require explicit, exact-host opt-in after a completed
+	// live probe. Never infer gzip support from OpenAI compatibility, and never
+	// retry an encoded POST as plaintext after an ambiguous upstream response.
+	oauth := req.URL.Host == "chatgpt.com" && req.URL.Path == "/backend-api/codex/responses" && req.Header.Get("Chatgpt-Account-Id") != ""
+	verified := false
+	if req.URL.Path == "/v1/responses" && (req.URL.Port() == "" || req.URL.Port() == "443") && req.URL.User == nil {
+		for _, host := range s.cfg.Gateway.OpenAIRequestGzipHosts {
+			if strings.EqualFold(req.URL.Hostname(), strings.TrimSpace(host)) {
+				verified = true
+				break
+			}
+		}
+	}
+	minimumBytes := int64(openAIRequestCompressionMinBytes)
+	if verified {
+		minimumBytes = verifiedRequestCompressionMinBytes
+	}
+	if req.Method != http.MethodPost || req.URL.Scheme != "https" || (!oauth && !verified) || req.URL.RawQuery != "" ||
+		!strings.HasPrefix(req.Header.Get("Authorization"), "Bearer ") ||
 		req.Header.Get("Content-Encoding") != "" || req.Body == nil || req.GetBody == nil ||
-		req.ContentLength < openAIRequestCompressionMinBytes || req.ContentLength > openAIRequestCompressionMaxBytes || req.Context().Err() != nil {
+		req.ContentLength < minimumBytes || req.ContentLength > openAIRequestCompressionMaxBytes || req.Context().Err() != nil {
 		return req
 	}
 	for _, h := range []string{"Content-MD5", "Digest", "Content-Digest", "Signature"} {

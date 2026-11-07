@@ -47,15 +47,19 @@
               <td class="px-3 py-2 font-medium text-gray-900 dark:text-white">{{ k.name }}</td>
               <td class="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{ maskApiKey(k.key) }}</td>
               <td class="px-3 py-2">
-                <GroupBadge
-                  v-if="k.group"
-                  :name="k.group.name"
-                  :platform="k.group.platform"
-                  :subscription-type="k.group.subscription_type"
-                  :rate-multiplier="k.group.rate_multiplier"
-                  :user-rate-multiplier="userGroupRates[k.group.id]"
-                />
-                <span v-else class="text-xs text-gray-400">—</span>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span v-for="(group, index) in monitorKeyGroups(k, groups)" :key="group.id" class="inline-flex items-center gap-1">
+                    <span class="text-xs font-semibold text-gray-400">{{ index + 1 }}.</span>
+                    <GroupBadge
+                      :name="group.name"
+                      :platform="group.platform"
+                      :subscription-type="group.subscription_type"
+                      :rate-multiplier="group.rate_multiplier"
+                      :user-rate-multiplier="userGroupRates[group.id]"
+                    />
+                  </span>
+                  <span v-if="!monitorKeyGroups(k, groups).length" class="text-xs text-gray-400">—</span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -75,7 +79,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { ApiKey } from '@/types'
+import type { ApiKey, Group } from '@/types'
+import { monitorKeyGroups, monitorKeySupportsProvider } from '@/utils/monitorKeyRoutes'
 import type { Provider } from '@/api/admin/channelMonitor'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
@@ -85,10 +90,12 @@ const props = withDefaults(defineProps<{
   show: boolean
   loading: boolean
   keys: ApiKey[]
+  groups?: Group[]
   provider: Provider
   userGroupRates?: Record<number, number>
 }>(), {
   userGroupRates: () => ({}),
+  groups: () => [],
 })
 
 defineEmits<{
@@ -107,12 +114,12 @@ watch(() => props.show, (shown) => {
 const filteredKeys = computed<ApiKey[]>(() => {
   const q = search.value.trim().toLowerCase()
   return props.keys.filter((k) => {
-    if (k.group?.platform !== props.provider) return false
+    if (!monitorKeySupportsProvider(k, props.groups, props.provider)) return false
     if (!q) return true
     return (
       k.name.toLowerCase().includes(q) ||
       k.key.toLowerCase().includes(q) ||
-      (k.group?.name || '').toLowerCase().includes(q)
+      monitorKeyGroups(k, props.groups).some(group => group.name.toLowerCase().includes(q))
     )
   })
 })

@@ -1131,7 +1131,7 @@ func (s *PricingService) mergeFallbackPricingData(data map[string]*LiteLLMModelP
 		merged++
 	}
 	if merged > 0 {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Merged %d fallback-only models", merged)
+		logger.L().Named("service.pricing").Info("Merged fallback-only model prices", zap.Int("count", merged))
 	}
 	return data
 }

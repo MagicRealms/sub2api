@@ -53,6 +53,47 @@ func TestHTTPUpstreamRequestCompressionPreservesExactBytesAndReplay(t *testing.T
 	}
 }
 
+func TestHTTPUpstreamRequestCompressionRequiresVerifiedExactHost(t *testing.T) {
+	svc := NewHTTPUpstream(&config.Config{Gateway: config.GatewayConfig{
+		OpenAIRequestGzipEnabled: true, OpenAIRequestGzipHosts: []string{"sharellm.net"},
+	}}).(*httpUpstreamService)
+	payload := bytes.Repeat([]byte("preserve original customer context "), 10000)
+	for _, tc := range []struct {
+		url     string
+		allowed bool
+	}{
+		{"https://sharellm.net/v1/responses", true},
+		{"https://SHARELLM.NET:443/v1/responses", true},
+		{"https://unverified.example/v1/responses", false},
+		{"https://sharellm.net.evil.example/v1/responses", false},
+		{"https://child.sharellm.net/v1/responses", false},
+		{"https://sharellm.net:8443/v1/responses", false},
+		{"https://sharellm.net/v1/chat/completions", false},
+		{"https://sharellm.net/v1/responses?other=1", false},
+		{"http://sharellm.net/v1/responses", false},
+		{"https://user:password@sharellm.net/v1/responses", false},
+	} {
+		t.Run(tc.url, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(t.Context(), "POST", tc.url, bytes.NewReader(payload))
+			require.NoError(t, err)
+			req.Header.Set("Authorization", "Bearer test")
+			out := svc.compressOpenAIRequest(req, service.HTTPUpstreamProfileOpenAI, 1)
+			defer out.Body.Close()
+			if !tc.allowed {
+				require.Same(t, req, out)
+				return
+			}
+			require.NotSame(t, req, out)
+			decoder, err := gzip.NewReader(out.Body)
+			require.NoError(t, err)
+			defer decoder.Close()
+			decoded, err := io.ReadAll(decoder)
+			require.NoError(t, err)
+			require.Equal(t, payload, decoded)
+		})
+	}
+}
+
 func TestHTTPUpstreamRequestCompressionSkipsUnsupportedAndIncompressible(t *testing.T) {
 	svc := NewHTTPUpstream(&config.Config{Gateway: config.GatewayConfig{OpenAIRequestGzipEnabled: true}}).(*httpUpstreamService)
 	payload := bytes.Repeat([]byte("original "), 40000)

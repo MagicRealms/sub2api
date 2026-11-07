@@ -6,8 +6,15 @@
     @close="emit('close')"
   >
     <div class="space-y-4">
+      <div v-if="routeGroups && routeGroups.length > 1" class="rounded-lg border border-gray-200 p-3 dark:border-dark-700">
+        <label class="input-label" for="key-guide-route">{{ t('keys.useKeyModal.routeExampleTitle') }}</label>
+        <select id="key-guide-route" data-testid="key-guide-route" class="input" :value="selectedRoute?.id" @change="selectedRouteID = Number(($event.target as HTMLSelectElement).value)">
+          <option v-for="(group, index) in routeGroups" :key="group.id" :value="group.id">{{ index + 1 }}. {{ group.name }} · {{ group.platform }}</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-500">{{ t('keys.useKeyModal.routeExampleHint') }}</p>
+      </div>
       <!-- No Group Assigned Warning -->
-      <div v-if="!platform" class="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+      <div v-if="!effectivePlatform" class="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
         <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
         </svg>
@@ -274,7 +281,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildCodexModelCatalogUrl, fetchCodexModelsManifest } from '@/api/codex'
-import type { GroupPlatform } from '@/types'
+import type { Group, GroupPlatform } from '@/types'
 import { buildCodexApiKeyAuthConfig } from '@/utils/codexAuthConfig'
 import {
   findCodexCatalogModel,
@@ -288,6 +295,7 @@ interface Props {
   apiKey: string
   baseUrl: string
   platform: GroupPlatform | null
+  routeGroups?: Group[]
   claudeCodeOnly?: boolean
   allowMessagesDispatch?: boolean
 }
@@ -310,6 +318,12 @@ interface FileConfig {
 }
 
 const props = defineProps<Props>()
+const selectedRouteID = ref<number | null>(null)
+const selectedRoute = computed(() => props.routeGroups?.find(group => group.id === selectedRouteID.value) ?? props.routeGroups?.[0])
+const effectivePlatform = computed(() => selectedRoute.value?.platform ?? props.platform)
+const effectiveClaudeCodeOnly = computed(() => selectedRoute.value ? Boolean(selectedRoute.value.claude_code_only) : props.claudeCodeOnly)
+const effectiveAllowMessagesDispatch = computed(() => selectedRoute.value ? Boolean(selectedRoute.value.allow_messages_dispatch) : props.allowMessagesDispatch)
+watch(() => [props.show, props.apiKey], () => { selectedRouteID.value = null })
 const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
@@ -337,7 +351,7 @@ let codexModelManifestRequestID = 0
 const showCodexModelCatalog = computed(() =>
   props.show &&
   (activeClientTab.value === 'codex' ||
-    (props.platform === 'openai' && activeClientTab.value === 'codex-ws'))
+    (effectivePlatform.value === 'openai' && activeClientTab.value === 'codex-ws'))
 )
 
 const codexModelCatalogPath = computed(() => {
@@ -352,13 +366,13 @@ const CODEX_MODEL_CATALOG_CONFIG_PATH = '~/.codex/codex-models.json'
 
 const codexManifestContext = computed(() => {
   if (!showCodexModelCatalog.value) return ''
-  return `${props.platform}|${props.baseUrl}|${props.apiKey}`
+  return `${effectivePlatform.value}|${props.baseUrl}|${props.apiKey}`
 })
 
 // Reset tabs when platform changes
 const defaultClientTab = computed(() => {
-  if (props.claudeCodeOnly) return 'claude'
-  switch (props.platform) {
+  if (effectiveClaudeCodeOnly.value) return 'claude'
+  switch (effectivePlatform.value) {
     case 'openai':
       return 'codex'
     case 'grok':
@@ -374,7 +388,7 @@ const defaultClientTab = computed(() => {
   }
 })
 
-watch(() => [props.platform, props.claudeCodeOnly], () => {
+watch(() => [effectivePlatform.value, effectiveClaudeCodeOnly.value], () => {
   activeTab.value = 'unix'
   activeClientTab.value = defaultClientTab.value
   codexAuthMode.value = 'api-key'
@@ -463,17 +477,17 @@ const SparkleIcon = {
 }
 
 const clientTabs = computed((): TabConfig[] => {
-  if (!props.platform) return []
-  if (props.claudeCodeOnly) {
+  if (!effectivePlatform.value) return []
+  if (effectiveClaudeCodeOnly.value) {
     return [{ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon }]
   }
-  switch (props.platform) {
+  switch (effectivePlatform.value) {
     case 'openai': {
       const tabs: TabConfig[] = [
         { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon },
       ]
-      if (props.allowMessagesDispatch) {
+      if (effectiveAllowMessagesDispatch.value) {
         tabs.push({ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon })
       }
       tabs.push({ id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon })
@@ -536,7 +550,7 @@ const openaiTabs: TabConfig[] = [
 const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
 
 const showCodexAuthMode = computed(() =>
-  props.platform === 'openai' &&
+  effectivePlatform.value === 'openai' &&
   (activeClientTab.value === 'codex' || activeClientTab.value === 'codex-ws')
 )
 
@@ -550,14 +564,14 @@ const currentTabs = computed(() => {
 
 const platformDescription = computed(() => {
   if (activeClientTab.value === 'codex' &&
-    props.platform !== 'openai' &&
-    props.platform !== 'grok' &&
-    props.platform !== 'deepseek' &&
-    props.platform !== 'minimax' &&
-    props.platform !== 'composite') {
+    effectivePlatform.value !== 'openai' &&
+    effectivePlatform.value !== 'grok' &&
+    effectivePlatform.value !== 'deepseek' &&
+    effectivePlatform.value !== 'minimax' &&
+    effectivePlatform.value !== 'composite') {
     return t('keys.useKeyModal.routedCodex.description')
   }
-  switch (props.platform) {
+  switch (effectivePlatform.value) {
     case 'openai':
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.description')
@@ -596,14 +610,14 @@ const platformDescription = computed(() => {
 
 const platformNote = computed(() => {
   if (activeClientTab.value === 'codex' &&
-    props.platform !== 'openai' &&
-    props.platform !== 'grok' &&
-    props.platform !== 'deepseek' &&
-    props.platform !== 'minimax' &&
-    props.platform !== 'composite') {
+    effectivePlatform.value !== 'openai' &&
+    effectivePlatform.value !== 'grok' &&
+    effectivePlatform.value !== 'deepseek' &&
+    effectivePlatform.value !== 'minimax' &&
+    effectivePlatform.value !== 'composite') {
     return t('keys.useKeyModal.routedCodex.note')
   }
-  switch (props.platform) {
+  switch (effectivePlatform.value) {
     case 'openai':
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.note')
@@ -756,7 +770,7 @@ const currentFiles = computed((): FileConfig[] => {
   })()
 
   if (activeClientTab.value === 'opencode') {
-    switch (props.platform) {
+    switch (effectivePlatform.value) {
       case 'anthropic':
         return [generateOpenCodeConfig('anthropic', apiBase, apiKey)]
       case 'openai':
@@ -775,7 +789,7 @@ const currentFiles = computed((): FileConfig[] => {
     }
   }
 
-  switch (props.platform) {
+  switch (effectivePlatform.value) {
     case 'typesafe':
       return [generateSystemOneCurl(baseRoot, apiKey)]
     case 'openai':
@@ -798,9 +812,9 @@ const currentFiles = computed((): FileConfig[] => {
         return generateRoutedCodexFiles(apiBase, apiKey, 'antigravity')
       }
       if (activeClientTab.value === 'gemini') {
-        return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
+        return [generateGeminiCliContent(`${baseRoot}/antigravity`, apiKey)]
       }
-      return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
+      return generateAnthropicFiles(`${baseRoot}/antigravity`, apiKey)
     case 'grok':
       if (activeClientTab.value === 'claude') {
         return generateGrokClaudeFiles(baseRoot, apiKey)
@@ -825,10 +839,10 @@ const currentFiles = computed((): FileConfig[] => {
       }
       return generateAnthropicFiles(baseRoot, apiKey)
     default:
-      if (activeClientTab.value === 'codex' && props.platform) {
-        return generateRoutedCodexFiles(apiBase, apiKey, props.platform)
+      if (activeClientTab.value === 'codex' && effectivePlatform.value) {
+        return generateRoutedCodexFiles(apiBase, apiKey, effectivePlatform.value)
       }
-      return generateAnthropicFiles(baseUrl, apiKey)
+      return generateAnthropicFiles(baseRoot, apiKey)
   }
 })
 

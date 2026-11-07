@@ -895,6 +895,35 @@ func (s *UsageLogRepoSuite) TestGetUserDashboardStats() {
 	s.Require().Equal(int64(1), stats.TotalRequests)
 }
 
+func (s *UsageLogRepoSuite) TestGetUserDashboardStatsCombinedWindows() {
+	user := mustCreateUser(s.T(), s.client, &service.User{Email: "combined-dashboard@test.com"})
+	key := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-combined-dashboard", Name: "active"})
+	inactive := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-combined-inactive", Name: "inactive"})
+	s.Require().NoError(s.client.APIKey.UpdateOneID(inactive.ID).SetStatus("inactive").Exec(s.ctx))
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "combined-dashboard"})
+	s.createUsageLog(user, key, account, 10, 5, .5, timezone.Today().Add(-time.Hour))
+	s.createUsageLog(user, key, account, 20, 7, .7, timezone.Today().Add(time.Hour))
+	for i := 0; i < 6; i++ {
+		s.createUsageLog(user, key, account, 3, 2, .1, time.Now().Add(-time.Minute))
+	}
+	stats, err := s.repo.GetUserDashboardStats(s.ctx, user.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(int64(2), stats.TotalAPIKeys)
+	s.Require().Equal(int64(1), stats.ActiveAPIKeys)
+	s.Require().Equal(int64(8), stats.TotalRequests)
+	s.Require().Equal(int64(7), stats.TodayRequests)
+	s.Require().Equal(int64(72), stats.TotalTokens)
+	s.Require().Equal(int64(57), stats.TodayTokens)
+	s.Require().InDelta(1.8, stats.TotalActualCost, 1e-8)
+	s.Require().InDelta(1.3, stats.TodayActualCost, 1e-8)
+	s.Require().Equal(int64(1), stats.Rpm)
+	s.Require().Equal(int64(6), stats.Tpm)
+	ctx, cancel := context.WithCancel(s.ctx)
+	cancel()
+	_, err = s.repo.GetUserDashboardStats(ctx, user.ID)
+	s.Require().ErrorIs(err, context.Canceled)
+}
+
 // --- GetAccountTodayStats ---
 
 func (s *UsageLogRepoSuite) TestGetAccountTodayStats() {

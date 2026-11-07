@@ -2,6 +2,8 @@
 package response
 
 import (
+	"context"
+	"errors"
 	"log"
 	"math"
 	"net/http"
@@ -83,6 +85,13 @@ func ErrorWithDetails(c *gin.Context, statusCode int, message, reason string, me
 func ErrorFrom(c *gin.Context, err error) bool {
 	if err == nil {
 		return false
+	}
+	// PostgreSQL reports cancellation as pq 57014 rather than wrapping
+	// context.Canceled. Check the request itself; a disconnected dashboard
+	// viewer is not a database/server failure. Never hide a live-context error.
+	if c.Request != nil && errors.Is(c.Request.Context().Err(), context.Canceled) {
+		c.AbortWithStatus(499)
+		return true
 	}
 
 	statusCode, status := infraerrors.ToHTTP(err)
