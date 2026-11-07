@@ -42,6 +42,59 @@ func TestOpenAIStreamEventIsTerminalWithTypeMatchesExistingSemantics(t *testing.
 	}
 }
 
+func TestNormalizeOpenAIIncompleteDetails(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantChange bool
+		wantReason string
+	}{
+		{
+			name:       "event missing reason",
+			input:      `{"type":"response.incomplete","response":{"status":"incomplete"}}`,
+			wantChange: true,
+			wantReason: "max_output_tokens",
+		},
+		{
+			name:       "event null details",
+			input:      `{"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":null}}`,
+			wantChange: true,
+			wantReason: "max_output_tokens",
+		},
+		{
+			name:       "response object missing reason",
+			input:      `{"status":"incomplete"}`,
+			wantChange: true,
+			wantReason: "max_output_tokens",
+		},
+		{
+			name:       "preserve provider reason",
+			input:      `{"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"content_filter"}}}`,
+			wantChange: false,
+			wantReason: "content_filter",
+		},
+		{
+			name:       "completed unchanged",
+			input:      `{"type":"response.completed","response":{"status":"completed"}}`,
+			wantChange: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, changed := normalizeOpenAIIncompleteDetails([]byte(tt.input))
+			require.Equal(t, tt.wantChange, changed)
+			if tt.wantReason != "" {
+				path := "incomplete_details.reason"
+				if gjson.GetBytes([]byte(tt.input), "type").String() != "" {
+					path = "response." + path
+				}
+				require.Equal(t, tt.wantReason, gjson.GetBytes(got, path).String())
+			}
+		})
+	}
+}
+
 var (
 	benchmarkOpenAIResponseSSEEventTypeSink string
 	benchmarkOpenAIResponseSSETerminalSink  bool

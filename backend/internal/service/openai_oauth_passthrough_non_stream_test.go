@@ -134,6 +134,22 @@ func TestOpenAIGatewayService_OAuthStreamFalseIncompleteReturnsJSON(t *testing.T
 	}
 }
 
+func TestOpenAIGatewayService_OAuthStreamFalseIncompleteWithoutReasonGetsCompatibilityFallback(t *testing.T) {
+	malformed := strings.Replace(openAINonStreamIncompleteSSE,
+		`"incomplete_details":{"reason":"max_output_tokens"}`,
+		`"incomplete_details":null`, 1)
+	for _, passthrough := range []bool{true, false} {
+		rec, _, result := runOpenAIOAuthNonStreamRegression(t, passthrough,
+			`{"model":"gpt-5.4","instructions":"x","input":"hi","stream":false}`,
+			malformed)
+
+		require.False(t, result.Stream)
+		require.True(t, strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json"), "passthrough=%v Content-Type=%q", passthrough, rec.Header().Get("Content-Type"))
+		require.Equal(t, "incomplete", gjson.GetBytes(rec.Body.Bytes(), "status").String(), "passthrough=%v body=%s", passthrough, rec.Body.String())
+		require.Equal(t, "max_output_tokens", gjson.GetBytes(rec.Body.Bytes(), "incomplete_details.reason").String(), "passthrough=%v body=%s", passthrough, rec.Body.String())
+	}
+}
+
 func TestOpenAIGatewayService_OAuthStreamFalseCancelledReturnsJSON(t *testing.T) {
 	cancelledSSE := "event: response.cancelled\n" +
 		`data: {"type":"response.cancelled","response":{"id":"resp_7978","object":"response","status":"cancelled","output":[],"usage":{"input_tokens":5,"output_tokens":0,"total_tokens":5}}}` + "\n\n"

@@ -652,6 +652,11 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				line = "data: " + data
 				eventType = effectiveOpenAISSEEventType(dataBytes, eventType)
 			}
+			if normalizedData, normalized := normalizeOpenAIIncompleteDetails(dataBytes); normalized {
+				dataBytes = normalizedData
+				data = string(normalizedData)
+				line = "data: " + data
+			}
 			restoredData, restoreErr := restoreGrokResponsesClientToolPayload(c, dataBytes)
 			if restoreErr != nil {
 				streamEarlyErr = fmt.Errorf("restore Grok Responses client tool response: %w", restoreErr)
@@ -1762,6 +1767,11 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 	if !ok && terminalOK {
 		finalResponse, ok = extractOpenAINonCompletedTerminalResponse(terminalType, terminalPayload)
 	}
+	if ok {
+		if normalized, changed := normalizeOpenAIIncompleteDetails(finalResponse); changed {
+			finalResponse = normalized
+		}
+	}
 
 	usage := s.parseSSEUsageFromBody(bodyText)
 	if ok {
@@ -2022,6 +2032,49 @@ func extractOpenAINonCompletedTerminalResponse(terminalType string, payload []by
 		return []byte(response.Raw), true
 	}
 	return nil, false
+}
+
+// normalizeOpenAIIncompleteDetails repairs a malformed Responses terminal
+// event/response from OpenAI-compatible upstreams that mark the response as
+// incomplete but omit incomplete_details.reason. Strict clients (including
+// chatgpt-oauth-go) turn that omission into "reason: unknown" and surface it
+// as a protocol error. max_output_tokens is the only broadly compatible
+// fallback reason for an incomplete response; a provider that supplies a
+// concrete reason is left untouched.
+func normalizeOpenAIIncompleteDetails(data []byte) ([]byte, bool) {
+	if len(data) == 0 || !gjson.ValidBytes(data) {
+		return data, false
+	}
+	eventType := strings.TrimSpace(gjson.GetBytes(data, "type").String())
+	responsePath := "response"
+	statusPath := "response.status"
+	if eventType == "" {
+		responsePath = ""
+		statusPath = "status"
+	}
+	if eventType != "" {
+		if eventType != "response.incomplete" {
+			return data, false
+		}
+	} else if strings.TrimSpace(gjson.GetBytes(data, statusPath).String()) != "incomplete" {
+		return data, false
+	}
+	reasonPath := "incomplete_details.reason"
+	if responsePath != "" {
+		reasonPath = responsePath + "." + reasonPath
+	}
+	if strings.TrimSpace(gjson.GetBytes(data, reasonPath).String()) != "" {
+		return data, false
+	}
+	detailsPath := "incomplete_details"
+	if responsePath != "" {
+		detailsPath = responsePath + "." + detailsPath
+	}
+	updated, err := sjson.SetRawBytes(data, detailsPath, []byte(`{"reason":"max_output_tokens"}`))
+	if err != nil {
+		return data, false
+	}
+	return updated, true
 }
 
 func extractCodexFinalResponse(body string) ([]byte, bool) {
