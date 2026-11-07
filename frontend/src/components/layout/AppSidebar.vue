@@ -11,22 +11,31 @@
       <!-- Custom Logo or Default Logo -->
       <router-link
         :to="homePath"
-        class="sidebar-logo flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-glow transition-opacity hover:opacity-80"
+        class="sidebar-logo flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl shadow-glow transition-transform hover:scale-105"
         @click="handleMenuItemClick(homePath)"
       >
-        <img v-if="settingsLoaded" :src="siteLogo || '/logo.svg'" alt="Logo" class="h-full w-full object-contain" />
+        <img v-if="settingsLoaded" :src="siteLogo || '/sunworld-mark.svg'" alt="Logo" class="h-full w-full object-contain" />
       </router-link>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <router-link
           :to="homePath"
-          class="sidebar-brand-title text-lg font-bold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
+          class="sidebar-brand-title text-[15px] font-semibold tracking-tight text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400"
           @click="handleMenuItemClick(homePath)"
         >
           {{ siteName }}
         </router-link>
+        <p class="sidebar-brand-caption">AI ROUTING WORKSPACE</p>
         <!-- Version Badge -->
         <VersionBadge :version="siteVersion" />
       </div>
+    </div>
+
+    <div v-if="!sidebarCollapsed" class="sidebar-status mx-3 mb-3 rounded-2xl p-3">
+      <div class="flex items-center gap-2">
+        <span class="sidebar-status-dot"></span>
+        <span class="text-[11px] font-semibold uppercase tracking-[0.16em]">系统在线</span>
+      </div>
+      <p class="mt-1.5 text-xs leading-5 text-gray-500 dark:text-dark-400">{{ isAdmin ? '路由与渠道状态正常' : '你的模型工作区已就绪' }}</p>
     </div>
 
     <!-- Navigation -->

@@ -1,6 +1,15 @@
 <template>
   <AppLayout>
     <div class="sunworld-dashboard space-y-6">
+      <SunworldWorkspaceHero
+        eyebrow="SUNWORLD / PERSONAL"
+        title="模型工作台"
+        subtitle="把常用模型、API 密钥和用量数据放在一个清晰的工作区里。"
+        action-label="浏览模型广场"
+        action-path="/model-plaza"
+        status-label="路由状态"
+        status-detail="你的请求入口已准备就绪"
+      />
       <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
       <template v-else-if="stats">
         <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" :platform-quotas="platformQuotas" />
@@ -19,6 +28,7 @@ import { ref, computed, onMounted } from 'vue'; import { useAuthStore } from '@/
 import AppLayout from '@/components/layout/AppLayout.vue'; import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'; import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
 import UserDashboardRecentUsage from '@/components/user/dashboard/UserDashboardRecentUsage.vue'; import UserDashboardQuickActions from '@/components/user/dashboard/UserDashboardQuickActions.vue'
+import SunworldWorkspaceHero from '@/components/layout/SunworldWorkspaceHero.vue'
 import type { UsageLog, TrendDataPoint, ModelStat, PlatformQuotaItem } from '@/types'
 import { getMyPlatformQuotas } from '@/api/user'
 import { formatDateLocalInput } from '@/utils/format'

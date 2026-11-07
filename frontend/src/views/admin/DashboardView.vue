@@ -1,6 +1,15 @@
 <template>
   <AppLayout>
     <div class="sunworld-dashboard space-y-6">
+      <SunworldWorkspaceHero
+        eyebrow="SUNWORLD / CONTROL ROOM"
+        title="运营控制台"
+        subtitle="从渠道、用户到请求质量，在同一张工作台上掌握中转站状态。"
+        action-label="查看渠道管理"
+        action-path="/admin/accounts"
+        status-label="系统状态"
+        status-detail="服务节点与路由链路在线"
+      />
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <LoadingSpinner />
@@ -365,6 +374,7 @@ import type {
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
+import SunworldWorkspaceHero from '@/components/layout/SunworldWorkspaceHero.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'

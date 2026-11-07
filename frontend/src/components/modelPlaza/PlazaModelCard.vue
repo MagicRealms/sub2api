@@ -6,12 +6,12 @@
     data-test="plaza-model-card"
   >
     <div class="flex items-start gap-3">
-      <span class="plaza-provider grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ring-inset ring-black/5 dark:ring-white/10">
+      <span class="plaza-provider grid h-11 w-11 shrink-0 place-items-center rounded-2xl ring-1 ring-inset ring-black/5 dark:ring-white/10">
         <PlatformIcon :platform="entry.platform as GroupPlatform" size="md" />
       </span>
       <div class="min-w-0 flex-1">
         <p class="text-[11px] text-gray-500 dark:text-dark-400">{{ platformLabel(entry.platform) }}</p>
-        <h2 class="mt-0.5 break-all font-mono text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">{{ entry.name }}</h2>
+        <h2 class="mt-0.5 break-all text-[15px] font-semibold leading-6 text-gray-900 dark:text-gray-100">{{ entry.name }}</h2>
       </div>
       <button type="button" class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 focus-visible:outline-primary-500 dark:hover:bg-dark-700 dark:hover:text-primary-400" :aria-label="t('modelPlaza.cards.copyModel', { name: entry.name })" @click="copyToClipboard(entry.name)">
         <Icon :name="copied ? 'check' : 'copy'" size="sm" />
@@ -35,7 +35,7 @@
       <span class="ml-auto text-gray-500 dark:text-dark-400" data-test="model-rate">{{ t('modelPlaza.cards.effectiveRate') }} <strong class="font-semibold text-gray-700 dark:text-gray-200">{{ rate }}×</strong></span>
     </div>
 
-    <div class="flex flex-1 flex-col rounded-xl border border-[#e9f1ee] bg-[#f7fbf9] p-3.5 dark:border-dark-700 dark:bg-dark-900/50" aria-live="polite" aria-atomic="true">
+    <div class="plaza-price-panel flex flex-1 flex-col rounded-2xl border p-3.5" aria-live="polite" aria-atomic="true">
       <p class="mb-3 text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.basePrice') }}<span v-if="tokenBilling" class="float-right">{{ t('modelPlaza.table.unitPerMillion') }}</span></p>
       <dl v-if="tokenBilling" class="grid grid-cols-2 gap-3">
         <div><dt class="text-[11px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.input') }}</dt><dd class="mt-1 break-all font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-input-price">{{ tokenPrice(tokenPrices?.input_price) }}</dd></div>

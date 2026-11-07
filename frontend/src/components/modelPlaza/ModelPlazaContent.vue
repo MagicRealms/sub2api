@@ -1,15 +1,15 @@
 <template>
   <div class="space-y-5">
-    <div class="sunworld-panel relative overflow-hidden px-5 py-6 sm:px-7">
+    <div class="sunworld-catalog-hero relative overflow-hidden px-5 py-6 sm:px-7">
       <div class="relative flex flex-wrap items-center justify-between gap-6">
         <div>
-          <div class="sunworld-kicker mb-2 flex items-center gap-2"><Icon name="grid" size="sm" />MODEL CATALOG</div>
-          <h1 v-if="!embedded" class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
-          <p :class="!embedded ? 'mt-2' : ''" class="text-sm leading-6 text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.intro') }}</p>
+          <div class="sunworld-catalog-eyebrow"><span class="sunworld-catalog-eyebrow-icon"><Icon name="grid" size="sm" /></span>MODEL CATALOG</div>
+          <h1 v-if="!embedded" class="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
+          <p :class="!embedded ? 'mt-2' : ''" class="max-w-2xl text-sm leading-6 text-white/70">{{ t('modelPlaza.cards.intro') }}</p>
         </div>
-        <dl v-if="response && !loading" class="flex gap-6 sm:gap-8" data-test="plaza-summary">
-          <div><dt class="text-xs text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.groups') }}</dt><dd class="mt-1 text-2xl font-semibold tabular-nums text-gray-900 dark:text-white">{{ response.groups.length }}</dd></div>
-          <div class="border-l border-gray-200 pl-6 dark:border-dark-700 sm:pl-8"><dt class="text-xs text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.uniqueModels') }}</dt><dd class="mt-1 text-2xl font-semibold tabular-nums text-gray-900 dark:text-white">{{ uniqueModelCount }}</dd></div>
+        <dl v-if="response && !loading" class="sunworld-catalog-summary" data-test="plaza-summary">
+          <div><dt>{{ t('modelPlaza.cards.groups') }}</dt><dd>{{ response.groups.length }}</dd></div>
+          <div><dt>{{ t('modelPlaza.cards.uniqueModels') }}</dt><dd>{{ uniqueModelCount }}</dd></div>
         </dl>
       </div>
     </div>
@@ -58,7 +58,7 @@
         @update:search="searchQuery = $event"
       />
 
-      <div v-if="modelEntries.length > 0" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div v-if="modelEntries.length > 0" class="sunworld-model-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <PlazaModelCard v-for="entry in modelEntries" :key="entry.key" :entry="entry" @open="detail = $event" />
       </div>
       <div

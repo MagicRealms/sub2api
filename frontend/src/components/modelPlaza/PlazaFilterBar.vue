@@ -1,5 +1,5 @@
 <template>
-  <div class="sunworld-panel space-y-3 p-3.5 sm:p-4">
+  <div class="sunworld-catalog-filter space-y-3 p-3.5 sm:p-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       <div class="relative min-w-0 flex-1 sm:min-w-[200px]">
         <Icon name="search" size="sm" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-dark-500" />

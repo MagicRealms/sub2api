@@ -541,17 +541,18 @@
   /* ============ 侧边栏 ============ */
   .sidebar {
     @apply fixed inset-y-0 left-0 z-40;
-    @apply w-64 bg-white/95 dark:bg-[#111f28];
-    @apply border-r border-[#deebe6] dark:border-[#243b44];
+    @apply w-64 bg-white/90 dark:bg-[#101e27];
+    @apply border-r border-[#dcece5] dark:border-[#29434a];
     @apply flex flex-col;
     @apply transition-transform duration-300;
+    box-shadow: 16px 0 36px rgba(27, 79, 68, 0.045);
     transition-property: width, transform;
   }
 
   .sidebar-header {
-    @apply h-16 px-6;
+    @apply h-[4.5rem] px-5;
     @apply flex items-center gap-3;
-    @apply border-b border-gray-100 dark:border-dark-800;
+    @apply border-b border-[#e5f0ec] dark:border-[#243b44];
     transition:
       padding 0.2s ease,
       gap 0.2s ease;
@@ -567,16 +568,17 @@
     @apply text-sm font-medium;
     @apply text-gray-600 dark:text-dark-300;
     @apply transition-all duration-200;
-    @apply hover:bg-gray-100 dark:hover:bg-dark-800;
+    @apply hover:bg-[#edf8f3] dark:hover:bg-[#172f35];
     @apply hover:text-gray-900 dark:hover:text-white;
     padding-left: 1.0625rem;
     padding-right: 0.875rem;
   }
 
   .sidebar-link-active {
-    @apply bg-primary-50 dark:bg-primary-900/25;
+    @apply bg-[#e3f7ee] dark:bg-primary-900/30;
     @apply text-primary-600 dark:text-primary-400;
-    @apply hover:bg-primary-100 dark:hover:bg-primary-900/30;
+    @apply hover:bg-[#d9f2e8] dark:hover:bg-primary-900/40;
+    box-shadow: inset 3px 0 0 #36a894;
   }
 
   .sidebar-section {
@@ -604,6 +606,8 @@
 
   /* Shared visual language for the refreshed dashboard and catalog. */
   .sunworld-shell {
+    position: relative;
+    isolation: isolate;
     background-color: #f6faf8;
     background-image: linear-gradient(135deg, rgba(54, 168, 148, 0.08), transparent 34%), linear-gradient(315deg, rgba(242, 184, 75, 0.06), transparent 44%);
   }
@@ -611,6 +615,44 @@
   .dark .sunworld-shell {
     background-color: #101c25;
     background-image: linear-gradient(135deg, rgba(54, 168, 148, 0.1), transparent 36%), linear-gradient(315deg, rgba(242, 184, 75, 0.05), transparent 48%);
+  }
+
+  .sunworld-ambient {
+    @apply pointer-events-none fixed inset-0 overflow-hidden;
+    z-index: -1;
+  }
+
+  .sunworld-ambient-sun {
+    position: absolute;
+    top: -12rem;
+    right: 8%;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 210, 130, 0.2), rgba(255, 210, 130, 0) 68%);
+    filter: blur(4px);
+  }
+
+  .dark .sunworld-ambient-sun {
+    background: radial-gradient(circle, rgba(65, 176, 160, 0.16), rgba(65, 176, 160, 0) 68%);
+  }
+
+  .sunworld-ambient-grid {
+    position: absolute;
+    inset: 0;
+    opacity: 0.42;
+    background-image: linear-gradient(rgba(31, 111, 101, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(31, 111, 101, 0.045) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+  }
+
+  .dark .sunworld-ambient-grid {
+    opacity: 0.2;
+    background-image: linear-gradient(rgba(125, 206, 188, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(125, 206, 188, 0.08) 1px, transparent 1px);
+  }
+
+  .sunworld-main {
+    min-height: calc(100vh - 4rem);
   }
 
   .sunworld-panel {
@@ -621,11 +663,34 @@
   .sunworld-header {
     background-color: rgba(255, 255, 255, 0.78);
     border-color: rgba(216, 235, 228, 0.78) !important;
+    box-shadow: 0 10px 30px rgba(25, 78, 67, 0.04);
   }
 
   .dark .sunworld-header {
     background-color: rgba(17, 31, 40, 0.82);
     border-color: rgba(53, 79, 88, 0.78) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  }
+
+  .sunworld-live-pill {
+    color: #1f6f65;
+    border: 1px solid rgba(54, 168, 148, 0.2);
+    background: rgba(228, 248, 238, 0.72);
+  }
+
+  .dark .sunworld-live-pill {
+    color: #9be3cc;
+    border-color: rgba(95, 192, 174, 0.24);
+    background: rgba(35, 77, 75, 0.56);
+  }
+
+  .sunworld-live-dot {
+    display: block;
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 999px;
+    background: #36a894;
+    box-shadow: 0 0 0 3px rgba(54, 168, 148, 0.15);
   }
 
   .dark .sunworld-panel {
@@ -638,6 +703,260 @@
 
   .sunworld-stat-card {
     @apply card relative min-w-0 overflow-hidden p-4;
+  }
+
+  .sunworld-stat-block .sunworld-metric-grid > .card {
+    position: relative;
+    min-height: 7.25rem;
+    border-color: rgba(213, 232, 224, 0.92);
+    padding: 1.2rem;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .dark .sunworld-stat-block .sunworld-metric-grid > .card {
+    border-color: rgba(53, 79, 88, 0.88);
+    background: rgba(23, 40, 50, 0.82);
+  }
+
+  .sunworld-stat-block .sunworld-metric-grid > .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 1.2rem;
+    right: 1.2rem;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #36a894, #f2b84b);
+    opacity: 0.5;
+  }
+
+  .sunworld-stat-block .sunworld-metric-grid > .card > div {
+    height: 100%;
+    align-items: flex-start;
+  }
+
+  .sunworld-stat-block .sunworld-metric-grid > .card [class*='rounded-lg'][class*='p-2'] {
+    display: flex;
+    height: 2.65rem;
+    width: 2.65rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(54, 168, 148, 0.14);
+    border-radius: 0.9rem;
+    background: #e7f7ee;
+  }
+
+  .dark .sunworld-stat-block .sunworld-metric-grid > .card [class*='rounded-lg'][class*='p-2'] {
+    border-color: rgba(95, 192, 174, 0.2);
+    background: rgba(41, 94, 85, 0.34);
+  }
+
+  .sunworld-platform-breakdown {
+    border-color: rgba(213, 232, 224, 0.92);
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .dark .sunworld-platform-breakdown {
+    border-color: rgba(53, 79, 88, 0.88);
+    background: rgba(23, 40, 50, 0.82);
+  }
+
+  .sunworld-hero {
+    position: relative;
+    display: flex;
+    min-height: 15.5rem;
+    overflow: hidden;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: 2rem 2.25rem;
+    border: 1px solid rgba(86, 183, 158, 0.28);
+    border-radius: 1.75rem;
+    color: #f7fffb;
+    background:
+      radial-gradient(circle at 78% 30%, rgba(250, 211, 139, 0.34), transparent 24%),
+      linear-gradient(115deg, #123a3b 0%, #1b5e58 48%, #2e8771 100%);
+    box-shadow: 0 20px 50px rgba(28, 96, 83, 0.18);
+  }
+
+  .sunworld-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.16;
+    background-image: linear-gradient(115deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px), linear-gradient(25deg, rgba(255, 255, 255, 0.16) 1px, transparent 1px);
+    background-size: 34px 34px, 46px 46px;
+    mask-image: linear-gradient(105deg, black, transparent 72%);
+  }
+
+  .dark .sunworld-hero {
+    border-color: rgba(113, 226, 193, 0.28);
+    background:
+      radial-gradient(circle at 80% 28%, rgba(250, 202, 115, 0.22), transparent 24%),
+      linear-gradient(115deg, #0d282f 0%, #153f43 48%, #1e675f 100%);
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.23);
+  }
+
+  .sunworld-hero-copy,
+  .sunworld-hero-metrics {
+    position: relative;
+    z-index: 1;
+  }
+
+  .sunworld-hero-copy {
+    display: flex;
+    max-width: 40rem;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .sunworld-hero-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: rgba(223, 255, 242, 0.72);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+  }
+
+  .sunworld-hero-mark {
+    display: inline-flex;
+    height: 1.65rem;
+    width: 1.65rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 240, 191, 0.48);
+    border-radius: 0.6rem;
+    color: #ffe9ae;
+    background: rgba(255, 226, 158, 0.12);
+  }
+
+  .sunworld-hero-title {
+    margin-top: 1.1rem;
+    font-size: 2.4rem;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+
+  .sunworld-hero-subtitle {
+    max-width: 34rem;
+    margin-top: 0.85rem;
+    color: rgba(235, 255, 247, 0.74);
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .sunworld-hero-action {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 0.55rem;
+    margin-top: 1.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    padding: 0.65rem 0.95rem 0.65rem 1.05rem;
+    color: #173c3b;
+    background: #f9e2aa;
+    font-size: 0.78rem;
+    font-weight: 700;
+    box-shadow: 0 8px 18px rgba(5, 49, 43, 0.18);
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+
+  .sunworld-hero-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(5, 49, 43, 0.26);
+  }
+
+  .sunworld-hero-metrics {
+    display: flex;
+    min-width: 13.5rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .sunworld-hero-orbit {
+    position: relative;
+    height: 8rem;
+    width: 8rem;
+  }
+
+  .sunworld-hero-orbit-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(240, 226, 176, 0.35);
+    border-radius: 999px;
+    transform: rotate(28deg) scaleY(0.42);
+  }
+
+  .sunworld-hero-orbit-ring-two {
+    transform: rotate(-28deg) scaleY(0.42);
+    border-color: rgba(174, 239, 211, 0.35);
+  }
+
+  .sunworld-hero-orbit-core {
+    position: absolute;
+    inset: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 235, 179, 0.55);
+    border-radius: 999px;
+    color: #fff0bf;
+    background: radial-gradient(circle at 35% 25%, #ffe8aa, #e59b66);
+    box-shadow: 0 0 36px rgba(255, 209, 126, 0.36);
+  }
+
+  .sunworld-hero-status {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    max-width: 13rem;
+    border-top: 1px solid rgba(225, 255, 243, 0.22);
+    padding-top: 0.8rem;
+  }
+
+  .sunworld-hero-status-dot {
+    display: block;
+    height: 0.55rem;
+    width: 0.55rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #9ce9c8;
+    box-shadow: 0 0 0 4px rgba(156, 233, 200, 0.14);
+  }
+
+  .sunworld-hero-status-label {
+    color: rgba(237, 255, 247, 0.92);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .sunworld-hero-status-detail {
+    margin-top: 0.18rem;
+    color: rgba(224, 252, 241, 0.62);
+    font-size: 0.68rem;
+  }
+
+  @media (max-width: 640px) {
+    .sunworld-hero {
+      min-height: 0;
+      padding: 1.45rem;
+    }
+
+    .sunworld-hero-metrics {
+      display: none;
+    }
+
+    .sunworld-hero-title {
+      font-size: 2rem;
+    }
   }
 
   .sunworld-stat-card::after {
@@ -668,6 +987,189 @@
 
   .sunworld-chart-card {
     @apply card relative overflow-hidden p-4 sm:p-5;
+  }
+
+  .sunworld-catalog-hero {
+    border: 1px solid rgba(92, 188, 160, 0.26);
+    border-radius: 1.75rem;
+    background:
+      radial-gradient(circle at 84% 20%, rgba(255, 218, 149, 0.3), transparent 24%),
+      linear-gradient(120deg, #123a3c, #216a62 58%, #3c9b7e);
+    box-shadow: 0 18px 42px rgba(27, 89, 77, 0.14);
+  }
+
+  .sunworld-catalog-hero::after {
+    content: '';
+    position: absolute;
+    right: -4rem;
+    bottom: -7rem;
+    height: 18rem;
+    width: 18rem;
+    border: 1px solid rgba(255, 238, 184, 0.2);
+    border-radius: 999px;
+    box-shadow: 0 0 0 24px rgba(255, 238, 184, 0.04), 0 0 0 48px rgba(255, 238, 184, 0.035);
+  }
+
+  .dark .sunworld-catalog-hero {
+    border-color: rgba(103, 219, 190, 0.22);
+    background:
+      radial-gradient(circle at 84% 20%, rgba(255, 209, 128, 0.2), transparent 24%),
+      linear-gradient(120deg, #0d282f, #164c4d 58%, #237565);
+  }
+
+  .sunworld-catalog-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: rgba(225, 255, 244, 0.72);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+  }
+
+  .sunworld-catalog-eyebrow-icon {
+    display: inline-flex;
+    height: 1.65rem;
+    width: 1.65rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 239, 185, 0.38);
+    border-radius: 0.6rem;
+    color: #ffe9ae;
+    background: rgba(255, 226, 158, 0.12);
+  }
+
+  .sunworld-catalog-summary {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 2rem;
+  }
+
+  .sunworld-catalog-summary > div + div {
+    border-left: 1px solid rgba(226, 255, 244, 0.22);
+    padding-left: 2rem;
+  }
+
+  .sunworld-catalog-summary dt {
+    color: rgba(224, 255, 243, 0.62);
+    font-size: 0.68rem;
+  }
+
+  .sunworld-catalog-summary dd {
+    margin-top: 0.35rem;
+    color: #fff3c9;
+    font-size: 1.85rem;
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  .sunworld-catalog-filter {
+    border: 1px solid rgba(205, 229, 219, 0.94);
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 8px 24px rgba(31, 91, 77, 0.04);
+  }
+
+  .dark .sunworld-catalog-filter {
+    border-color: rgba(53, 79, 88, 0.88);
+    background: rgba(23, 40, 50, 0.78);
+  }
+
+  .plaza-model-card {
+    border: 1px solid rgba(205, 229, 219, 0.94);
+    border-radius: 1.35rem;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 10px 26px rgba(31, 91, 77, 0.055);
+  }
+
+  .dark .plaza-model-card {
+    border-color: rgba(53, 79, 88, 0.88);
+    background: rgba(23, 40, 50, 0.82);
+  }
+
+  .plaza-model-card:hover {
+    border-color: rgba(54, 168, 148, 0.5);
+    box-shadow: 0 18px 36px rgba(31, 111, 101, 0.12);
+  }
+
+  .plaza-price-panel {
+    border-color: rgba(209, 232, 221, 0.9);
+    background: linear-gradient(135deg, rgba(242, 252, 247, 0.95), rgba(255, 250, 236, 0.82));
+  }
+
+  .dark .plaza-price-panel {
+    border-color: rgba(53, 79, 88, 0.9);
+    background: linear-gradient(135deg, rgba(21, 51, 56, 0.86), rgba(48, 48, 38, 0.52));
+  }
+
+  .sunworld-work-card {
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.76);
+  }
+
+  .dark .sunworld-work-card {
+    background: rgba(23, 40, 50, 0.82);
+  }
+
+  .sunworld-work-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(216, 235, 228, 0.8);
+    padding: 1.15rem 1.35rem;
+  }
+
+  .dark .sunworld-work-card-header {
+    border-color: rgba(53, 79, 88, 0.8);
+  }
+
+  .sunworld-action-row,
+  .sunworld-usage-row {
+    border: 1px solid rgba(219, 235, 228, 0.88);
+    background: rgba(247, 252, 249, 0.8);
+  }
+
+  .sunworld-action-row:hover,
+  .sunworld-usage-row:hover {
+    border-color: rgba(54, 168, 148, 0.35);
+    background: rgba(232, 248, 239, 0.92);
+    transform: translateY(-1px);
+  }
+
+  .dark .sunworld-action-row,
+  .dark .sunworld-usage-row {
+    border-color: rgba(53, 79, 88, 0.78);
+    background: rgba(16, 36, 44, 0.62);
+  }
+
+  .dark .sunworld-action-row:hover,
+  .dark .sunworld-usage-row:hover {
+    border-color: rgba(95, 192, 174, 0.34);
+    background: rgba(31, 68, 68, 0.54);
+  }
+
+  .sidebar-brand-caption {
+    @apply mt-0.5 text-[9px] font-semibold tracking-[0.16em] text-primary-600/70 dark:text-primary-300/70;
+  }
+
+  .sidebar-status {
+    border: 1px solid rgba(95, 192, 174, 0.22);
+    background: linear-gradient(135deg, rgba(228, 248, 238, 0.9), rgba(255, 249, 232, 0.74));
+  }
+
+  .dark .sidebar-status {
+    border-color: rgba(95, 192, 174, 0.22);
+    background: linear-gradient(135deg, rgba(25, 63, 63, 0.9), rgba(57, 54, 38, 0.56));
+  }
+
+  .sidebar-status-dot {
+    display: block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: #35b88f;
+    box-shadow: 0 0 0 4px rgba(53, 184, 143, 0.14), 0 0 14px rgba(53, 184, 143, 0.45);
   }
 
   .sunworld-table-row {

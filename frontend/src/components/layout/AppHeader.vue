@@ -1,6 +1,6 @@
 <template>
   <header class="sunworld-header glass sticky top-0 z-30 border-b border-gray-200/50 dark:border-dark-700/50">
-    <div class="flex h-16 items-center justify-between gap-2 px-2 sm:px-4 md:px-6">
+    <div class="flex h-[4.5rem] items-center justify-between gap-3 px-2 sm:px-5 md:px-7">
       <!-- Left: Mobile Menu Toggle + Page Title -->
       <div class="flex shrink-0 items-center gap-2 sm:gap-4">
         <button
@@ -12,17 +12,26 @@
         </button>
 
         <div class="hidden lg:block">
-          <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
+          <div class="mb-0.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-600/80 dark:text-primary-300/80">
+            <span>太阳新世界</span>
+            <span class="text-gray-300 dark:text-dark-600">/</span>
+            <span>WORKSPACE</span>
+          </div>
+          <h1 class="text-[17px] font-semibold tracking-tight text-gray-900 dark:text-white">
             {{ pageTitle }}
           </h1>
-          <p v-if="pageDescription" class="text-xs text-gray-500 dark:text-dark-400">
+          <p v-if="pageDescription" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
             {{ pageDescription }}
           </p>
         </div>
       </div>
 
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
-      <div class="flex min-w-0 items-center gap-1 sm:gap-3">
+      <div class="flex min-w-0 items-center gap-1.5 sm:gap-3">
+        <div class="sunworld-live-pill hidden items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex">
+          <span class="sunworld-live-dot"></span>
+          <span>ROUTING LIVE</span>
+        </div>
         <!-- Announcement Bell -->
         <AnnouncementBell v-if="user" />
 

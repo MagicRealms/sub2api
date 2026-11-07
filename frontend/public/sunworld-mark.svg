@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">太阳新世界</title>
+  <desc id="desc">A warm sun mark with a calm teal horizon.</desc>
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="86" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#133b3d"/>
+      <stop offset="1" stop-color="#0b202b"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="27" y1="23" x2="68" y2="68" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffe5a5"/>
+      <stop offset="1" stop-color="#f0a96f"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="28" fill="url(#bg)"/>
+  <circle cx="48" cy="42" r="20" fill="url(#sun)"/>
+  <g fill="none" stroke="#b6f0d8" stroke-linecap="round" stroke-width="4">
+    <path d="M48 12v8M48 64v8M18 42h8M70 42h8M27 21l6 6M63 57l6 6M69 21l-6 6M33 57l-6 6"/>
+  </g>
+  <path d="M15 75c10-7 20-7 30 0s20 7 36 0" fill="none" stroke="#72d8c4" stroke-linecap="round" stroke-width="4"/>
+  <path d="M18 82c9-4 18-4 27 0s18 4 33 0" fill="none" stroke="#f7c77e" stroke-linecap="round" stroke-opacity=".76" stroke-width="3"/>
+</svg>
