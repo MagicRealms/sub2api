@@ -76,7 +76,7 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 			c.Request.Body = pkghttputil.NewPrereadBody(body)
 			models := requestmodel.FromBodyCandidates(path, c.Request.Header.Get("Content-Type"), body)
 			for _, candidate := range models {
-				if len(models) > 0 && !strings.EqualFold(candidate, models[0]) {
+				if len(models) > 0 && candidate != models[0] {
 					c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": "Ambiguous model fields are not allowed for ordered group routing"}})
 					return
 				}

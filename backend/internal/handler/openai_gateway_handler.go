@@ -269,6 +269,10 @@ func wrapUsageRecordTaskContext(parent context.Context, task service.UsageRecord
 	}
 	done := func() {}
 	if parent != nil {
+		// Mark synchronously, before handing work to a detached worker context.
+		// Even a partial result with no visible output must not be billed twice
+		// by a later ordered-group retry while this bill is still queued.
+		service.MarkAPIKeyGroupRouteBilled(parent)
 		done = service.InflightReservationFromContext(parent).Acquire()
 	}
 	requestContext := usageRecordContext(parent, context.Background())
