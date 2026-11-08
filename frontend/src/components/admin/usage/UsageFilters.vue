@@ -1,5 +1,5 @@
 <template>
-  <div :class="flat ? 'p-4 sm:p-6' : 'card p-6'">
+  <div :class="[flat ? 'p-4 sm:p-6' : 'card p-6', { 'sw-admin-filters': compact }]">
     <!-- Toolbar: left filters (multi-line) + right actions -->
     <div class="flex flex-wrap items-end justify-between gap-4">
       <!-- Left: filters (allowed to wrap to multiple rows) -->
@@ -85,7 +85,7 @@
         </div>
 
         <!-- Account Filter -->
-        <div ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]">
+        <div v-show="!compact || expanded || mode !== 'usage'" ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]">
           <label class="input-label">{{ t('admin.usage.account') }}</label>
           <input
             v-model="accountKeyword"
@@ -122,30 +122,30 @@
         </div>
 
         <!-- Request Type Filter (usage only) -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode !== 'errors'" v-show="!compact || expanded" class="w-full sm:w-auto sm:min-w-[180px]">
           <label class="input-label">{{ t('usage.type') }}</label>
           <Select v-model="filters.request_type" :options="requestTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Native compaction is independent of the transport request type. -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[180px]">
+        <div v-if="mode !== 'errors'" v-show="!compact || expanded" class="w-full sm:w-auto sm:min-w-[180px]">
           <label class="input-label">{{ t('usage.compactionFilter') }}</label>
           <Select v-model="filters.native_compaction_v2" :options="compactionOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Type Filter (usage only) -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[200px]">
+        <div v-if="mode !== 'errors'" v-show="!compact || expanded" class="w-full sm:w-auto sm:min-w-[200px]">
           <label class="input-label">{{ t('admin.usage.billingType') }}</label>
           <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="emitChange" />
         </div>
 
         <!-- Billing Mode Filter (usage only；用户排行的 user-breakdown 接口不支持该维度) -->
-        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[200px]">
+        <div v-if="mode === 'usage'" v-show="!compact || expanded" class="w-full sm:w-auto sm:min-w-[200px]">
           <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
           <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="emitChange" />
         </div>
 
-        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[220px]">
+        <div v-if="mode === 'usage'" v-show="!compact || expanded" class="w-full sm:w-auto sm:min-w-[220px]">
           <label class="input-label">{{ t('admin.usage.upstreamModelAudit') }}</label>
           <Select v-model="filters.upstream_model_mismatch" :options="upstreamModelMismatchOptions" @change="emitChange" />
         </div>
@@ -175,6 +175,8 @@
         </div>
 
       </div>
+
+      <button v-if="compact && mode === 'usage'" type="button" class="btn btn-secondary" :aria-expanded="expanded" @click="expanded = !expanded">{{ t(expanded ? 'workspace.lessFilters' : 'workspace.moreFilters') }}</button>
 
       <!-- Right: actions -->
       <div v-if="showActions" class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
@@ -209,6 +211,7 @@ import type { SimpleApiKey, SimpleUser } from '@/api/admin/usage'
 type ModelValue = Record<string, any>
 
 interface Props {
+  compact?: boolean
   modelValue: ModelValue
   exporting: boolean
   startDate: string
@@ -224,7 +227,9 @@ interface Props {
   flat?: boolean
 }
 
+const expanded = ref(false)
 const props = withDefaults(defineProps<Props>(), {
+  compact: false,
   showActions: true,
   mode: 'usage',
   flat: false

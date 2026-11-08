@@ -166,7 +166,11 @@
           </div>
           <!-- Token 请求 -->
           <div v-else class="flex items-center gap-1.5">
-            <div class="space-y-1 text-sm">
+            <div v-if="compact" class="space-y-1 text-xs">
+              <strong class="font-medium tabular-nums text-gray-900 dark:text-white">{{ formatTokenMillions((row.input_tokens || 0) + (row.output_tokens || 0) + (row.cache_read_tokens || 0) + (row.cache_creation_tokens || 0)) }}</strong>
+              <p class="text-[10px] text-gray-400">{{ t('usage.in') }} {{ formatTokenMillions(row.input_tokens || 0) }} · {{ t('usage.out') }} {{ formatTokenMillions(row.output_tokens || 0) }}</p>
+            </div>
+            <div v-else class="space-y-1 text-sm">
               <div class="flex items-center gap-2">
                 <div class="inline-flex items-center gap-1">
                   <Icon name="arrowDown" size="sm" class="h-3.5 w-3.5 text-emerald-500" />
@@ -551,6 +555,7 @@ import { useAppStore } from '@/stores/app'
 import { formatDateTime, formatReasoningEffort, reasoningEffortValuesEqual } from '@/utils/format'
 import { formatCacheTokens, formatMultiplier } from '@/utils/formatters'
 import { formatTokenPricePerMillion } from '@/utils/usagePricing'
+import { formatTokenMillions } from '@/utils/workspace'
 import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 import { resolveUsageRequestType } from '@/utils/usageRequestType'
 import {
@@ -601,6 +606,7 @@ import type { AdminUsageLog } from '@/types'
 import type { Column } from '@/components/common/types'
 
 interface Props {
+  compact?: boolean
   data: AdminUsageLog[]
   loading?: boolean
   columns: Column[]

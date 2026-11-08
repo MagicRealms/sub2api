@@ -1,6 +1,6 @@
 <template>
-  <div class="card p-4">
-    <div class="mb-4 flex items-center justify-between gap-3">
+  <div class="card p-4" :class="{ 'sw-chart-panel': compact }">
+    <div class="mb-4 flex items-center justify-between gap-3" :class="{ 'sw-section-head': compact }">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
         {{ t('admin.dashboard.groupDistribution') }}
       </h3>
@@ -33,6 +33,9 @@
     <div v-if="loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
     </div>
+    <DistributionSummary v-else-if="compact && displayGroupStats.length" :items="displayGroupStats.map(g => ({ key: g.group_id, label: g.group_name || t('admin.dashboard.noGroup'), value: toFiniteNumber(metric === 'tokens' ? g.total_tokens : g.actual_cost) }))" :metric="metric" :interactive="enableBreakdown" @select="id => Number(id) > 0 && toggleBreakdown('group', id)">
+      <template #default="{ item }"><UserBreakdownSubTable v-if="enableBreakdown && expandedKey === `group-${item.key}`" :items="breakdownItems" :loading="breakdownLoading" :show-account-cost="showAccountCost" /></template>
+    </DistributionSummary>
     <div v-else-if="displayGroupStats.length > 0 && chartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
       <div class="h-48 w-48 shrink-0">
         <Doughnut :data="chartData" :options="doughnutOptions" />
@@ -112,6 +115,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'vue-chartjs'
+import DistributionSummary from '@/components/workspace/DistributionSummary.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { GroupStat, UserBreakdownItem } from '@/types'
@@ -125,6 +129,7 @@ type DistributionMetric = 'tokens' | 'actual_cost'
 
 const props = withDefaults(defineProps<{
   groupStats: GroupStat[]
+  compact?: boolean
   loading?: boolean
   metric?: DistributionMetric
   showMetricToggle?: boolean
@@ -134,6 +139,7 @@ const props = withDefaults(defineProps<{
   endDate?: string
   filters?: Record<string, any>
 }>(), {
+  compact: false,
   loading: false,
   metric: 'tokens',
   showMetricToggle: false,

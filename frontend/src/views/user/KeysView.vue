@@ -1,5 +1,15 @@
 <template>
   <AppLayout>
+    <div class="sw-page sw-keys-page">
+      <div class="sw-page-heading"><div><div class="sw-page-kicker">ACCESS / KEYS</div><h1>{{ t('keys.title') }}</h1><p>一把密钥，连接你的模型与灵感。管理权限、分组和用量。</p></div></div>
+      <section class="sw-api-connect" aria-label="推荐 API 地址">
+        <div><div class="sw-page-kicker">QUICK / CONNECT</div><h2>使用 API 密钥，连接你的客户端</h2><p>复制对应协议的地址，在客户端填入本站密钥。多分组 Key 仍按你设置的顺序自动路由。</p><div class="sw-api-badges"><span>OpenAI Compatible</span><span>Claude Code / Anthropic</span><span>一个 Key · 多组路由</span></div></div>
+        <div class="sw-api-addresses">
+          <div class="sw-api-address"><WorkspaceIcon name="channels" /><div><label>OpenAI · 推荐 API 地址</label><code :title="recommendedEndpoint">{{ recommendedEndpoint }}</code></div><button type="button" class="btn btn-secondary" :aria-label="recommendedEndpointCopied ? '已复制' : '复制 OpenAI 地址'" @click="copyRecommendedEndpoint"><Icon :name="recommendedEndpointCopied ? 'check' : 'clipboard'" size="sm" /></button></div>
+          <div class="sw-api-address"><WorkspaceIcon name="models" /><div><label>Anthropic / Claude Code · 根地址</label><code :title="recommendedRootEndpoint">{{ recommendedRootEndpoint }}</code></div><button type="button" class="btn btn-secondary" :aria-label="rootEndpointCopied ? '已复制' : '复制 Anthropic 地址'" @click="copyRootEndpoint"><Icon :name="rootEndpointCopied ? 'check' : 'clipboard'" size="sm" /></button></div>
+          <EndpointPopover v-if="(publicSettings?.custom_endpoints?.length ?? 0) > 0" :api-base-url="recommendedRootEndpoint" :custom-endpoints="publicSettings?.custom_endpoints || []" />
+        </div>
+      </section>
     <TablePageLayout>
       <template #filters>
         <div class="flex flex-col gap-3">
@@ -23,31 +33,6 @@
               @update:model-value="onStatusFilterChange"
             />
           </div>
-          <section v-if="publicSettings?.api_base_url || appStore.apiBaseUrl" class="console-api-panel" aria-label="推荐 API 地址">
-            <div class="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="min-w-0">
-                <p class="sunworld-kicker">API CONNECTION</p>
-                <h2 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">推荐 API 地址</h2>
-                <p class="mt-1 text-xs leading-5 text-gray-600 dark:text-dark-300">将下面地址填入兼容 OpenAI 的客户端，再选择对应 API Key 即可使用。</p>
-              </div>
-              <div class="flex min-w-0 items-center gap-2">
-                <code class="console-api-code max-w-[min(70vw,30rem)] truncate" :title="recommendedEndpoint">{{ recommendedEndpoint }}</code>
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm shrink-0"
-                  :title="recommendedEndpointCopied ? '已复制' : '复制 API 地址'"
-                  @click="copyRecommendedEndpoint"
-                >
-                  <Icon :name="recommendedEndpointCopied ? 'check' : 'clipboard'" size="sm" />
-                </button>
-              </div>
-            </div>
-          </section>
-          <EndpointPopover
-            v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
-            :api-base-url="publicSettings?.api_base_url || ''"
-            :custom-endpoints="publicSettings?.custom_endpoints || []"
-          />
           <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">
               {{ t('keys.bulkEdit.selectedCount', { count: selectedIds.length }) }}
@@ -182,11 +167,12 @@
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                 :title="t('keys.clickToChangeGroup')"
               >
-                <span v-if="keyRouteIDs(row).length" class="flex min-w-0 max-w-[min(70vw,26rem)] items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-hide" :title="keyRouteIDs(row).map((id, index) => `${index + 1}. ${groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)}`).join(' → ')">
-                  <span v-for="(id, index) in keyRouteIDs(row)" :key="id" class="inline-flex max-w-[12rem] shrink-0 items-center gap-1 rounded-lg border border-primary-100 bg-primary-50/60 px-1.5 py-1 dark:border-primary-800/70 dark:bg-primary-900/20">
+                <span v-if="keyRouteIDs(row).length" class="sw-route-chips" :title="keyRouteIDs(row).map((id, index) => `${index + 1}. ${groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)}`).join(' → ')">
+                  <span v-for="(id, index) in keyRouteIDs(row).slice(0, 2)" :key="id" class="sw-route-chip">
                     <span class="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] font-bold text-white">{{ index + 1 }}</span>
-                    <GroupBadge class="max-w-[9.5rem]" :name="groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)" :platform="groupOptions.find(group => group.value === id)?.platform ?? row.group?.platform" :rate-multiplier="groupOptions.find(group => group.value === id)?.rate" :user-rate-multiplier="userGroupRates[id]" />
+                    <GroupBadge class="max-w-[7rem]" :name="groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)" :platform="groupOptions.find(group => group.value === id)?.platform ?? row.group?.platform" :rate-multiplier="groupOptions.find(group => group.value === id)?.rate" :user-rate-multiplier="userGroupRates[id]" />
                   </span>
+                  <span v-if="keyRouteIDs(row).length > 2" class="sw-route-more">+{{ keyRouteIDs(row).length - 2 }}</span>
                 </span>
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
@@ -490,6 +476,7 @@
         />
       </template>
     </TablePageLayout>
+    </div>
 
     <!-- Create/Edit Modal -->
     <BaseDialog
@@ -1187,7 +1174,8 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import EmptyState from '@/components/common/EmptyState.vue'
 	import Select from '@/components/common/Select.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
-	import Icon from '@/components/icons/Icon.vue'
+	import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
+import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
@@ -1388,11 +1376,18 @@ const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | n
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
 
-const recommendedEndpoint = computed(() => {
-  const configured = publicSettings.value?.api_base_url?.trim() || appStore.apiBaseUrl?.trim()
-  if (configured) return configured.replace(/\/$/, '')
-  return `${window.location.origin}/v1`
+const recommendedRootEndpoint = computed(() => {
+  const configured = publicSettings.value?.api_base_url?.trim() || appStore.apiBaseUrl?.trim() || window.location.origin
+  return configured.replace(/\/+$/, '').replace(/\/v1$/i, '')
 })
+const recommendedEndpoint = computed(() => `${recommendedRootEndpoint.value}/v1`)
+const rootEndpointCopied = ref(false)
+const copyRootEndpoint = async () => {
+  if (await clipboardCopy(recommendedRootEndpoint.value, '已复制')) {
+    rootEndpointCopied.value = true
+    window.setTimeout(() => { rootEndpointCopied.value = false }, 1200)
+  }
+}
 
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {

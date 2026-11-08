@@ -1,31 +1,23 @@
 <template>
-  <div class="sunworld-chart-card">
-    <div class="mb-4 flex items-center justify-between gap-3">
-      <div>
-        <p class="sunworld-kicker">{{ t('dashboard.tokenUsageTrend') }}</p>
-        <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">
-          {{ title || t('admin.dashboard.tokenUsageTrend') }}
-        </h3>
+  <div class="sunworld-chart-card sw-chart-panel">
+    <div class="sw-section-head flex flex-wrap">
+      <h3><WorkspaceIcon name="analysis" />{{ title || t('admin.dashboard.tokenUsageTrend') }}</h3>
+      <div class="sw-segmented" role="group" :aria-label="title || t('admin.dashboard.tokenUsageTrend')">
+        <button v-for="item in chartMetrics" :key="item.value" type="button" :class="{ 'is-active': metric === item.value }" :aria-pressed="metric === item.value" @click="metric = item.value">{{ item.label }}</button>
       </div>
-      <span class="rounded-lg bg-sun-50 px-2 py-1 text-[10px] font-medium text-sun-700 dark:bg-sun-900/25 dark:text-sun-300">TOKENS</span>
     </div>
-    <div v-if="loading" class="flex h-56 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-56">
-      <Line :data="chartData" :options="lineOptions" />
-    </div>
-    <div
-      v-else
-      class="flex h-56 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      {{ t('admin.dashboard.noDataAvailable') }}
-    </div>
+    <div class="mb-3 flex items-baseline gap-2"><strong class="sw-chart-total">{{ summaryValue }}</strong><span class="sw-chart-sub">{{ t('usage.inSelectedRange') }}</span></div>
+    <div v-if="loading" class="flex h-48 items-center justify-center"><LoadingSpinner /></div>
+    <div v-else-if="trendData.length > 0 && chartData" class="h-48"><Line :data="chartData" :options="lineOptions" /></div>
+    <div v-else class="flex h-48 items-center justify-center text-xs text-gray-400">{{ t('admin.dashboard.noDataAvailable') }}</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useMutationObserver } from '@vueuse/core'
+import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
+import { formatTokenMillions } from '@/utils/workspace'
 import { useI18n } from 'vue-i18n'
 import {
   Chart as ChartJS,
@@ -61,23 +53,36 @@ const props = defineProps<{
   title?: string
 }>()
 
-const isDarkMode = computed(() => {
-  return document.documentElement.classList.contains('dark')
+const isDarkMode = ref(document.documentElement.classList.contains('dark'))
+useMutationObserver(document.documentElement, () => { isDarkMode.value = document.documentElement.classList.contains('dark') }, { attributes: true, attributeFilter: ['class'] })
+const metric = ref<'tokens' | 'requests' | 'cost'>('tokens')
+const chartMetrics = computed(() => [
+  { value: 'tokens' as const, label: 'Token' },
+  { value: 'requests' as const, label: t('admin.dashboard.requests') },
+  { value: 'cost' as const, label: t('usage.cost') },
+])
+const summaryValue = computed(() => {
+  if (metric.value === 'requests') return props.trendData.reduce((sum, d) => sum + Number(d.requests || 0), 0).toLocaleString()
+  if (metric.value === 'cost') return `$${props.trendData.reduce((sum, d) => sum + Number(d.actual_cost || 0), 0).toFixed(2)}`
+  return formatTokenMillions(props.trendData.reduce((sum, d) => sum + d.input_tokens + d.output_tokens + d.cache_creation_tokens + d.cache_read_tokens, 0))
 })
 
 const chartColors = computed(() => ({
-  text: isDarkMode.value ? '#c7d8d8' : '#49615c',
-  grid: isDarkMode.value ? 'rgba(125, 164, 163, 0.16)' : 'rgba(82, 137, 126, 0.13)',
-  input: '#278a7a',
-  output: '#d86658',
-  cacheCreation: '#dc9632',
-  cacheRead: '#559bb4',
-  cacheHitRate: '#8a73b8'
+  text: isDarkMode.value ? '#93a4bd' : '#8794a9',
+  grid: isDarkMode.value ? 'rgba(143,172,211,.09)' : 'rgba(138,163,193,.1)',
+  input: '#6c9ee5',
+  output: '#69c4b1',
+  cacheCreation: '#e8be7e',
+  cacheRead: '#a498d9',
+  cacheHitRate: '#91a1b7'
 }))
 
 const chartData = computed(() => {
   if (!props.trendData?.length) return null
-
+  if (metric.value !== 'tokens') return {
+    labels: props.trendData.map(d => d.date),
+    datasets: [{ label: metric.value === 'cost' ? t('usage.cost') : t('admin.dashboard.requests'), data: props.trendData.map(d => metric.value === 'cost' ? Number(d.actual_cost || 0) : Number(d.requests || 0)), borderColor: chartColors.value.input, backgroundColor: `${chartColors.value.input}16`, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .4, fill: true }]
+  }
   return {
     labels: props.trendData.map((d) => d.date),
     datasets: [
@@ -86,38 +91,38 @@ const chartData = computed(() => {
         data: props.trendData.map((d) => d.input_tokens),
         borderColor: chartColors.value.input,
         backgroundColor: `${chartColors.value.input}18`,
-        pointRadius: 1.5,
+        pointRadius: 0,
         pointHoverRadius: 4,
         fill: true,
-        tension: 0.3
+        tension: 0.4
       },
       {
         label: 'Output',
         data: props.trendData.map((d) => d.output_tokens),
         borderColor: chartColors.value.output,
         backgroundColor: `${chartColors.value.output}16`,
-        pointRadius: 1.5,
+        pointRadius: 0,
         pointHoverRadius: 4,
         fill: true,
-        tension: 0.3
+        tension: 0.4
       },
       {
         label: 'Cache Creation',
         data: props.trendData.map((d) => d.cache_creation_tokens),
         borderColor: chartColors.value.cacheCreation,
         backgroundColor: `${chartColors.value.cacheCreation}14`,
-        pointRadius: 1,
+        pointRadius: 0,
         fill: true,
-        tension: 0.3
+        tension: 0.4
       },
       {
         label: 'Cache Read',
         data: props.trendData.map((d) => d.cache_read_tokens),
         borderColor: chartColors.value.cacheRead,
         backgroundColor: `${chartColors.value.cacheRead}14`,
-        pointRadius: 1,
+        pointRadius: 0,
         fill: true,
-        tension: 0.3
+        tension: 0.4
       },
       {
         label: 'Cache Hit Rate',
@@ -127,10 +132,10 @@ const chartData = computed(() => {
         }),
         borderColor: chartColors.value.cacheHitRate,
         backgroundColor: `${chartColors.value.cacheHitRate}14`,
-        pointRadius: 1,
+        pointRadius: 0,
         borderDash: [5, 5],
         fill: false,
-        tension: 0.3,
+        tension: 0.4,
         yAxisID: 'yPercent'
       }
     ]
@@ -140,20 +145,24 @@ const chartData = computed(() => {
 const lineOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  animation: { duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600 },
+  elements: { line: { borderWidth: 2 } },
   interaction: {
     intersect: false,
     mode: 'index' as const
   },
   plugins: {
     legend: {
-      position: 'top' as const,
+      position: 'bottom' as const,
       labels: {
         color: chartColors.value.text,
         usePointStyle: true,
         pointStyle: 'circle',
-        padding: 15,
+        boxWidth: 5,
+        boxHeight: 5,
+        padding: 12,
         font: {
-          size: 11
+          size: 9
         }
       }
     },
@@ -163,7 +172,7 @@ const lineOptions = computed(() => ({
           if (context.dataset.yAxisID === 'yPercent') {
             return `${context.dataset.label}: ${context.raw.toFixed(1)}%`
           }
-          return `${context.dataset.label}: ${formatTokens(context.raw)}`
+          return `${context.dataset.label}: ${metric.value === 'cost' ? '$' + Number(context.raw).toFixed(4) : metric.value === 'requests' ? Number(context.raw).toLocaleString() : formatTokens(context.raw)}`
         },
         footer: (tooltipItems: any) => {
           const dataIndex = tooltipItems[0]?.dataIndex
@@ -199,10 +208,11 @@ const lineOptions = computed(() => ({
         font: {
           size: 10
         },
-        callback: (value: string | number) => formatTokens(Number(value))
+        callback: (value: string | number) => metric.value === 'cost' ? '$' + Number(value).toFixed(2) : metric.value === 'requests' ? Number(value).toLocaleString() : formatTokens(Number(value))
       }
     },
     yPercent: {
+      display: metric.value === 'tokens',
       position: 'right' as const,
       min: 0,
       max: 100,

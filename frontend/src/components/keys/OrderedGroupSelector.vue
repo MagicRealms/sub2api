@@ -1,7 +1,7 @@
 <template>
-  <div class="space-y-3" data-test="ordered-group-selector">
+  <div class="sw-group-selector space-y-3" data-test="ordered-group-selector">
     <p class="text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('keys.routing.hint') }}</p>
-    <ol v-if="modelValue.length" class="space-y-1.5" aria-live="polite">
+    <ol v-if="modelValue.length" class="sw-route-order" aria-live="polite">
       <li v-for="(id, index) in modelValue" :key="id" class="flex min-w-0 items-center gap-2 rounded-xl border border-primary-200 bg-primary-50/70 p-2 dark:border-primary-800 dark:bg-primary-900/20" :data-route-id="id">
         <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white" :aria-label="t('keys.routing.priority', { order: index + 1 })">{{ index + 1 }}</span>
         <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white" :title="findOption(id)?.label ?? `#${id}`">{{ findOption(id)?.label ?? `#${id}` }}</span>

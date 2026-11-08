@@ -1,4 +1,17 @@
 export default {
+  workspace: {
+    moreFilters: 'More filters',
+    lessFilters: 'Fewer filters',
+    compactView: 'Compact view',
+    expandedView: 'All fields',
+    analytics: 'Usage Analytics',
+    globalAnalytics: 'Global Usage Analytics',
+    analyticsDescription: 'Explore spending, models, and request trends in one place.',
+    recordsDescription: 'Find the essentials first, then explore the details of each request.',
+    usageNavigation: 'Usage navigation',
+    globalScope: 'All users · Global view',
+    personalScope: 'Usage for your account only',
+  },
   dashboard: {
     title: 'Data Board',
     welcomeMessage: "Welcome back! Here's an overview of your account.",
@@ -21,6 +34,7 @@ export default {
     modelCallAnalysis: 'Model Call Analysis',
     groupDistribution: 'Group Usage Distribution',
     platformBreakdown: 'Per-platform Breakdown',
+    modelWorkspace: 'Model Workspace',
     platformBreakdownEmpty: 'No platform usage yet',
     platformCount: '{count} platforms',
     platformOther: 'Other',

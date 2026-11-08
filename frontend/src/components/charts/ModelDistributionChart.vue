@@ -1,7 +1,7 @@
 <template>
-  <div class="card p-4">
-    <div class="mb-4 flex items-center justify-between gap-3">
-      <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+  <div class="card p-4" :class="{ 'sw-chart-panel': compact }">
+    <div class="sw-section-head flex flex-wrap">
+      <h3 class="text-sm font-semibold text-gray-900 dark:text-white"><WorkspaceIcon name="wallet" />
         {{ enableRankingView && activeView !== 'model_distribution'
           ? t('admin.dashboard.spendingRankingTitle')
           : (title || t('admin.dashboard.modelDistribution')) }}
@@ -9,13 +9,13 @@
       <div class="flex flex-wrap items-center justify-end gap-2">
         <div
           v-if="showSourceToggle"
-          class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800"
+          class="sw-segmented"
         >
           <button
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="source === 'requested'
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              ? 'is-active'
               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
             @click="emit('update:source', 'requested')"
           >
@@ -25,7 +25,7 @@
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="source === 'upstream'
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              ? 'is-active'
               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
             @click="emit('update:source', 'upstream')"
           >
@@ -35,7 +35,7 @@
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="source === 'mapping'
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              ? 'is-active'
               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
             @click="emit('update:source', 'mapping')"
           >
@@ -44,13 +44,13 @@
         </div>
         <div
           v-if="showMetricToggle"
-          class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-dark-700 dark:bg-dark-800"
+          class="sw-segmented"
         >
           <button
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="metric === 'tokens'
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              ? 'is-active'
               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
             @click="emit('update:metric', 'tokens')"
           >
@@ -60,20 +60,20 @@
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="metric === 'actual_cost'
-              ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+              ? 'is-active'
               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
             @click="emit('update:metric', 'actual_cost')"
           >
             {{ t('admin.dashboard.metricActualCost') }}
           </button>
         </div>
-        <div v-if="enableRankingView" class="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-dark-800">
+        <div v-if="enableRankingView" class="sw-segmented">
           <button
             type="button"
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="
               activeView === 'model_distribution'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+                ? 'is-active'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             "
             @click="activeView = 'model_distribution'"
@@ -85,7 +85,7 @@
             class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
             :class="
               activeView === 'spending_ranking'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
+                ? 'is-active'
                 : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
             "
             @click="activeView = 'spending_ranking'"
@@ -98,6 +98,23 @@
 
     <div v-if="activeView === 'model_distribution' && loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
+    </div>
+    <div v-else-if="compact && activeView === 'model_distribution' && displayModelStats.length > 0 && chartData" class="sw-distribution">
+      <div class="sw-donut">
+        <Doughnut :data="chartData" :options="doughnutOptions" />
+        <div class="sw-donut-center"><strong>{{ metric === 'actual_cost' ? `$${formatCost(distributionTotal)}` : formatTokenMillions(distributionTotal) }}</strong><span>{{ t('common.total') }}</span></div>
+      </div>
+      <div class="sw-model-list">
+        <div v-for="(model, index) in displayModelStats" :key="model.model">
+          <button type="button" class="sw-model-list-row w-full text-left" :aria-disabled="!enableBreakdown" :title="`${model.model} · ${formatNumber(model.requests)} ${t('admin.dashboard.requests')} · $${formatCost(model.actual_cost)}`" @click="enableBreakdown && toggleBreakdown('model', model.model)">
+            <i class="sw-model-list-dot" :style="{ background: workspacePalette[index % workspacePalette.length] }"></i>
+            <span class="sw-model-list-name">{{ model.model }}</span>
+            <span class="sw-model-list-value">{{ metric === 'actual_cost' ? `$${formatCost(model.actual_cost)}` : formatTokenMillions(model.total_tokens) }}</span>
+            <span class="sw-model-list-track"><i :style="{ width: `${distributionTotal > 0 ? Math.max(0, (Number(metric === 'actual_cost' ? model.actual_cost : model.total_tokens) / distributionTotal) * 100) : 0}%`, background: workspacePalette[index % workspacePalette.length] }"></i></span>
+          </button>
+          <UserBreakdownSubTable v-if="expandedKey === `model-${model.model}`" :items="breakdownItems" :loading="breakdownLoading" :show-account-cost="showAccountCost" />
+        </div>
+      </div>
     </div>
     <div
       v-else-if="activeView === 'model_distribution' && displayModelStats.length > 0 && chartData"
@@ -248,6 +265,8 @@ import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
+import { workspacePalette, formatTokenMillions } from '@/utils/workspace'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { ModelStat, UserSpendingRankingItem, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
@@ -262,6 +281,7 @@ type RankingDisplayItem = UserSpendingRankingItem & { isOther?: boolean }
 const props = withDefaults(defineProps<{
   modelStats: ModelStat[]
   title?: string
+  compact?: boolean
   upstreamModelStats?: ModelStat[]
   mappingModelStats?: ModelStat[]
   source?: ModelSource
@@ -285,6 +305,7 @@ const props = withDefaults(defineProps<{
   upstreamModelStats: () => [],
   mappingModelStats: () => [],
   source: 'requested',
+  compact: false,
   enableRankingView: false,
   rankingItems: () => [],
   rankingTotalActualCost: 0,
@@ -367,6 +388,8 @@ const displayModelStats = computed(() => {
   return [...sourceStats].sort((a, b) => toFiniteNumber(b[metricKey]) - toFiniteNumber(a[metricKey]))
 })
 
+const distributionTotal = computed(() => displayModelStats.value.reduce((sum, m) => sum + toFiniteNumber(props.metric === 'actual_cost' ? m.actual_cost : m.total_tokens), 0))
+
 const chartData = computed(() => {
   if (!displayModelStats.value.length) return null
 
@@ -375,7 +398,9 @@ const chartData = computed(() => {
     datasets: [
       {
         data: displayModelStats.value.map((m) => toFiniteNumber(props.metric === 'actual_cost' ? m.actual_cost : m.total_tokens)),
-        backgroundColor: chartColors.slice(0, displayModelStats.value.length),
+        backgroundColor: displayModelStats.value.map((_, index) => (props.compact ? workspacePalette : chartColors)[index % (props.compact ? workspacePalette.length : chartColors.length)]),
+        spacing: props.compact ? 3 : 0,
+        borderRadius: props.compact ? 5 : 0,
         borderWidth: 0
       }
     ]
@@ -439,6 +464,8 @@ const rankingDisplayItems = computed<RankingDisplayItem[]>(() => {
 })
 
 const doughnutOptions = computed(() => ({
+  cutout: props.compact ? '80%' : '65%',
+  animation: { duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 650 },
   responsive: true,
   maintainAspectRatio: false,
   plugins: {

@@ -1,10 +1,10 @@
 <template>
   <AppLayout>
-    <div class="sunworld-dashboard console-data-board space-y-6">
+    <div class="sunworld-dashboard console-data-board sw-page">
       <SunworldWorkspaceHero
         eyebrow="DATA / BOARD"
         title="数据看板"
-        subtitle="模型调用、平台分布、额度和近期活动都在这里汇总。"
+        subtitle="每一次灵感，都有迹可循。查看你的模型用量与近期活动。"
         action-label="进入模型工作台"
         action-path="/model-plaza"
         status-label="实时路由"
@@ -13,6 +13,7 @@
       <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
       <template v-else-if="stats">
         <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" :platform-quotas="platformQuotas" />
+        <ModelWorkspace :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" :platform-quotas="platformQuotas" />
         <UserDashboardCharts v-model:startDate="startDate" v-model:endDate="endDate" v-model:granularity="granularity" :loading="loadingCharts" :trend="trendData" :models="modelStats" @dateRangeChange="loadCharts" @granularityChange="loadCharts" @refresh="refreshAll" />
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div class="lg:col-span-2"><UserDashboardRecentUsage :data="recentUsage" :loading="loadingUsage" /></div>
@@ -28,6 +29,7 @@ import { ref, computed, onMounted } from 'vue'; import { useAuthStore } from '@/
 import AppLayout from '@/components/layout/AppLayout.vue'; import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.vue'; import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
 import UserDashboardRecentUsage from '@/components/user/dashboard/UserDashboardRecentUsage.vue'; import UserDashboardQuickActions from '@/components/user/dashboard/UserDashboardQuickActions.vue'
+import ModelWorkspace from '@/components/user/dashboard/ModelWorkspace.vue'
 import SunworldWorkspaceHero from '@/components/layout/SunworldWorkspaceHero.vue'
 import type { UsageLog, TrendDataPoint, ModelStat, PlatformQuotaItem } from '@/types'
 import { getMyPlatformQuotas } from '@/api/user'

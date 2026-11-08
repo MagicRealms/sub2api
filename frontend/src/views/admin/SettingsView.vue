@@ -6629,6 +6629,15 @@
                 </p>
               </div>
 
+              <div class="rounded-2xl border border-sky-100 bg-sky-50/40 p-4 dark:border-dark-600 dark:bg-dark-800/40">
+                <h3 class="text-sm font-semibold">{{ t('admin.settings.site.qqCommunity') }}</h3>
+                <p class="mb-3 mt-1 text-xs text-gray-500">{{ t('admin.settings.site.qqCommunityHint') }}</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <label class="text-xs text-gray-500">{{ t('admin.settings.site.qqGroupNumber') }}<input v-model.lazy="qqGroupNumber" type="text" inputmode="numeric" maxlength="15" class="input mt-1.5" placeholder="123456789" /></label>
+                  <label class="text-xs text-gray-500">{{ t('admin.settings.site.qqGroupUrl') }}<input v-model.lazy="qqGroupUrl" type="url" class="input mt-1.5" placeholder="https://qm.qq.com/q/…" /></label>
+                </div>
+              </div>
+
               <!-- Doc URL -->
               <div>
                 <label
@@ -8939,6 +8948,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from "vue";
+import { parseCommunityContact, updateCommunityContact } from '@/utils/communityContact';
 import { listPlatformIds } from "@/constants/platformCatalog";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api";
@@ -9737,6 +9747,15 @@ const schedulingThresholdPlatforms = SCHEDULING_THRESHOLD_PLATFORMS;
 function platformQuotaRows(map: DefaultPlatformQuotasMap | undefined): string[] {
   return listPlatformIds().filter((platform) => !!map?.[platform]);
 }
+
+const qqGroupNumber = computed({
+  get: () => parseCommunityContact(form.contact_info).number,
+  set: (number: string) => { form.contact_info = updateCommunityContact(form.contact_info, number, parseCommunityContact(form.contact_info).url); },
+});
+const qqGroupUrl = computed({
+  get: () => parseCommunityContact(form.contact_info).url,
+  set: (url: string) => { form.contact_info = updateCommunityContact(form.contact_info, parseCommunityContact(form.contact_info).number, url); },
+});
 
 const form = reactive<SettingsForm>({
   registration_enabled: true,

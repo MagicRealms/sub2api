@@ -636,10 +636,12 @@ describe('UsageView subscription feature flag', () => {
     )
   }
 
-  it('offers the balance / subscription billing-type filter by default', async () => {
+  it('offers the balance / subscription billing-type filter under more filters', async () => {
     const wrapper = mountUsageView()
     await flushPromises()
 
+    expect(billingTypeSelect(wrapper)).toBeUndefined()
+    await wrapper.get('[data-testid="usage-more-filters"]').trigger('click')
     expect(billingTypeSelect(wrapper)).toBeDefined()
     expect(wrapper.text()).toContain('Billing type')
     wrapper.unmount()
@@ -651,6 +653,7 @@ describe('UsageView subscription feature flag', () => {
     const wrapper = mountUsageView()
     await flushPromises()
 
+    await wrapper.get('[data-testid="usage-more-filters"]').trigger('click')
     expect(billingTypeSelect(wrapper)).toBeUndefined()
     expect(wrapper.text()).not.toContain('Billing type')
     wrapper.unmount()

@@ -1,12 +1,7 @@
 <template>
   <AppLayout>
-    <div class="console-usage-page space-y-6">
-      <div class="console-page-heading">
-        <div>
-          <h1>使用记录</h1>
-          <p>按模型、密钥和时间快速回看最近的请求。</p>
-        </div>
-      </div>
+    <div class="console-usage-page sw-page">
+      <UsageWorkspaceHeader :analysis="analysisMode"  />
       <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
@@ -29,8 +24,13 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ModelDistributionChart
+        <div v-if="analysisMode" class="sw-analysis-filters">
+            <label><span>{{ t('usage.apiKeyFilter') }}</span><Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" /></label>
+            <label><span>{{ t('usage.model') }}</span><Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" /></label>
+            <label><span>{{ t('admin.usage.group') }}</span><Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" /></label>
+          </div>
+        <div v-if="analysisMode" class="sw-chart-grid">
+          <ModelDistributionChart compact
             v-model:metric="modelDistributionMetric"
             :model-stats="requestedModelStats"
             :loading="modelStatsLoading"
@@ -41,7 +41,7 @@
             :start-date="startDate"
             :end-date="endDate"
           />
-          <GroupDistributionChart
+          <GroupDistributionChart compact
             v-model:metric="groupDistributionMetric"
             :group-stats="groupStats"
             :loading="chartsLoading"
@@ -53,8 +53,8 @@
           />
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EndpointDistributionChart
+        <div v-if="analysisMode" class="sw-chart-grid">
+          <EndpointDistributionChart compact
             v-model:source="endpointDistributionSource"
             v-model:metric="endpointDistributionMetric"
             :endpoint-stats="inboundEndpointStats"
@@ -72,7 +72,7 @@
         </div>
       </div>
 
-      <div class="card p-6">
+      <div v-if="!analysisMode" class="card sw-record-filters p-5">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
             <div class="w-full sm:w-auto sm:min-w-[220px]">
@@ -113,6 +113,7 @@
               <label class="input-label">{{ t('admin.usage.group') }}</label>
               <Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" />
             </div>
+            <template v-if="advancedFilters">
             <div class="w-full sm:w-auto sm:min-w-[180px]">
               <label class="input-label">{{ t('usage.type') }}</label>
               <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
@@ -129,15 +130,18 @@
               <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
               <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
             </div>
+            </template>
           </div>
 
           <div class="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+            <button v-if="activeTab === 'usage'" type="button" class="btn btn-secondary" data-testid="usage-more-filters" :aria-expanded="advancedFilters" @click="advancedFilters = !advancedFilters">{{ t(advancedFilters ? 'workspace.lessFilters' : 'workspace.moreFilters') }}</button>
             <button type="button" @click="refreshData" :disabled="activeTab === 'errors' ? errorLoading : loading" class="btn btn-secondary">
               {{ t('common.refresh') }}
             </button>
             <button type="button" @click="resetFilters" class="btn btn-secondary">
               {{ t('common.reset') }}
             </button>
+            <button v-if="activeTab === 'usage'" type="button" data-testid="usage-density" class="btn btn-secondary" @click="toggleCompactView">{{ t(compactView ? 'workspace.compactView' : 'workspace.expandedView') }}</button>
             <div class="relative" ref="columnDropdownRef">
               <button
                 type="button"
@@ -173,7 +177,7 @@
         </div>
       </div>
 
-      <div v-if="errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
+      <div v-if="!analysisMode && errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
         <button class="tab" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
           {{ t('usage.tabs.usage') }}
         </button>
@@ -182,12 +186,13 @@
         </button>
       </div>
 
-      <template v-if="activeTab === 'usage'">
+      <template v-if="!analysisMode && activeTab === 'usage'">
         <div class="console-usage-table">
           <UsageTable
             :data="usageLogs"
             :loading="loading"
             :columns="visibleColumns"
+            :compact="compactView"
             :server-side-sort="true"
             :show-account-billing="false"
             :show-upstream-endpoint="false"
@@ -209,7 +214,7 @@
       </template>
 
       <UserErrorRequestsTable
-        v-else-if="errorViewEnabled"
+        v-else-if="!analysisMode && errorViewEnabled"
         :rows="errorRows"
         :total="errorTotal"
         :loading="errorLoading"
@@ -227,11 +232,13 @@
 </template>
 
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
+import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import Select, { type SelectOption } from '@/components/common/Select.vue'
@@ -264,6 +271,9 @@ import type { Column } from '@/components/common/types'
 import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 
 const { t } = useI18n()
+const route = useRoute()
+const advancedFilters = ref(false)
+const analysisMode = computed(() => route?.meta?.usageAnalytics === true)
 const appStore = useAppStore()
 
 type DistributionMetric = 'tokens' | 'actual_cost'
@@ -738,6 +748,12 @@ const exportToCSV = async () => {
   }
 }
 
+const compactView = ref(localStorage.getItem('sunworld-user-usage-view') !== 'expanded')
+const compactColumnKeys = new Set(['user', 'api_key', 'model', 'group', 'tokens', 'cost', 'latency', 'created_at'])
+const toggleCompactView = () => {
+  compactView.value = !compactView.value
+  localStorage.setItem('sunworld-user-usage-view', compactView.value ? 'compact' : 'expanded')
+}
 const ALWAYS_VISIBLE = ['created_at']
 const DEFAULT_HIDDEN_COLUMNS = ['user_agent']
 const HIDDEN_COLUMNS_KEY = 'user-usage-hidden-columns'
@@ -761,13 +777,18 @@ const allColumns = computed<Column[]>(() => [
 const hiddenColumns = reactive<Set<string>>(new Set())
 const toggleableColumns = computed(() => allColumns.value.filter((col) => !ALWAYS_VISIBLE.includes(col.key)))
 const visibleColumns = computed(() =>
-  allColumns.value.filter((col) => ALWAYS_VISIBLE.includes(col.key) || !hiddenColumns.has(col.key))
+  allColumns.value.filter((col) => (ALWAYS_VISIBLE.includes(col.key) || !hiddenColumns.has(col.key)) && (!compactView.value || compactColumnKeys.has(col.key)))
 )
-const isColumnVisible = (key: string) => !hiddenColumns.has(key)
+const isColumnVisible = (key: string) => !hiddenColumns.has(key) && (!compactView.value || compactColumnKeys.has(key))
 const toggleColumn = (key: string) => {
+  if (compactView.value) {
+    allColumns.value.forEach(col => { if (!compactColumnKeys.has(col.key)) hiddenColumns.add(col.key) })
+    compactView.value = false
+  }
   if (hiddenColumns.has(key)) hiddenColumns.delete(key)
   else hiddenColumns.add(key)
-  localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
+  localStorage.setItem('sunworld-user-usage-view', 'expanded')
+    localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
 }
 const loadSavedColumns = () => {
   try {

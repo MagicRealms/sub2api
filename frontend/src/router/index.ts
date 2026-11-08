@@ -251,6 +251,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/usage/analytics',
+    name: 'UsageAnalytics',
+    component: () => import('@/views/user/UsageView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: false, usageAnalytics: true, title: 'Usage Analytics', titleKey: 'workspace.analytics', descriptionKey: 'workspace.analyticsDescription' }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),
@@ -700,6 +706,12 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.promptAudit.description',
       requiresRiskControl: true
     }
+  },
+  {
+    path: '/admin/usage/analytics',
+    name: 'AdminUsageAnalytics',
+    component: () => import('@/views/admin/UsageView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, usageAnalytics: true, title: 'Global Usage Analytics', titleKey: 'workspace.globalAnalytics', descriptionKey: 'workspace.analyticsDescription' }
   },
   {
     path: '/admin/usage',

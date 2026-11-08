@@ -13,7 +13,7 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-import UserDashboardStats from '../UserDashboardStats.vue'
+import UserDashboardStats from '../ModelWorkspace.vue'
 import type { UserDashboardStats as UserStatsType, PlatformDashboardStats } from '@/api/usage'
 import type { PlatformQuotaItem } from '@/types'
 
@@ -81,7 +81,7 @@ function cardPlatforms(w: VueWrapper): string[] {
   return w.findAll('[data-testid="platform-card"]').map((c) => c.attributes('data-platform') ?? '')
 }
 
-describe('UserDashboardStats 按平台拆分', () => {
+describe('ModelWorkspace 平台用量与配额', () => {
   it('只有用量的平台才产生卡片；三档全空的限额记录不产生卡片', () => {
     const w = mountStats(
       makeStats({ total_actual_cost: 0.03, today_actual_cost: 0.03, by_platform: [usage('grok', 0.03)] }),

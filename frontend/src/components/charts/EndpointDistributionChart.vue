@@ -1,6 +1,6 @@
 <template>
-  <div class="card p-4">
-    <div class="mb-4 flex items-center justify-between gap-3">
+  <div class="card p-4" :class="{ 'sw-chart-panel': compact }">
+    <div class="mb-4 flex items-center justify-between gap-3" :class="{ 'sw-section-head': compact }">
       <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
         {{ title || t('usage.endpointDistribution') }}
       </h3>
@@ -71,6 +71,9 @@
     <div v-if="loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
     </div>
+    <DistributionSummary v-else-if="compact && displayEndpointStats.length" :items="displayEndpointStats.map(e => ({ key: e.endpoint, label: e.endpoint, value: toFiniteNumber(metric === 'tokens' ? e.total_tokens : e.actual_cost) }))" :metric="metric" :interactive="enableBreakdown" @select="endpoint => toggleBreakdown(String(endpoint))">
+      <template #default="{ item }"><UserBreakdownSubTable v-if="enableBreakdown && expandedKey === item.key" :items="breakdownItems" :loading="breakdownLoading" /></template>
+    </DistributionSummary>
     <div v-else-if="displayEndpointStats.length > 0 && chartData" class="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
       <div class="h-48 w-48 shrink-0">
         <Doughnut :data="chartData" :options="doughnutOptions" />
@@ -137,6 +140,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { Doughnut } from 'vue-chartjs'
+import DistributionSummary from '@/components/workspace/DistributionSummary.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { EndpointStat, UserBreakdownItem } from '@/types'
@@ -145,6 +149,7 @@ import { getUserBreakdown } from '@/api/admin/dashboard'
 ChartJS.register(ArcElement, Tooltip, Legend)
 
 const { t } = useI18n()
+const toFiniteNumber = (value: number) => Number.isFinite(Number(value)) ? Number(value) : 0
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
@@ -154,7 +159,8 @@ const props = withDefaults(
     endpointStats: EndpointStat[]
     upstreamEndpointStats?: EndpointStat[]
     endpointPathStats?: EndpointStat[]
-    loading?: boolean
+    compact?: boolean
+  loading?: boolean
     title?: string
     metric?: DistributionMetric
     source?: EndpointSource
@@ -168,7 +174,8 @@ const props = withDefaults(
   {
     upstreamEndpointStats: () => [],
     endpointPathStats: () => [],
-    loading: false,
+    compact: false,
+  loading: false,
     title: '',
     metric: 'tokens',
     source: 'inbound',

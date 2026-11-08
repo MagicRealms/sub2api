@@ -1,12 +1,7 @@
 <template>
   <AppLayout>
-    <div class="console-usage-page console-admin-usage space-y-6">
-      <div class="console-page-heading">
-        <div>
-          <h1>全局用量分析</h1>
-          <p>从模型、分组、接口和账户维度观察中转站的真实消耗。</p>
-        </div>
-      </div>
+    <div class="console-usage-page console-admin-usage sw-page">
+      <UsageWorkspaceHeader :analysis="analysisMode" admin />
       <UsageStatsCards :stats="usageStats" />
       <!-- Charts Section -->
       <div class="space-y-4">
@@ -28,8 +23,9 @@
             </div>
           </div>
         </div>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ModelDistributionChart
+        <UsageFilters compact v-if="analysisMode" v-model="filters" :exporting="false" :show-actions="false" :model-options="modelNameOptions" :start-date="startDate" :end-date="endDate" @change="applyFilters" />
+        <div v-if="analysisMode" class="sw-chart-grid">
+          <ModelDistributionChart compact
             :title="t('admin.dashboard.consumptionDistribution')"
             v-model:source="modelDistributionSource"
             v-model:metric="modelDistributionMetric"
@@ -43,7 +39,7 @@
             :end-date="endDate"
             :filters="breakdownFilters"
           />
-          <GroupDistributionChart
+          <GroupDistributionChart compact
             v-model:metric="groupDistributionMetric"
             :group-stats="groupStats"
             :loading="chartsLoading"
@@ -53,8 +49,8 @@
             :filters="breakdownFilters"
           />
         </div>
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EndpointDistributionChart
+        <div v-if="analysisMode" class="sw-chart-grid">
+          <EndpointDistributionChart compact
             v-model:source="endpointDistributionSource"
             v-model:metric="endpointDistributionMetric"
             :endpoint-stats="inboundEndpointStats"
@@ -76,7 +72,7 @@
         </div>
       </div>
       <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
-      <div class="card">
+      <div v-if="!analysisMode" class="card sw-log-card">
         <div class="flex flex-wrap items-center border-b border-gray-200 px-2 dark:border-dark-700 sm:px-4">
           <button
             v-for="tab in detailTabs"
@@ -94,8 +90,9 @@
           </button>
         </div>
 
-        <UsageFilters v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="border-b border-gray-100 dark:border-dark-700/50" :start-date="startDate" :end-date="endDate" :exporting="exporting" :model-options="modelNameOptions" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+        <UsageFilters compact v-model="filters" ref="usageFiltersRef" flat :mode="activeTab" class="border-b border-gray-100 dark:border-dark-700/50" :start-date="startDate" :end-date="endDate" :exporting="exporting" :model-options="modelNameOptions" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
           <template #after-reset>
+            <button v-if="activeTab === 'usage'" type="button" data-testid="usage-density" class="btn btn-secondary" @click="toggleCompactView">{{ t(compactView ? 'workspace.compactView' : 'workspace.expandedView') }}</button>
             <div v-if="activeTab !== 'ranking'" class="relative" ref="columnDropdownRef">
               <button
                 data-testid="usage-column-settings"
@@ -139,6 +136,7 @@
             :data="usageLogs"
             :loading="loading"
             :columns="visibleColumns"
+            :compact="compactView"
             :server-side-sort="true"
             :default-sort-key="'created_at'"
             :default-sort-order="'desc'"
@@ -203,6 +201,7 @@ import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admi
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
+import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
@@ -224,6 +223,7 @@ type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
 type ModelDistributionSource = 'requested' | 'upstream' | 'mapping'
 const route = useRoute()
+const analysisMode = computed(() => route?.meta?.usageAnalytics === true)
 const usageStats = ref<AdminUsageStatsResponse | null>(null); const usageLogs = ref<AdminUsageLog[]>([]); const loading = ref(false); const exporting = ref(false)
 const trendData = ref<TrendDataPoint[]>([]); const requestedModelStats = ref<ModelStat[]>([]); const upstreamModelStats = ref<ModelStat[]>([]); const mappingModelStats = ref<ModelStat[]>([]); const groupStats = ref<GroupStat[]>([]); const chartsLoading = ref(false); const modelStatsLoading = ref(false); const granularity = ref<'day' | 'hour'>('hour')
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
@@ -640,6 +640,12 @@ const exportToExcel = async () => {
 }
 
 // Column visibility
+const compactView = ref(localStorage.getItem('sunworld-admin-usage-view') !== 'expanded')
+const compactColumnKeys = new Set(['user', 'api_key', 'model', 'group', 'tokens', 'cost', 'latency', 'created_at'])
+const toggleCompactView = () => {
+  compactView.value = !compactView.value
+  localStorage.setItem('sunworld-admin-usage-view', compactView.value ? 'compact' : 'expanded')
+}
 const ALWAYS_VISIBLE = ['user', 'created_at']
 const DEFAULT_HIDDEN_COLUMNS = ['reasoning_effort', 'request_id', 'upstream_request_id', 'user_agent']
 const HIDDEN_COLUMNS_KEY = 'usage-hidden-columns'
@@ -676,19 +682,24 @@ const toggleableColumns = computed(() =>
 
 const visibleColumns = computed(() =>
   allColumns.value.filter(col =>
-    ALWAYS_VISIBLE.includes(col.key) || !hiddenColumns.has(col.key)
+    (ALWAYS_VISIBLE.includes(col.key) || !hiddenColumns.has(col.key)) && (!compactView.value || compactColumnKeys.has(col.key))
   )
 )
 
-const isColumnVisible = (key: string) => !hiddenColumns.has(key)
+const isColumnVisible = (key: string) => !hiddenColumns.has(key) && (!compactView.value || compactColumnKeys.has(key))
 
 const toggleColumn = (key: string) => {
+  if (compactView.value) {
+    allColumns.value.forEach(col => { if (!compactColumnKeys.has(col.key)) hiddenColumns.add(col.key) })
+    compactView.value = false
+  }
   if (hiddenColumns.has(key)) {
     hiddenColumns.delete(key)
   } else {
     hiddenColumns.add(key)
   }
   try {
+    localStorage.setItem('sunworld-admin-usage-view', 'expanded')
     localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hiddenColumns]))
     localStorage.setItem(HIDDEN_COLUMNS_VERSION_KEY, HIDDEN_COLUMNS_CURRENT_VERSION)
   } catch (e) {

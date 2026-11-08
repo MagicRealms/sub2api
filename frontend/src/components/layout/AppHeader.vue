@@ -11,20 +11,13 @@
           <Icon name="menu" size="md" />
         </button>
 
-        <div class="hidden lg:block">
-          <h1 class="text-[17px] font-semibold tracking-tight text-gray-900 dark:text-white">
-            {{ pageTitle }}
-          </h1>
-          <p v-if="pageDescription" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
-            {{ pageDescription }}
-          </p>
-        </div>
+        <div class="sw-breadcrumb hidden lg:flex"><WorkspaceIcon name="board" /><span>/</span><strong>{{ pageTitle }}</strong></div>
       </div>
 
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
       <div class="flex min-w-0 items-center gap-1.5 sm:gap-3">
         <a
-          v-if="contactInfo"
+          v-if="contactLink"
           :href="contactLink"
           target="_blank"
           rel="noopener noreferrer"
@@ -33,7 +26,7 @@
         >
           <span class="sunworld-live-dot"></span>
           <Icon name="users" size="xs" />
-          <span>{{ contactLabel }}</span>
+          <span>{{ contactLabel }}</span><Icon name="arrowRight" size="xs" />
         </a>
         <span class="console-sun-mark hidden sm:inline-flex" aria-hidden="true">
           <Icon name="sun" size="sm" />
@@ -258,6 +251,8 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import SubscriptionProgressMini from '@/components/common/SubscriptionProgressMini.vue'
 import AnnouncementBell from '@/components/common/AnnouncementBell.vue'
 import Icon from '@/components/icons/Icon.vue'
+import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
+import { parseCommunityContact } from '@/utils/communityContact'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { resolveRouteMetaKeys } from '@/router/title'
@@ -276,13 +271,11 @@ const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const contactLink = computed(() => {
-  const raw = contactInfo.value.trim()
-  return raw.match(/https?:\/\/[^\s]+/i)?.[0] || 'https://qm.qq.com/'
+  return parseCommunityContact(contactInfo.value).url
 })
 const contactLabel = computed(() => {
-  const raw = contactInfo.value.trim()
-  const group = raw.match(/(?:QQ群号|QQ群|QQ|群)\s*[:：]?\s*([0-9]{5,})/i)?.[1]
-  return group ? `QQ群 ${group}` : raw.slice(0, 24)
+  const group = parseCommunityContact(contactInfo.value).number
+  return group ? `QQ群 ${group}` : '加入 QQ 交流群'
 })
 const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
@@ -343,13 +336,6 @@ const pageTitle = computed(() => {
   return (route.meta.title as string) || ''
 })
 
-const pageDescription = computed(() => {
-  const descKey = routeMetaKeys.value.descriptionKey
-  if (descKey) {
-    return t(descKey)
-  }
-  return (route.meta.description as string) || ''
-})
 
 function toggleMobileSidebar() {
   appStore.toggleMobileSidebar()

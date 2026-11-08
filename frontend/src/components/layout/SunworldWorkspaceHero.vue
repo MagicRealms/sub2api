@@ -14,11 +14,7 @@
     </div>
 
     <div class="sunworld-hero-metrics">
-      <div class="sunworld-hero-orbit" aria-hidden="true">
-        <div class="sunworld-hero-orbit-ring sunworld-hero-orbit-ring-one"></div>
-        <div class="sunworld-hero-orbit-ring sunworld-hero-orbit-ring-two"></div>
-        <div class="sunworld-hero-orbit-core"><Icon name="sparkles" size="lg" /></div>
-      </div>
+      <SolarScene />
       <div class="sunworld-hero-status">
         <span class="sunworld-hero-status-dot"></span>
         <div>
@@ -32,6 +28,7 @@
 
 <script setup lang="ts">
 import Icon from '@/components/icons/Icon.vue'
+import SolarScene from '@/components/workspace/SolarScene.vue'
 
 defineProps<{
   eyebrow: string

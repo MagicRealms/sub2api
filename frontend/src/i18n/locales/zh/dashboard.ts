@@ -1,4 +1,17 @@
 export default {
+  workspace: {
+    moreFilters: '更多筛选',
+    lessFilters: '收起筛选',
+    compactView: '精简视图',
+    expandedView: '完整字段',
+    analytics: '用量分析',
+    globalAnalytics: '全局用量分析',
+    analyticsDescription: '把消耗、模型与调用趋势放在一起，发现每次请求背后的变化。',
+    recordsDescription: '先看重点，再深入细节。快速定位每一次模型调用。',
+    usageNavigation: '用量页面导航',
+    globalScope: '全站用户 · 全局视角',
+    personalScope: '仅展示当前账户用量',
+  },
   dashboard: {
     title: '数据看板',
     welcomeMessage: '欢迎回来！这是您账户的概览。',
@@ -21,6 +34,7 @@ export default {
     modelCallAnalysis: '模型调用分析',
     groupDistribution: '分组使用分布',
     platformBreakdown: '按平台拆分',
+    modelWorkspace: '模型工作台',
     platformBreakdownEmpty: '暂无平台用量',
     platformCount: '{count} 个平台',
     platformOther: '其他',

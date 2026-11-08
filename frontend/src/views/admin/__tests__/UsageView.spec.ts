@@ -4,7 +4,9 @@ import { defineComponent, ref } from 'vue'
 
 import UsageView from '../UsageView.vue'
 
-const { list, exportList, getStats, getSnapshotV2, getById, getModelStats, listErrorLogs, routeQuery, aoaToSheet, sheetAddAoa, saveAs, xlsxWrite } = vi.hoisted(() => {
+afterEach(() => { routeMeta.usageAnalytics = false })
+
+const { list, exportList, getStats, getSnapshotV2, getById, getModelStats, listErrorLogs, routeQuery, routeMeta, aoaToSheet, sheetAddAoa, saveAs, xlsxWrite } = vi.hoisted(() => {
   vi.stubGlobal('localStorage', {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
@@ -20,6 +22,7 @@ const { list, exportList, getStats, getSnapshotV2, getById, getModelStats, listE
     getModelStats: vi.fn(),
     listErrorLogs: vi.fn(),
     routeQuery: {} as Record<string, string>,
+    routeMeta: { usageAnalytics: false },
 		aoaToSheet: vi.fn(() => ({})),
 		sheetAddAoa: vi.fn(),
 		saveAs: vi.fn(),
@@ -112,7 +115,8 @@ vi.mock('vue-i18n', async () => {
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({
-    query: routeQuery
+    query: routeQuery,
+    meta: routeMeta
   })
 }))
 
@@ -177,6 +181,7 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
 
 describe('admin UsageView route filters', () => {
   beforeEach(() => {
+  routeMeta.usageAnalytics = false
     vi.useFakeTimers()
     Object.keys(routeQuery).forEach((key) => delete routeQuery[key])
     list.mockReset().mockResolvedValue({ items: [], total: 0, pages: 0 })
@@ -404,7 +409,8 @@ describe('admin UsageView distribution metric toggles', () => {
     expect((wrapper.vm as any).requestedModelStats).toEqual([{ model: 'B', total_tokens: 20 }])
   })
 
-  it('keeps model and group metric toggles independent without refetching chart data', async () => {
+  it('keeps model and group metric toggles independent on the analytics page without refetching chart data', async () => {
+    routeMeta.usageAnalytics = true
     const wrapper = mount(UsageView, {
       global: {
         stubs: {
