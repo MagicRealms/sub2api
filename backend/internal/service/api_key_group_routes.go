@@ -73,6 +73,37 @@ func (s *APIKeyService) validateAPIKeyGroupRoutes(ctx context.Context, user *Use
 	return nil
 }
 
+// dropDeletedAPIKeyGroupRoutes removes historical route IDs whose groups were
+// soft-deleted. Group deletion intentionally leaves those IDs on the key so
+// monitor/audit snapshots can explain why the old route stopped working. When
+// a user edits the key, however, those historical IDs must not poison the new
+// ordered route submitted by the UI.
+func (s *APIKeyService) dropDeletedAPIKeyGroupRoutes(ctx context.Context, ids []int64) ([]int64, error) {
+	if len(ids) == 0 {
+		return []int64{}, nil
+	}
+	active := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		group, err := s.groupRepo.GetByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, ErrGroupNotFound) {
+				continue
+			}
+			return nil, fmt.Errorf("get route group: %w", err)
+		}
+		if group == nil {
+			continue
+		}
+		active = append(active, id)
+	}
+	// An edit that contains only stale/deleted IDs should fail closed instead
+	// of silently turning a still-routable key into an ungrouped key.
+	if len(active) == 0 {
+		return nil, ErrGroupNotAllowed
+	}
+	return active, nil
+}
+
 // OrderedRouteGroups always reloads group policy. Secondary routes cannot retain
 // access after a group is disabled, removed, or made exclusive.
 func (s *APIKeyService) OrderedRouteGroups(ctx context.Context, key *APIKey) ([]*Group, error) {

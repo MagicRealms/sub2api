@@ -65,6 +65,26 @@ func TestOrderedKeyGroupRoutesNormalization(t *testing.T) {
 	}
 }
 
+func TestUpdateRoutesDropsSoftDeletedGroupsButKeepsOrder(t *testing.T) {
+	first := &Group{ID: 11, Status: StatusActive}
+	second := &Group{ID: 22, Status: StatusActive}
+	svc := &APIKeyService{groupRepo: orderedGroupRepoTest{groups: map[int64]*Group{
+		first.ID: first,
+		second.ID: second,
+	}}}
+
+	ids, err := svc.dropDeletedAPIKeyGroupRoutes(context.Background(), []int64{99, first.ID, 100, second.ID})
+	require.NoError(t, err)
+	require.Equal(t, []int64{first.ID, second.ID}, ids)
+}
+
+func TestUpdateRoutesRejectsOnlySoftDeletedGroups(t *testing.T) {
+	svc := &APIKeyService{groupRepo: orderedGroupRepoTest{groups: map[int64]*Group{}}}
+
+	_, err := svc.dropDeletedAPIKeyGroupRoutes(context.Background(), []int64{99})
+	require.ErrorIs(t, err, ErrGroupNotAllowed)
+}
+
 func TestOrderedKeyRouteAuthorizationAndRequestIsolation(t *testing.T) {
 	first := &Group{ID: 1, Status: StatusActive, RateMultiplier: .32}
 	second := &Group{ID: 2, Status: StatusActive, RateMultiplier: .13}

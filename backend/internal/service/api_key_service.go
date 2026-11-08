@@ -849,6 +849,12 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		if err != nil {
 			return nil, err
 		}
+		// A deleted group may remain in GroupIDs as a historical route snapshot.
+		// Drop it only on an explicit edit, then validate the remaining live routes.
+		ids, err = s.dropDeletedAPIKeyGroupRoutes(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
 		if err := s.validateAPIKeyGroupRoutes(ctx, user, ids); err != nil {
 			return nil, err
 		}
