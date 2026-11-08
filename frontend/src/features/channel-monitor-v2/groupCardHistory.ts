@@ -1,5 +1,5 @@
 import type { MonitorCoverage, MonitorMatrixBucket } from '@/api/channelMonitorV2'
-import { healthModeScore, type HealthDisplayMode } from './monitorFormat'
+import { healthModeScore, healthModeState, type HealthDisplayMode } from './monitorFormat'
 
 export interface GroupHistorySlot {
   start: number
@@ -7,7 +7,7 @@ export interface GroupHistorySlot {
   bucket?: MonitorMatrixBucket
 }
 
-/** Compact presentation only: retain V2 sampling and show the worst scored
+/** Compact presentation only: retain V2 sampling and show the worst observed state / scored
  * native bucket in each display interval. Never average percentile values. */
 export function groupCardHistory(buckets: MonitorMatrixBucket[], coverage: MonitorCoverage, mode: HealthDisplayMode): GroupHistorySlot[] {
   const from = Date.parse(coverage.requested_start)
@@ -25,7 +25,10 @@ export function groupCardHistory(buckets: MonitorMatrixBucket[], coverage: Monit
     const slot = slots[Math.floor((time - aligned) / step)]!
     const score = healthModeScore(bucket.health, mode)
     const currentScore = slot.bucket ? healthModeScore(slot.bucket.health, mode) : null
-    if (!slot.bucket || (score != null && (currentScore == null || score < currentScore))) slot.bucket = bucket
+    const severity = { unknown: -1, healthy: 0, warning: 1, critical: 2 }
+    const rank = severity[healthModeState(bucket.health, mode)]
+    const currentRank = slot.bucket ? severity[healthModeState(slot.bucket.health, mode)] : -1
+    if (!slot.bucket || rank > currentRank || (rank === currentRank && score != null && (currentScore == null || score < currentScore))) slot.bucket = bucket
   }
   return slots
 }

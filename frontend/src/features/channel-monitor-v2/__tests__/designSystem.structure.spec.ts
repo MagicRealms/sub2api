@@ -31,14 +31,18 @@ describe('channel-monitor-v2 design system structure', () => {
     // Ops elevation: rounded-3xl + ring surfaces
     expect(src).toContain('rounded-3xl')
     expect(src).toContain('ring-1 ring-gray-900/5')
-    // Group cards are the primary view; summary follows the monitoring card.
-    expect(src.indexOf('<MonitorGroupCards')).toBeLessThan(src.indexOf('summaryAria'))
+    // Summary is inset into the main header, before group cards.
+    expect(src.indexOf('summaryAria')).toBeLessThan(src.indexOf('</header>'))
+    expect(src.indexOf('</header>')).toBeLessThan(src.indexOf('<MonitorGroupCards'))
     // No page-level fixed min-width that forces viewport horizontal scroll
     expect(src).not.toMatch(/min-width:\s*980px/)
     expect(src).not.toMatch(/min-w-\[980px\]/)
-    // Dense tables scroll internally
-    expect(src).toMatch(/max-h-\[min\(52vh/)
-    expect(src).toContain('overflow-auto')
+    // Redundant detail card and its background requests are removed.
+    expect(src).not.toContain('monitor-table')
+    expect(src).not.toContain('loadTab')
+    expect(src).not.toContain('getModels')
+    expect(src).not.toContain('getErrors')
+    expect(src).not.toContain('getUsers')
     // The V2 page no longer offers the obsolete trend views.
     expect(src).toContain('getGroupCards')
     expect(src).not.toContain('MonitorTrendChart')

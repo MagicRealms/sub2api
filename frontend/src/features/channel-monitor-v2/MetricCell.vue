@@ -1,6 +1,9 @@
 <template>
   <div
-    class="stat-card !min-h-[6.5rem] !rounded-3xl !border-0 !p-4 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700"
+    class="stat-card"
+    :class="compact
+      ? '!min-h-0 !rounded-2xl !border-0 !bg-gray-50/80 !p-3 !shadow-none !ring-0 dark:!bg-dark-900/40'
+      : '!min-h-[6.5rem] !rounded-3xl !border-0 !p-4 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700'"
     :title="title || undefined"
   >
     <div
@@ -38,6 +41,7 @@ import { computed } from 'vue'
 import type { HealthState } from '@/api/channelMonitorV2'
 
 const props = defineProps<{
+  compact?: boolean
   label: string
   value: string
   detail: string

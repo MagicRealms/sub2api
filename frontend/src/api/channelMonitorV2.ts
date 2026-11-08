@@ -61,6 +61,8 @@ export interface MonitorHealth {
   ttft_score?: number | null
   cache_score?: number | null
   minimum_sample: number
+  /** Observed group-card state based on fewer samples than the configured minimum. */
+  sample_limited?: boolean
   thresholds?: {
     minimum_sample?: number
     warning_error_rate: number

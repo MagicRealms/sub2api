@@ -6,6 +6,7 @@ import (
 )
 
 // Group cards use the same V2 facts, histograms, coverage and health thresholds.
+// Observed health is shown even for sparse traffic, with confidence marked separately.
 // Presence flags survive volume redaction without exposing absolute counts.
 type ChannelMonitorV2GroupCard struct {
 	ChannelMonitorV2MatrixRow
@@ -31,6 +32,14 @@ func (s *ChannelMonitorV2Service) GroupCards(ctx context.Context, filter Channel
 		return nil, err
 	}
 	result := selectChannelMonitorV2GroupCards(matrix)
+	for i := range result.Items {
+		card := &result.Items[i]
+		card.Health = channelMonitorV2ObservedHealth(card.Metrics, cfg.HealthThresholds)
+		for j := range card.Buckets {
+			bucket := &card.Buckets[j]
+			bucket.Health = channelMonitorV2ObservedHealth(bucket.Metrics, cfg.HealthThresholds)
+		}
+	}
 	if !admin {
 		hideTP := s.hideThroughputForViewer(ctx, admin)
 		for i := range result.Items {
@@ -41,6 +50,25 @@ func (s *ChannelMonitorV2Service) GroupCards(ctx context.Context, filter Channel
 		}
 	}
 	return result, nil
+}
+
+// A card describes observed requests, not statistical certainty. Reuse the
+// configured scoring budgets/weights while allowing one real sample to be
+// displayed. Retain the configured minimum and flag low confidence explicitly.
+// Empty/ignored-only buckets stay unknown, as do absent TTFT/cache measurements.
+func channelMonitorV2ObservedHealth(metrics ChannelMonitorV2Metric, thresholds ChannelMonitorV2HealthThresholds) ChannelMonitorV2Health {
+	thresholds = NormalizeChannelMonitorV2HealthThresholds(thresholds)
+	observed := thresholds
+	observed.MinimumSample = 1
+	health := ChannelMonitorV2HealthForWithThresholds(metrics, observed)
+	health.MinimumSample = thresholds.MinimumSample
+	health.Thresholds = thresholds
+	if metrics.RequestCount > 0 {
+		health.SampleLimited = metrics.RequestCount < thresholds.MinimumSample ||
+			(health.TTFTScore != nil && metrics.TTFT.SampleCount < thresholds.MinimumSample) ||
+			(health.CacheScore != nil && metrics.CacheRateDenominator < thresholds.MinimumSample)
+	}
+	return health
 }
 
 func selectChannelMonitorV2GroupCards(matrix *ChannelMonitorV2Matrix) *ChannelMonitorV2GroupCards {

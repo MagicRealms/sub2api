@@ -52,6 +52,10 @@ func TestChannelMonitorV2GroupCardsSelectionAndPrivacy(t *testing.T) {
 	require.Zero(t, card.Metrics.TTFT.SampleCount)
 	require.Zero(t, card.Metrics.RPM)
 	require.Zero(t, card.Buckets[0].Metrics.RequestCount)
+	require.True(t, card.Health.SampleLimited)
+	require.NotEqual(t, "unknown", card.Buckets[0].Health.Overall)
+	require.True(t, card.Buckets[0].Health.SampleLimited)
+	require.Empty(t, matrix.Items[1].Buckets[0].Health.Overall)
 	require.Equal(t, int64(10), matrix.Items[1].Metrics.RequestCount)
 	require.Equal(t, int64(10), matrix.Items[1].Buckets[0].Metrics.RequestCount)
 	require.False(t, byID[empty].HasTraffic)
@@ -79,4 +83,56 @@ func TestChannelMonitorV2GroupCardsStableTiesAndEmptyScope(t *testing.T) {
 	result := selectChannelMonitorV2GroupCards(&ChannelMonitorV2Matrix{})
 	require.NotNil(t, result.Items)
 	require.Empty(t, result.Items)
+}
+
+func TestChannelMonitorV2ObservedHealthSparseAndMissingSignals(t *testing.T) {
+	thresholds := DefaultChannelMonitorV2HealthThresholds()
+	thresholds.WarningCacheRate, thresholds.CriticalCacheRate = .2, .05
+	for _, tt := range []struct {
+		name                                        string
+		requests, successes, p50, latencySamples    int64
+		errorRate, cacheRate                        float64
+		cacheTokens                                 int64
+		wantOverall, wantError, wantTTFT, wantCache string
+	}{
+		{"single-success", 1, 1, 1000, 1, 0, .8, 100, "healthy", "healthy", "healthy", "healthy"},
+		{"single-failure", 1, 0, 0, 0, 1, 0, 0, "critical", "critical", "unknown", "unknown"},
+		{"degraded", 10, 9, 1000, 9, .1, .8, 100, "warning", "warning", "healthy", "healthy"},
+		{"sync-success", 1, 1, 0, 0, 0, 0, 0, "healthy", "healthy", "unknown", "unknown"},
+		{"slow-stream", 1, 1, 15000, 1, 0, 0, 0, "warning", "healthy", "critical", "unknown"},
+		{"cache-miss", 1, 1, 1000, 1, 0, 0, 100, "healthy", "healthy", "healthy", "critical"},
+		{"empty-or-ignored-only", 0, 0, 0, 0, 0, 0, 0, "unknown", "unknown", "unknown", "unknown"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m := ChannelMonitorV2Metric{RequestCount: tt.requests, SuccessRequests: tt.successes, ErrorRate: tt.errorRate, CacheRate: tt.cacheRate, CacheRateDenominator: tt.cacheTokens,
+				TTFT: ChannelMonitorV2Latency{SampleCount: tt.latencySamples}}
+			if tt.latencySamples > 0 {
+				m.TTFT.P50Ms = &tt.p50
+			}
+			h := channelMonitorV2ObservedHealth(m, thresholds)
+			require.Equal(t, tt.wantOverall, h.Overall)
+			require.Equal(t, tt.wantError, h.ErrorRate)
+			require.Equal(t, tt.wantTTFT, h.TTFT)
+			require.Equal(t, tt.wantCache, h.Cache)
+			require.Equal(t, tt.requests > 0, h.SampleLimited)
+			require.Equal(t, thresholds, h.Thresholds)
+			require.Equal(t, thresholds.MinimumSample, h.MinimumSample)
+			// The strict aggregate API still enforces the operator's minimum.
+			require.Equal(t, "unknown", ChannelMonitorV2HealthForWithThresholds(m, thresholds).Overall)
+		})
+	}
+}
+
+func TestChannelMonitorV2ObservedHealthKeepsConfiguredThresholdsAndConfidence(t *testing.T) {
+	thresholds := DefaultChannelMonitorV2HealthThresholds()
+	thresholds.WarningErrorRate, thresholds.CriticalErrorRate = .01, .04
+	p50 := int64(1000)
+	m := ChannelMonitorV2Metric{RequestCount: 50, ErrorRate: .04, CacheRateDenominator: 100, CacheRate: .8,
+		TTFT: ChannelMonitorV2Latency{SampleCount: 50, P50Ms: &p50}}
+	h := channelMonitorV2ObservedHealth(m, thresholds)
+	require.False(t, h.SampleLimited)
+	require.Equal(t, ChannelMonitorV2HealthForWithThresholds(m, thresholds), h)
+	require.Equal(t, "critical", h.ErrorRate)
+	m.TTFT.SampleCount = 1
+	require.True(t, channelMonitorV2ObservedHealth(m, thresholds).SampleLimited)
 }

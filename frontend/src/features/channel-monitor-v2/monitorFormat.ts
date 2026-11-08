@@ -108,6 +108,14 @@ export function healthModeScore(
   return health.score ?? null
 }
 
+/** Group cards use three explicit states; keep missing measurements neutral. */
+export function healthModeState(health: MonitorHealth, mode: HealthDisplayMode): HealthState {
+  const state = mode === 'success' ? health.error_rate : mode === 'ttft' ? health.ttft : mode === 'cache' ? health.cache : health.overall
+  if (state) return state
+  const score = healthModeScore(health, mode)
+  return score == null ? 'unknown' : score >= 80 ? 'healthy' : score >= 50 ? 'warning' : 'critical'
+}
+
 export function healthScoreClass(
   health: MonitorHealth,
   mode: HealthDisplayMode,

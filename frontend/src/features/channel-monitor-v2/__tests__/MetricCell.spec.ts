@@ -60,4 +60,11 @@ describe('MetricCell', () => {
     expect(wrapper.text()).toContain('P90 800ms')
     expect(wrapper.text()).not.toContain('…')
   })
+  it('supports compact inset cards while keeping metric details', () => {
+    const wrapper = mount(MetricCell, { props: { label: 'RPM', value: '12', detail: '每分钟请求数', compact: true } })
+    expect(wrapper.classes()).toContain('!min-h-0')
+    expect(wrapper.classes()).toContain('!shadow-none')
+    expect(wrapper.text()).toContain('每分钟请求数')
+  })
+
 })

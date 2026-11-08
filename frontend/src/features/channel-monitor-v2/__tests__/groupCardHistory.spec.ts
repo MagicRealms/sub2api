@@ -29,4 +29,16 @@ describe('V2 group card history', () => {
     const long = {...coverage,requested_end:'2026-12-08T00:00:00Z'}
     expect(groupCardHistory([],long,'overall').length).toBeLessThanOrEqual(36)
   })
+  it('retains a red observed state ahead of a lower-scored yellow bucket', () => {
+    const red = bucket(0, 90, 90), yellow = bucket(1, 50, 50)
+    red.health.overall = 'critical'; yellow.health.overall = 'warning'
+    expect(groupCardHistory([yellow, red], coverage, 'overall')[0]?.bucket).toBe(red)
+    expect(groupCardHistory([red, yellow], coverage, 'overall')[0]?.bucket).toBe(red)
+  })
+  it('does not let an unknown bucket hide a real sampled state', () => {
+    const empty = bucket(0, null, null), green = bucket(1, 100, 100)
+    empty.health.overall = 'unknown'; green.health.overall = 'healthy'
+    expect(groupCardHistory([empty, green], coverage, 'overall')[0]?.bucket).toBe(green)
+  })
+
 })

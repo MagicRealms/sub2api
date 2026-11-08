@@ -9,12 +9,13 @@
     <div v-if="entries.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <article v-for="{ card, slots } in entries" :key="card.group_id" class="monitor-group-card min-w-0 rounded-3xl border border-gray-200/80 bg-white p-4 transition-shadow hover:shadow-md dark:border-dark-600/70 dark:bg-dark-800 sm:p-5" :data-group-id="card.group_id">
         <header class="flex items-start gap-3">
-          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-300">
-            <ProviderIcon :provider="card.platform" :size="23" />
+          <span class="group-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" :class="groupIconClass(card.group_id)">
+            <WorkspaceIcon name="group" class="h-[23px] w-[23px]" />
           </span>
           <div class="min-w-0 flex-1">
             <h2 class="truncate text-sm font-bold text-gray-900 dark:text-gray-100" :title="card.group_name">{{ card.group_name || `#${card.group_id}` }}</h2>
             <span class="mt-1 inline-block text-[11px] font-medium text-gray-500 dark:text-gray-400">{{ providerName(card.platform) }}</span>
+            <span v-if="card.health.sample_limited" class="ml-1.5 text-[10px] text-gray-400" :title="t('channelMonitorV2.cards.limitedHint')">{{ t('channelMonitorV2.cards.limited') }}</span>
           </div>
           <span class="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-300">
             <i class="status-dot" :class="cellClass(card.health, card.has_traffic)" />{{ statusLabel(card) }}
@@ -44,6 +45,9 @@
             <span>{{ t('channelMonitorV2.cards.window', { range: rangeLabel }) }}</span>
             <span>{{ t('channelMonitorV2.cards.historyLabel') }}</span>
           </div>
+          <div class="mb-2 flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-400" aria-hidden="true">
+            <span v-for="state in ['healthy', 'warning', 'critical', 'unknown']" :key="state" class="inline-flex items-center gap-1"><i class="status-dot" :class="`health-${state}`" />{{ t(`channelMonitorV2.cards.${state}`) }}</span>
+          </div>
           <div class="group-history flex h-5 items-stretch gap-[3px]" :aria-label="t('channelMonitorV2.cards.historyHint')">
             <button v-for="slot in slots" :key="slot.start" type="button" class="min-w-0 flex-1 rounded-full transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" :class="slot.bucket ? cellClass(slot.bucket.health, true) : 'health-unknown'" :aria-label="slotLabel(slot)" @mouseenter="showTooltip($event, slot)" @mouseleave="closeTooltip" @focus="showTooltip($event, slot)" @blur="closeTooltip" @click="showTooltip($event, slot)" />
           </div>
@@ -59,6 +63,8 @@
       <template v-if="tooltipSlot">
         <p class="font-semibold">{{ time(tooltipSlot.start) }} — {{ time(tooltipSlot.end) }}</p>
         <template v-if="tooltipSlot.bucket">
+          <p class="font-medium" :class="tooltipSlot.bucket.health.sample_limited ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500'">{{ t(`channelMonitorV2.cards.${healthModeState(tooltipSlot.bucket.health, healthMode)}`) }}</p>
+          <p v-if="tooltipSlot.bucket.health.sample_limited" class="my-1 text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.cards.limitedHint') }}</p>
           <p class="mb-2 text-gray-400">{{ t('channelMonitorV2.cards.sampleAt', { time: time(tooltipSlot.bucket.bucket_start) }) }}</p>
           <p>{{ t('channelMonitorV2.metrics.successRateValue', { value: formatMonitorPercent(1 - tooltipSlot.bucket.metrics.error_rate) }) }}</p>
           <p>{{ t('channelMonitorV2.metrics.ttftValue', { value: formatMonitorMs(tooltipSlot.bucket.metrics.ttft.p50_ms) }) }}</p>
@@ -75,9 +81,9 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { MonitorCoverage, MonitorGroupCard, MonitorHealth } from '@/api/channelMonitorV2'
 import Icon from '@/components/icons/Icon.vue'
-import ProviderIcon from '@/components/user/monitor/ProviderIcon.vue'
+import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
-import { formatLatencyPrivacy, formatMonitorMs, formatMonitorPercent, healthScoreClass, type HealthDisplayMode } from './monitorFormat'
+import { formatLatencyPrivacy, formatMonitorMs, formatMonitorPercent, healthModeState, type HealthDisplayMode } from './monitorFormat'
 import { groupCardHistory, type GroupHistorySlot } from './groupCardHistory'
 
 const props = defineProps<{ cards: MonitorGroupCard[]; coverage: MonitorCoverage; healthMode: HealthDisplayMode; rangeLabel: string }>()
@@ -91,7 +97,16 @@ function showTooltip(event: MouseEvent | FocusEvent, slot: GroupHistorySlot) {
   tooltipSlot.value = slot
 }
 watch(() => [props.cards, props.healthMode, props.coverage], closeTooltip)
-function cellClass(health: MonitorHealth, sampled: boolean) { return healthScoreClass(health, props.healthMode, sampled ? 1 : 0) }
+function cellClass(health: MonitorHealth, sampled: boolean) { return `health-${sampled ? healthModeState(health, props.healthMode) : 'unknown'}` }
+const groupColors = [
+  'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300',
+  'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+  'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
+  'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300',
+  'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
+  'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300',
+]
+function groupIconClass(id?: number) { return groupColors[(Math.abs(id || 0) * 17 + Math.floor(Math.abs(id || 0) / 6)) % groupColors.length] }
 function modelLabel(card: MonitorGroupCard) {
   if (!card.has_traffic || !card.model) return t('channelMonitorV2.cards.noSamples')
   return card.model === '__other__' ? t('channelMonitorV2.otherModels') : card.model
@@ -102,8 +117,7 @@ function providerName(platform: string) {
 }
 function statusLabel(card: MonitorGroupCard) {
   if (!card.has_traffic) return t('channelMonitorV2.cards.noTraffic')
-  const state = props.healthMode === 'success' ? card.health.error_rate : props.healthMode === 'ttft' ? card.health.ttft : props.healthMode === 'cache' ? card.health.cache : card.health.overall
-  return t(`channelMonitorV2.cards.${state || 'unknown'}`)
+  return t(`channelMonitorV2.cards.${healthModeState(card.health, props.healthMode)}`)
 }
 function time(value: string | number) {
   const date = new Date(value)
@@ -119,17 +133,6 @@ function slotLabel(slot: GroupHistorySlot) {
 .monitor-group-card { container-type: inline-size; }
 .card-metric-value { font-size: 14px; font-size: clamp(12px, 5cqi, 18px); }
 .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 999px; }
-.health-score10 { background: #059669; }
-.health-score9 { background: #10b981; }
-.health-score8 { background: #34d399; }
-.health-score7 { background: #a3d766; }
-.health-score6 { background: #e4c84a; }
-.health-score5 { background: #eeb849; }
-.health-score4 { background: #f59e42; }
-.health-score3 { background: #f58b58; }
-.health-score2 { background: #f1787f; }
-.health-score1 { background: #f16470; }
-.health-score0 { background: #ef4444; }
 .health-healthy { background: #10b981; }
 .health-warning { background: #f59e0b; }
 .health-critical { background: #ef4444; }

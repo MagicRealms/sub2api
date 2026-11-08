@@ -125,13 +125,14 @@ type ChannelMonitorV2Health struct {
 	ErrorRate string `json:"error_rate"`
 	TTFT      string `json:"ttft"`
 	Cache     string `json:"cache"`
-	// Score is 0–100 when samples are sufficient; omitted/null when unknown.
+	// Score is 0–100 when scorable; group-card observations can be sample-limited.
 	// Overall blends error-rate, TTFT p50, and cache rate (weights in Thresholds).
 	Score          *float64                         `json:"score,omitempty"`
 	ErrorRateScore *float64                         `json:"error_rate_score,omitempty"`
 	TTFTScore      *float64                         `json:"ttft_score,omitempty"`
 	CacheScore     *float64                         `json:"cache_score,omitempty"`
 	MinimumSample  int64                            `json:"minimum_sample"`
+	SampleLimited  bool                             `json:"sample_limited,omitempty"`
 	Thresholds     ChannelMonitorV2HealthThresholds `json:"thresholds"`
 }
 
