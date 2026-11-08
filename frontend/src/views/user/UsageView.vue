@@ -1,6 +1,12 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="console-usage-page space-y-6">
+      <div class="console-page-heading">
+        <div>
+          <h1>使用记录</h1>
+          <p>按模型、密钥和时间快速回看最近的请求。</p>
+        </div>
+      </div>
       <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
@@ -177,18 +183,20 @@
       </div>
 
       <template v-if="activeTab === 'usage'">
-        <UsageTable
-          :data="usageLogs"
-          :loading="loading"
-          :columns="visibleColumns"
-          :server-side-sort="true"
-          :show-account-billing="false"
-          :show-upstream-endpoint="false"
-          default-sort-key="created_at"
-          default-sort-order="desc"
-          @sort="handleSort"
-          @ipGeoBatchFailed="handleIpGeoBatchFailed"
-        />
+        <div class="console-usage-table">
+          <UsageTable
+            :data="usageLogs"
+            :loading="loading"
+            :columns="visibleColumns"
+            :server-side-sort="true"
+            :show-account-billing="false"
+            :show-upstream-endpoint="false"
+            default-sort-key="created_at"
+            default-sort-order="desc"
+            @sort="handleSort"
+            @ipGeoBatchFailed="handleIpGeoBatchFailed"
+          />
+        </div>
 
         <Pagination
           v-if="pagination.total > 0"

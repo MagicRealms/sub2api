@@ -17,6 +17,8 @@ export default {
     day: '按天',
     hour: '按小时',
     modelDistribution: '模型分布',
+    consumptionDistribution: '消耗分布',
+    modelCallAnalysis: '模型调用分析',
     groupDistribution: '分组使用分布',
     platformBreakdown: '按平台拆分',
     platformBreakdownEmpty: '暂无平台用量',

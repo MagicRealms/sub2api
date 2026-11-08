@@ -23,6 +23,26 @@
               @update:model-value="onStatusFilterChange"
             />
           </div>
+          <section v-if="publicSettings?.api_base_url || appStore.apiBaseUrl" class="console-api-panel" aria-label="推荐 API 地址">
+            <div class="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <p class="sunworld-kicker">API CONNECTION</p>
+                <h2 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">推荐 API 地址</h2>
+                <p class="mt-1 text-xs leading-5 text-gray-600 dark:text-dark-300">将下面地址填入兼容 OpenAI 的客户端，再选择对应 API Key 即可使用。</p>
+              </div>
+              <div class="flex min-w-0 items-center gap-2">
+                <code class="console-api-code max-w-[min(70vw,30rem)] truncate" :title="recommendedEndpoint">{{ recommendedEndpoint }}</code>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm shrink-0"
+                  :title="recommendedEndpointCopied ? '已复制' : '复制 API 地址'"
+                  @click="copyRecommendedEndpoint"
+                >
+                  <Icon :name="recommendedEndpointCopied ? 'check' : 'clipboard'" size="sm" />
+                </button>
+              </div>
+            </div>
+          </section>
           <EndpointPopover
             v-if="publicSettings?.api_base_url || (publicSettings?.custom_endpoints?.length ?? 0) > 0"
             :api-base-url="publicSettings?.api_base_url || ''"
@@ -1359,6 +1379,7 @@ const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
+const recommendedEndpointCopied = ref(false)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -1366,6 +1387,12 @@ const columnDropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
+
+const recommendedEndpoint = computed(() => {
+  const configured = publicSettings.value?.api_base_url?.trim() || appStore.apiBaseUrl?.trim()
+  if (configured) return configured.replace(/\/$/, '')
+  return `${window.location.origin}/v1`
+})
 
 // Get the currently selected key for group change
 const selectedKeyForGroup = computed(() => {
@@ -1526,6 +1553,13 @@ const copyToClipboard = async (text: string, keyId: number) => {
       copiedKeyId.value = null
     }, 800)
   }
+}
+
+const copyRecommendedEndpoint = async () => {
+  const success = await clipboardCopy(recommendedEndpoint.value, '已复制')
+  if (!success) return
+  recommendedEndpointCopied.value = true
+  window.setTimeout(() => { recommendedEndpointCopied.value = false }, 1200)
 }
 
 const isAbortError = (error: unknown) => {

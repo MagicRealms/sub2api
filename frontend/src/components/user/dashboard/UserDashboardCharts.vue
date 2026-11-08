@@ -28,8 +28,8 @@
         </div>
         <div class="mb-4 flex items-center justify-between gap-3">
           <div>
-            <p class="sunworld-kicker">{{ t('dashboard.modelDistribution') }}</p>
-            <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ t('dashboard.modelDistribution') }}</h3>
+            <p class="sunworld-kicker">{{ t('dashboard.consumptionDistribution') }}</p>
+            <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">{{ t('dashboard.consumptionDistribution') }}</h3>
           </div>
           <Icon name="chart" size="md" class="text-primary-500/70" />
         </div>
@@ -64,7 +64,7 @@
       </div>
 
       <!-- Token Usage Trend Chart -->
-      <TokenUsageTrend :trend-data="trend" :loading="loading" />
+      <TokenUsageTrend :trend-data="trend" :loading="loading" :title="t('dashboard.modelCallAnalysis')" />
     </div>
   </div>
 </template>

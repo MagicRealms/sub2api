@@ -1,6 +1,12 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="console-usage-page console-admin-usage space-y-6">
+      <div class="console-page-heading">
+        <div>
+          <h1>全局用量分析</h1>
+          <p>从模型、分组、接口和账户维度观察中转站的真实消耗。</p>
+        </div>
+      </div>
       <UsageStatsCards :stats="usageStats" />
       <!-- Charts Section -->
       <div class="space-y-4">
@@ -122,7 +128,7 @@
           </template>
         </UsageFilters>
 
-        <div v-show="activeTab === 'usage'" class="overflow-hidden rounded-b-2xl">
+        <div v-show="activeTab === 'usage'" class="console-usage-table overflow-hidden rounded-b-2xl">
           <UsageTable
             flat
             :data="usageLogs"

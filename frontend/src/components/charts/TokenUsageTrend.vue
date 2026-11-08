@@ -4,7 +4,7 @@
       <div>
         <p class="sunworld-kicker">{{ t('dashboard.tokenUsageTrend') }}</p>
         <h3 class="mt-1 text-base font-semibold text-gray-900 dark:text-white">
-          {{ t('admin.dashboard.tokenUsageTrend') }}
+          {{ title || t('admin.dashboard.tokenUsageTrend') }}
         </h3>
       </div>
       <span class="rounded-lg bg-sun-50 px-2 py-1 text-[10px] font-medium text-sun-700 dark:bg-sun-900/25 dark:text-sun-300">TOKENS</span>
@@ -58,6 +58,7 @@ const { t } = useI18n()
 const props = defineProps<{
   trendData: TrendDataPoint[]
   loading?: boolean
+  title?: string
 }>()
 
 const isDarkMode = computed(() => {

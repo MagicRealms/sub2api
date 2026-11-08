@@ -12,11 +12,6 @@
         </button>
 
         <div class="hidden lg:block">
-          <div class="mb-0.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary-600/80 dark:text-primary-300/80">
-            <span>太阳新世界</span>
-            <span class="text-gray-300 dark:text-dark-600">/</span>
-            <span>WORKSPACE</span>
-          </div>
           <h1 class="text-[17px] font-semibold tracking-tight text-gray-900 dark:text-white">
             {{ pageTitle }}
           </h1>
@@ -28,10 +23,21 @@
 
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
       <div class="flex min-w-0 items-center gap-1.5 sm:gap-3">
-        <div class="sunworld-live-pill hidden items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex">
+        <a
+          v-if="contactInfo"
+          :href="contactLink"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="sunworld-live-pill hidden items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:flex"
+          :title="contactInfo"
+        >
           <span class="sunworld-live-dot"></span>
-          <span>ROUTING LIVE</span>
-        </div>
+          <Icon name="users" size="xs" />
+          <span>{{ contactLabel }}</span>
+        </a>
+        <span class="console-sun-mark hidden sm:inline-flex" aria-hidden="true">
+          <Icon name="sun" size="sm" />
+        </span>
         <!-- Announcement Bell -->
         <AnnouncementBell v-if="user" />
 
@@ -269,6 +275,15 @@ const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
+const contactLink = computed(() => {
+  const raw = contactInfo.value.trim()
+  return raw.match(/https?:\/\/[^\s]+/i)?.[0] || 'https://qm.qq.com/'
+})
+const contactLabel = computed(() => {
+  const raw = contactInfo.value.trim()
+  const group = raw.match(/(?:QQ群号|QQ群|QQ|群)\s*[:：]?\s*([0-9]{5,})/i)?.[1]
+  return group ? `QQ群 ${group}` : raw.slice(0, 24)
+})
 const docUrl = computed(() => sanitizeUrl(appStore.docUrl))
 const modelPlazaEnabled = computed(() => isFeatureFlagEnabled(FeatureFlags.modelPlaza))
 const avatarUrl = computed(() => user.value?.avatar_url?.trim() || '')

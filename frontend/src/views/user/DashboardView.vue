@@ -1,14 +1,14 @@
 <template>
   <AppLayout>
-    <div class="sunworld-dashboard space-y-6">
+    <div class="sunworld-dashboard console-data-board space-y-6">
       <SunworldWorkspaceHero
-        eyebrow="SUNWORLD / PERSONAL"
-        title="模型工作台"
-        subtitle="把常用模型、API 密钥和用量数据放在一个清晰的工作区里。"
-        action-label="浏览模型广场"
+        eyebrow="DATA / BOARD"
+        title="数据看板"
+        subtitle="模型调用、平台分布、额度和近期活动都在这里汇总。"
+        action-label="进入模型工作台"
         action-path="/model-plaza"
-        status-label="路由状态"
-        status-detail="你的请求入口已准备就绪"
+        status-label="实时路由"
+        status-detail="请求与用量正在同步"
       />
       <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
       <template v-else-if="stats">

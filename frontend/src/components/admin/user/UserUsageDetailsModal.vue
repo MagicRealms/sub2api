@@ -1,6 +1,6 @@
 <template>
   <BaseDialog :show="show" :title="t('admin.users.usageDetails.title')" width="wide" @close="emit('close')">
-    <div class="space-y-4">
+    <div class="console-usage-dialog space-y-4">
       <div v-if="displayUser" class="rounded-xl bg-gray-50 p-3 dark:bg-dark-800">
         <div class="flex flex-wrap items-center gap-2">
           <span class="break-all font-medium text-gray-900 dark:text-gray-100">{{ displayUser.email }}</span>
@@ -55,7 +55,7 @@
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-dark-700">
               <tr><th class="px-4 py-2.5 text-left font-normal text-gray-500">{{ t('admin.users.usageDetails.requests') }}</th><td class="px-4 py-2.5 text-right font-semibold tabular-nums" data-test="day-requests">{{ number(selectedUsage.requests) }}</td><td class="px-4 py-2.5 text-right tabular-nums" data-test="total-requests">{{ number(details.total.requests) }}</td></tr>
-              <tr><th class="px-4 py-2.5 text-left font-normal text-gray-500">Token</th><td class="px-4 py-2.5 text-right font-semibold tabular-nums" :title="tokenBreakdown(selectedUsage)" data-test="day-tokens">{{ number(selectedUsage.total_tokens) }}</td><td class="px-4 py-2.5 text-right tabular-nums" :title="tokenBreakdown(details.total)" data-test="total-tokens">{{ number(details.total.total_tokens) }}</td></tr>
+              <tr><th class="px-4 py-2.5 text-left font-normal text-gray-500">Token</th><td class="px-4 py-2.5 text-right font-semibold tabular-nums" :title="tokenBreakdown(selectedUsage)" data-test="day-tokens">{{ formatTokensM(selectedUsage.total_tokens) }}</td><td class="px-4 py-2.5 text-right tabular-nums" :title="tokenBreakdown(details.total)" data-test="total-tokens">{{ formatTokensM(details.total.total_tokens) }}</td></tr>
               <tr><th class="px-4 py-2.5 text-left font-normal text-gray-500">{{ t('admin.users.usageDetails.actualCost') }}</th><td class="px-4 py-2.5 text-right font-semibold tabular-nums" data-test="day-cost">{{ money(selectedUsage.actual_cost) }}</td><td class="px-4 py-2.5 text-right tabular-nums" data-test="total-cost">{{ money(details.total.actual_cost) }}</td></tr>
             </tbody>
           </table>
@@ -82,8 +82,8 @@
                     <div class="flex items-center gap-2"><span class="truncate font-medium" :title="key.name">{{ key.name || `#${key.id}` }}</span><span :class="keyStatus(key) === 'active' ? 'text-green-600 dark:text-green-400' : 'text-gray-500'">{{ t(`admin.users.usageDetails.${keyStatus(key)}`) }}</span></div>
                     <div class="mt-1 truncate text-gray-500"><span class="font-mono">{{ key.key_preview || '—' }}</span><span v-if="key.group_name"> · {{ key.group_name }}</span></div>
                   </td>
-                  <td class="px-3 py-3 text-right tabular-nums" :title="tokenBreakdown(keyDay(key))"><div>{{ number(keyDay(key).requests) }} / {{ number(keyDay(key).total_tokens) }}</div><div class="mt-1 text-gray-500">{{ money(keyDay(key).actual_cost) }}</div></td>
-                  <td class="px-3 py-3 text-right tabular-nums" :title="tokenBreakdown(key.total)"><div>{{ number(key.total.requests) }} / {{ number(key.total.total_tokens) }}</div><div class="mt-1 text-gray-500">{{ money(key.total.actual_cost) }}</div></td>
+                  <td class="px-3 py-3 text-right tabular-nums" :title="tokenBreakdown(keyDay(key))"><div>{{ number(keyDay(key).requests) }} / {{ formatTokensM(keyDay(key).total_tokens) }}</div><div class="mt-1 text-gray-500">{{ money(keyDay(key).actual_cost) }}</div></td>
+                  <td class="px-3 py-3 text-right tabular-nums" :title="tokenBreakdown(key.total)"><div>{{ number(key.total.requests) }} / {{ formatTokensM(key.total.total_tokens) }}</div><div class="mt-1 text-gray-500">{{ money(key.total.actual_cost) }}</div></td>
                   <td class="px-3 py-3 text-right text-gray-500">{{ dateTime(key.last_used_at) }}</td>
                 </tr>
                 <tr v-if="filteredKeys.length === 0"><td colspan="4" class="px-3 py-8 text-center text-gray-500">{{ t('admin.users.usageDetails.noKeys') }}</td></tr>
@@ -137,6 +137,13 @@ const filteredKeys = computed(() => {
 const pageCount = computed(() => Math.max(1, Math.ceil(filteredKeys.value.length / pageSize)))
 const pagedKeys = computed(() => filteredKeys.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const number = (value: number) => new Intl.NumberFormat(locale.value).format(value)
+const formatTokensM = (value: number) => {
+  const tokens = Number(value) || 0
+  if (tokens <= 0) return '0 M'
+  const precision = tokens >= 1_000_000 ? 2 : tokens >= 10_000 ? 3 : 4
+  const formatted = (tokens / 1_000_000).toFixed(precision).replace(/\.?(0+)$/, '')
+  return `${formatted} M`
+}
 const money = (value: number) => new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(value)
 const dateTime = (value?: string | null) => value ? formatDateTime(value) : '—'
 const keyDay = (key: UserAPIKeyUsage): UserUsageMetrics => key.daily.find(day => day.date === selectedDate.value) ?? zero
