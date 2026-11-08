@@ -596,7 +596,7 @@ function formatBucketRange(value: string) {
 .pulse-tooltip {
   display: none;
 }
-.matrix-floating-tooltip {
+:global(.matrix-floating-tooltip) {
   pointer-events: none;
   position: fixed;
   min-width: 11.5rem;
@@ -606,9 +606,10 @@ function formatBucketRange(value: string) {
   background: rgb(255 255 255);
   padding: 0.5rem 0.625rem;
   box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.28);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-:global(.dark) .matrix-floating-tooltip {
+:global(.dark .matrix-floating-tooltip) {
   border-color: rgb(55 65 81);
   background: rgb(17 24 39);
   color: rgb(229 231 235);
