@@ -19,9 +19,7 @@
         />
       </span>
     </button>
-
-    <Transition name="date-picker-dropdown">
-      <div v-if="isOpen" class="date-picker-dropdown">
+    <FloatingPanel :open="isOpen" :anchor="containerRef" align="start" :min-width="320" @close="isOpen = false" class="date-picker-dropdown">
         <!-- Quick presets -->
         <div class="date-picker-presets">
           <button
@@ -70,12 +68,12 @@
             {{ t('dates.apply') }}
           </button>
         </div>
-      </div>
-    </Transition>
+      </FloatingPanel>
   </div>
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
@@ -350,14 +348,16 @@ onUnmounted(() => {
   @apply text-gray-400 dark:text-dark-400;
 }
 
-.date-picker-dropdown {
-  @apply absolute left-0 z-[100] mt-2;
-  @apply bg-white dark:bg-dark-800;
+:global(.date-picker-dropdown) {
+  @apply bg-white;
   @apply rounded-xl;
-  @apply border border-gray-200 dark:border-dark-700;
-  @apply shadow-lg shadow-black/10 dark:shadow-black/30;
+  @apply border border-gray-200;
+  @apply shadow-lg shadow-black/10;
   @apply overflow-hidden;
-  @apply min-w-[320px];
+}
+
+:global(.dark .date-picker-dropdown) {
+  @apply border-dark-700 bg-dark-800 shadow-black/30;
 }
 
 .date-picker-presets {
@@ -385,7 +385,7 @@ onUnmounted(() => {
 }
 
 .date-picker-field {
-  @apply flex-1;
+  @apply min-w-0 flex-1;
 }
 
 .date-picker-label {

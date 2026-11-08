@@ -169,7 +169,7 @@ const GroupDistributionChartStub = {
 }
 
 const mountRouteFilteredUsageView = () => mount(UsageView, {
-  global: { stubs: {
+  global: { stubs: { Teleport: true,
     AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
     UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
     UserBalanceHistoryModal: true, Pagination: true, Select: true,
@@ -383,7 +383,7 @@ describe('admin UsageView distribution metric toggles', () => {
     getModelStats.mockResolvedValueOnce({ models: [{ model: 'A', total_tokens: 10 }] })
 
     const wrapper = mount(UsageView, {
-      global: { stubs: {
+      global: { stubs: { Teleport: true,
         AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
         UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
         UserBalanceHistoryModal: true, AuditLogModal: true, Pagination: true, Select: true,
@@ -413,7 +413,7 @@ describe('admin UsageView distribution metric toggles', () => {
     routeMeta.usageAnalytics = true
     const wrapper = mount(UsageView, {
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           AppLayout: AppLayoutStub,
           UsageStatsCards: true,
           UsageFilters: UsageFiltersStub,
@@ -488,7 +488,7 @@ describe('admin UsageView request ID column visibility', () => {
   it('keeps request ID hidden by default and allows enabling it from column settings', async () => {
     const wrapper = mount(UsageView, {
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           AppLayout: AppLayoutStub,
           UsageStatsCards: true,
           UsageFilters: UsageFiltersStub,
@@ -533,7 +533,7 @@ describe('admin UsageView request ID column visibility', () => {
   it('keeps upstream ID hidden by default and allows enabling it from column settings', async () => {
     const wrapper = mount(UsageView, {
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           AppLayout: AppLayoutStub,
           UsageStatsCards: true,
           UsageFilters: UsageFiltersStub,
@@ -597,7 +597,7 @@ describe('admin UsageView handleUserClick', () => {
 
     const wrapper = mount(UsageView, {
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           AppLayout: AppLayoutStub,
           UsageStatsCards: true,
           UsageFilters: UsageFiltersStub,
@@ -654,7 +654,7 @@ describe('admin UsageView errors tab filter forwarding', () => {
 
   it('forwards model/account_id/group_id to listErrorLogs on the errors tab', async () => {
     const wrapper = mount(UsageView, {
-      global: { stubs: {
+      global: { stubs: { Teleport: true,
         AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
         UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
         UserBalanceHistoryModal: true, AuditLogModal: true, Pagination: true, Select: true,
@@ -710,7 +710,7 @@ describe('admin UsageView ranking tab', () => {
 
   it('mounts ranking lazily and drill-down sets user filter then jumps back to usage tab', async () => {
     const wrapper = mount(UsageView, {
-      global: { stubs: {
+      global: { stubs: { Teleport: true,
         AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
         UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
         UserBalanceHistoryModal: true, Pagination: true, Select: true,

@@ -76,7 +76,7 @@ function mountSelector(props: Record<string, unknown> = {}) {
       ...props,
     },
     global: {
-      stubs: {
+      stubs: { Teleport: true,
         ModelIcon: true
       }
     }
@@ -240,7 +240,7 @@ describe('ModelWhitelistSelector', () => {
         accountId: 46
       },
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           ModelIcon: true
         }
       }
@@ -295,7 +295,7 @@ describe('ModelWhitelistSelector', () => {
         accountId: 46
       },
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           ModelIcon: true
         }
       }

@@ -63,9 +63,9 @@
           @input="searchAccounts"
           @focus="onSearchFocus"
         />
-        <div
-          v-if="showDropdown && (searchResults.length > 0 || searchKeyword.trim() !== '')"
-          class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
+        <FloatingPanel
+          :open="!!(showDropdown && (searchResults.length > 0 || searchKeyword.trim() !== ''))" :anchor="searchContainerRef" align="start" match-width @close="showDropdown = false"
+          class="max-h-48 w-full overflow-auto rounded-lg border bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
           data-testid="codex-manifest-dropdown"
         >
           <p
@@ -89,7 +89,7 @@
             <span>{{ account.name }}</span>
             <span class="ml-2 text-xs text-gray-400">#{{ account.id }}</span>
           </button>
-        </div>
+        </FloatingPanel>
       </div>
 
       <!-- 回退子开关 -->
@@ -126,6 +126,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Icon from "@/components/icons/Icon.vue";

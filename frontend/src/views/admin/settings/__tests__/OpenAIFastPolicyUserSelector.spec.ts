@@ -60,7 +60,7 @@ describe('OpenAIFastPolicyUserSelector', () => {
 
     const wrapper = mount(OpenAIFastPolicyUserSelector, {
       props: { modelValue: [7] },
-      global: { stubs: { Icon: true } },
+      global: { stubs: { Teleport: true, Icon: true } },
     })
     await flushPromises()
 
@@ -77,7 +77,7 @@ describe('OpenAIFastPolicyUserSelector', () => {
 
     const wrapper = mount(OpenAIFastPolicyUserSelector, {
       props: { modelValue: [] },
-      global: { stubs: { Icon: true } },
+      global: { stubs: { Teleport: true, Icon: true } },
     })
     const input = wrapper.get('input')
     await input.trigger('focus')
@@ -101,7 +101,7 @@ describe('OpenAIFastPolicyUserSelector', () => {
 
     const wrapper = mount(OpenAIFastPolicyUserSelector, {
       props: { modelValue: [42] },
-      global: { stubs: { Icon: true } },
+      global: { stubs: { Teleport: true, Icon: true } },
     })
     await flushPromises()
 

@@ -100,7 +100,7 @@ function mountFilters(filters = defaultFilters()) {
       modelOptions: [],
     },
     global: {
-      stubs: {
+      stubs: { Teleport: true,
         Select: true,
         Teleport: true,
       },
@@ -253,7 +253,7 @@ describe('UsageFilters — model options come from prop (no dup request)', () =>
         showActions: false,
         modelOptions: ['claude-3', 'gpt-4o'],
       },
-      global: { stubs: { Select: true, Teleport: true } },
+      global: { stubs: { Teleport: true, Select: true, Teleport: true } },
     })
     await flushPromises()
 
@@ -282,7 +282,7 @@ describe('UsageFilters — native compaction filter', () => {
         showActions: false,
         modelOptions: [],
       },
-      global: { stubs: { Select: SelectStub, Teleport: true } },
+      global: { stubs: { Teleport: true, Select: SelectStub, Teleport: true } },
     })
 
     const compactionSelect = wrapper.findAllComponents(SelectStub).find((select: any) =>

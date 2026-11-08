@@ -153,7 +153,7 @@ const usageLog = {
 function mountUsageView() {
   return mount(UsageView, {
     global: {
-      stubs: {
+      stubs: { Teleport: true,
         AppLayout: simpleStub,
         Pagination: true,
         Select: true,

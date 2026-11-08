@@ -44,7 +44,7 @@ describe('DateRangePicker', () => {
         endDate: formatLocalDate(now)
       },
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           Icon: true
         }
       }
@@ -63,7 +63,7 @@ describe('DateRangePicker', () => {
         endDate: today
       },
       global: {
-        stubs: {
+        stubs: { Teleport: true,
           Icon: true
         }
       }

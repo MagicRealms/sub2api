@@ -20,9 +20,9 @@
       </span>
     </button>
 
-    <div
-      v-if="showDropdown"
-      class="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
+    <FloatingPanel
+      :open="showDropdown" :anchor="dropdownRef" align="end" @close="showDropdown = false"
+      class="w-44 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
     >
       <div class="p-1.5">
         <button
@@ -47,11 +47,12 @@
           </svg>
         </button>
       </div>
-    </div>
+    </FloatingPanel>
   </div>
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 

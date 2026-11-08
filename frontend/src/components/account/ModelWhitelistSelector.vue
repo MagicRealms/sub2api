@@ -1,7 +1,7 @@
 <template>
   <div>
     <!-- Multi-select Dropdown -->
-    <div class="relative mb-3">
+    <div class="relative mb-3" ref="dropdownAnchorRef">
       <div
         @click="toggleDropdown"
         class="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-dark-500 dark:bg-dark-700"
@@ -33,9 +33,9 @@
         </div>
       </div>
       <!-- Dropdown List -->
-      <div
-        v-if="showDropdown"
-        class="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-700"
+      <FloatingPanel
+        :open="!!(showDropdown)" :anchor="dropdownAnchorRef" align="start" match-width @close="showDropdown = false"
+        class="rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-700"
       >
         <div class="sticky top-0 border-b border-gray-200 bg-white p-2 dark:border-dark-600 dark:bg-dark-700">
           <input
@@ -89,7 +89,7 @@
             {{ t('admin.accounts.noMatchingModels') }}
           </div>
         </div>
-      </div>
+      </FloatingPanel>
     </div>
 
     <!-- Quick Actions -->
@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -184,6 +185,7 @@ const emit = defineEmits<{
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 
+const dropdownAnchorRef = ref<HTMLElement | null>(null)
 const showDropdown = ref(false)
 const searchQuery = ref('')
 const customModel = ref('')

@@ -105,9 +105,9 @@
                 </svg>
                 <span class="hidden md:inline">{{ t('admin.users.columnSettings') }}</span>
               </button>
-              <div
-                v-if="showColumnDropdown"
-                class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+              <FloatingPanel
+                :open="showColumnDropdown" :anchor="columnDropdownRef" align="end" :max-height="320" @close="showColumnDropdown = false"
+                class="max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
               >
                 <button
                   v-for="col in currentToggleableColumns"
@@ -125,7 +125,7 @@
                     :stroke-width="2"
                   />
                 </button>
-              </div>
+              </FloatingPanel>
             </div>
           </template>
         </UsageFilters>
@@ -193,6 +193,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'

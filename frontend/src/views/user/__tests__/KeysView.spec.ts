@@ -228,7 +228,7 @@ const IconStub = {
 const mountView = async () => {
   const wrapper = mount(KeysView, {
     global: {
-      stubs: {
+      stubs: { Teleport: true,
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,

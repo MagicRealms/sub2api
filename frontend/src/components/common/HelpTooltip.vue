@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef, nextTick } from 'vue'
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, nextTick, type CSSProperties } from 'vue'
 
 const props = withDefaults(defineProps<{
   content?: string
@@ -13,7 +13,8 @@ const props = withDefaults(defineProps<{
 const show = ref(false)
 const triggerRef = useTemplateRef<HTMLElement>('trigger')
 const tooltipRef = useTemplateRef<HTMLElement>('tooltip')
-const tooltipStyle = ref({ top: '0px', left: '0px' })
+const tooltipStyle = ref<CSSProperties>({ top: '0px', left: '0px' })
+const tooltipBelow = ref(false)
 
 function openTooltip() {
   show.value = true
@@ -78,11 +79,31 @@ function onViewportChange() {
 
 function updatePosition() {
   const el = triggerRef.value
-  if (!el) return
+  const tooltip = tooltipRef.value
+  if (!el || !tooltip) return
   const rect = el.getBoundingClientRect()
+  if (rect.width > 0 && (rect.bottom <= 0 || rect.top >= window.innerHeight || rect.right <= 0 || rect.left >= window.innerWidth)) {
+    closeTooltip()
+    return
+  }
+  const padding = 8
+  const maxWidth = Math.max(0, window.innerWidth - padding * 2)
+  tooltip.style.maxWidth = `${maxWidth}px`
+  const bounds = tooltip.getBoundingClientRect()
+  const width = Math.min(bounds.width, maxWidth)
+  const above = Math.max(0, rect.top - padding * 2)
+  const below = Math.max(0, window.innerHeight - rect.bottom - padding * 2)
+  tooltipBelow.value = above < bounds.height && below > above
+  const room = tooltipBelow.value ? below : above
+  const center = Math.max(padding + width / 2, Math.min(rect.left + rect.width / 2, window.innerWidth - width / 2 - padding))
+  // Fixed tooltips use viewport coordinates, never document scroll offsets.
   tooltipStyle.value = {
-    top: `${rect.top + window.scrollY}px`,
-    left: `${rect.left + rect.width / 2 + window.scrollX}px`,
+    top: `${tooltipBelow.value ? rect.bottom + padding : rect.top - padding}px`,
+    left: `${center}px`,
+    maxWidth: `${maxWidth}px`,
+    maxHeight: `${room}px`,
+    overflowY: tooltip.scrollHeight > room ? 'auto' : 'visible',
+    transform: tooltipBelow.value ? 'translateX(-50%)' : 'translate(-50%, -100%)',
   }
 }
 
@@ -134,10 +155,11 @@ onBeforeUnmount(() => {
         v-show="show"
         role="tooltip"
         :class="[
-          'fixed z-[99999] -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 p-3 text-xs leading-relaxed text-white shadow-xl ring-1 ring-white/10 selection:bg-primary-200 selection:text-gray-900 before:absolute before:inset-x-0 before:top-full before:h-3 dark:bg-gray-800 dark:selection:bg-primary-200 dark:selection:text-gray-900',
+          'fixed z-[99999] rounded-lg bg-gray-900 p-3 text-xs leading-relaxed text-white shadow-xl ring-1 ring-white/10 selection:bg-primary-200 selection:text-gray-900 before:absolute before:inset-x-0 before:h-3 dark:bg-gray-800 dark:selection:bg-primary-200 dark:selection:text-gray-900',
+          tooltipBelow ? 'before:bottom-full' : 'before:top-full',
           props.widthClass,
         ]"
-        :style="{ top: `calc(${tooltipStyle.top} - 8px)`, left: tooltipStyle.left }"
+        :style="tooltipStyle"
         @mouseleave="onTooltipLeave"
       >
         <button
@@ -152,7 +174,7 @@ onBeforeUnmount(() => {
           </svg>
         </button>
         <slot>{{ content }}</slot>
-        <div class="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900 dark:bg-gray-800"></div>
+        <div class="absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-gray-900 dark:bg-gray-800" :class="tooltipBelow ? '-top-1' : '-bottom-1'"></div>
       </div>
     </Teleport>
   </div>

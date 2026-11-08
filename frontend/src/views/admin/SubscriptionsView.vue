@@ -114,9 +114,9 @@
                 <span class="hidden md:inline">{{ t('admin.users.columnSettings') }}</span>
               </button>
               <!-- Dropdown menu -->
-              <div
-                v-if="showColumnDropdown"
-                class="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
+              <FloatingPanel
+                :open="!!(showColumnDropdown)" :anchor="columnDropdownRef" align="end" :max-height="320" @close="showColumnDropdown = false"
+                class="w-48 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
               >
                 <div class="p-2">
                   <!-- User column mode selection -->
@@ -150,7 +150,7 @@
                     <Icon v-if="isColumnVisible(col.key)" name="check" size="sm" class="text-primary-500" />
                   </button>
                 </div>
-              </div>
+              </FloatingPanel>
             </div>
             <button
               @click="showGuideModal = true"
@@ -840,6 +840,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

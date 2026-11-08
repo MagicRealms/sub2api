@@ -73,9 +73,9 @@
               </svg>
               <span class="hidden md:inline">{{ t('keys.columnSettings') }}</span>
             </button>
-            <div
-              v-if="showColumnDropdown"
-              class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+            <FloatingPanel
+              :open="showColumnDropdown" :anchor="columnDropdownRef" align="end" :max-height="320" @close="showColumnDropdown = false"
+              class="max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
             >
               <button
                 v-for="col in toggleableColumns"
@@ -92,7 +92,7 @@
                   :stroke-width="2"
                 />
               </button>
-            </div>
+            </FloatingPanel>
           </div>
           <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
             <Icon name="plus" size="md" class="mr-2" />
@@ -1154,6 +1154,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 	import { ref, reactive, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'

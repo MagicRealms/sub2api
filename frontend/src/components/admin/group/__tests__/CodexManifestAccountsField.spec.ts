@@ -52,7 +52,7 @@ const mountInteractive = (initial: CodexModelsManifestConfig, accountNames?: Rec
   });
   return mount(host, {
     global: {
-      stubs: {
+      stubs: { Teleport: true,
         Icon: { props: ["name"], template: '<i :data-icon="name" />' },
       },
     },
@@ -67,7 +67,7 @@ const mountField = (modelValue: CodexModelsManifestConfig, accountNames?: Record
       ...(accountNames ? { accountNames } : {}),
     },
     global: {
-      stubs: {
+      stubs: { Teleport: true,
         Icon: { props: ["name"], template: '<i :data-icon="name" />' },
       },
     },

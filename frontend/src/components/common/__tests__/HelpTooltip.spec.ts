@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -14,6 +14,25 @@ function getTooltipElement(): HTMLDivElement {
 describe('HelpTooltip', () => {
   afterEach(() => {
     document.body.innerHTML = ''
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('uses viewport coordinates after scrolling and keeps a narrow-screen tooltip within the edges', async () => {
+    vi.stubGlobal('innerWidth', 320)
+    vi.stubGlobal('innerHeight', 640)
+    vi.stubGlobal('scrollY', 600)
+    const wrapper = mount(HelpTooltip, { attachTo: document.body, props: { content: 'details' } })
+    const trigger = wrapper.get('.group')
+    const tooltip = getTooltipElement()
+    vi.spyOn(trigger.element, 'getBoundingClientRect').mockReturnValue({ left: 4, top: 180, right: 20, bottom: 196, width: 16, height: 16 } as DOMRect)
+    vi.spyOn(tooltip, 'getBoundingClientRect').mockReturnValue({ width: 256, height: 48 } as DOMRect)
+    await trigger.trigger('mouseenter')
+    await nextTick()
+    expect(tooltip.style.top).toBe('172px')
+    expect(tooltip.style.left).toBe('136px')
+    expect(tooltip.style.maxWidth).toBe('304px')
+    wrapper.unmount()
   })
 
   it('keeps the existing hover interaction by default', async () => {

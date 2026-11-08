@@ -21,9 +21,7 @@
         />
       </span>
     </button>
-
-    <Transition name="select-dropdown">
-      <div v-if="isOpen" class="select-dropdown">
+    <FloatingPanel :open="isOpen" :anchor="containerRef" align="start" match-width @close="isOpen = false; searchQuery = ''" class="select-dropdown proxy-selector-panel">
         <!-- Search and Batch Test Header -->
         <div class="select-header">
           <div class="select-search">
@@ -162,12 +160,12 @@
             {{ t('common.noOptionsFound') }}
           </div>
         </div>
-      </div>
-    </Transition>
+      </FloatingPanel>
   </div>
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
@@ -341,13 +339,16 @@ onUnmounted(() => {
   @apply flex-shrink-0 text-gray-400 dark:text-dark-400;
 }
 
-.select-dropdown {
-  @apply absolute z-[100] mt-2 w-full;
-  @apply bg-white dark:bg-dark-800;
+:global(.proxy-selector-panel) {
+  @apply bg-white;
   @apply rounded-xl;
-  @apply border border-gray-200 dark:border-dark-700;
-  @apply shadow-lg shadow-black/10 dark:shadow-black/30;
+  @apply border border-gray-200;
+  @apply shadow-lg shadow-black/10;
   @apply overflow-hidden;
+}
+
+:global(.dark .proxy-selector-panel) {
+  @apply border-dark-700 bg-dark-800 shadow-black/30;
 }
 
 .select-header {

@@ -36,9 +36,9 @@
                     }}
                   </span>
                 </button>
-                <div
-                  v-if="showAutoRefreshDropdown"
-                  class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
+                <FloatingPanel
+                  :open="!!(showAutoRefreshDropdown)" :anchor="autoRefreshDropdownRef" align="end" @close="showAutoRefreshDropdown = false"
+                  class="w-56 origin-top-right rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
                 >
                   <div class="p-2">
                     <button
@@ -59,7 +59,7 @@
                       <Icon v-if="autoRefreshIntervalSeconds === sec" name="check" size="sm" class="text-primary-500" />
                     </button>
                   </div>
-                </div>
+                </FloatingPanel>
               </div>
 
               <!-- More Tools Dropdown -->
@@ -490,6 +490,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted, toRaw, watch } from 'vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'

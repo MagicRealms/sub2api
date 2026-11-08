@@ -24,7 +24,7 @@
               </span>
               <Icon name="chevronDown" size="sm" class="shrink-0" />
             </button>
-            <div v-if="datesOpen" id="backup-archive-options" class="absolute left-0 top-full z-30 mt-1 w-full rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-dark-600 dark:bg-dark-800">
+            <FloatingPanel :open="!!(datesOpen)" :anchor="datePicker" align="start" :min-width="280" @close="datesOpen = false" id="backup-archive-options" class="w-full rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-dark-600 dark:bg-dark-800">
               <div class="mb-1 flex items-center justify-between gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">
                 <span>{{ t('admin.backup.archive.selectedDates', { count: selectedLabels.length }) }}</span>
                 <button type="button" class="min-h-9 px-2 text-primary-600 dark:text-primary-400" @click="closeDates(true)">{{ t('admin.backup.archive.done') }}</button>
@@ -39,7 +39,7 @@
                   {{ t('admin.backup.archive.monthEnd') }}
                 </label>
               </div>
-            </div>
+            </FloatingPanel>
           </div>
           <p id="backup-archive-dates-hint" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.backup.archive.datesHint') }}</p>
         </div>
@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'

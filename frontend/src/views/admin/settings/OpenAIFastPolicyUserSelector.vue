@@ -45,9 +45,9 @@
       />
     </div>
 
-    <div
-      v-if="showDropdown && searchQuery.trim()"
-      class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-700"
+    <FloatingPanel
+      :open="!!(showDropdown && searchQuery.trim())" :anchor="containerRef" align="start" match-width @close="showDropdown = false"
+      class="max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-600 dark:bg-dark-700"
     >
       <div v-if="searchLoading" class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
         {{ t("common.loading") }}
@@ -75,11 +75,12 @@
           <span class="shrink-0 text-xs text-gray-400">#{{ user.id }}</span>
         </button>
       </template>
-    </div>
+    </FloatingPanel>
   </div>
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { adminAPI } from "@/api/admin";
