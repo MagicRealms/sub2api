@@ -1,5 +1,17 @@
 export default {
   workspace: {
+    globalRecords: '全局记录',
+    globalRecordsDescription: '全站请求与用量洞察，重点一眼可见，详情按需展开。',
+    insightDetails: '查看分析详情',
+    modelsUsed: '个模型',
+    groupsUsed: '个分组',
+    endpointsUsed: '个端点',
+    leadingShare: '占比 {value}%',
+    noActivity: '所选时间暂无用量',
+    trendSnapshot: '缓存、成本与用量趋势',
+    trendSummary: '缓存命中率',
+    trendDetailHint: '查看时间趋势，点击数据点追溯请求。',
+
     moreFilters: '更多筛选',
     lessFilters: '收起筛选',
     compactView: '精简视图',

@@ -710,8 +710,7 @@ const adminNavItems = computed((): NavItem[] => {
         { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
       ],
     },
-    { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
-    { path: '/admin/usage/analytics', label: t('workspace.globalAnalytics'), icon: { render: () => h(WorkspaceIcon, { name: 'analysis' }) } },
+    { path: '/admin/usage', label: t('workspace.globalRecords'), icon: { render: () => h(WorkspaceIcon, { name: 'analysis' }) } },
     { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
   ]
 

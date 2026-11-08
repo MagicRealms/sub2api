@@ -180,8 +180,11 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
 })
 
 describe('admin UsageView route filters', () => {
-  it('renders the interactive trend chart on the records route', async () => {
+  it('opens the interactive trend chart from the records insight card', async () => {
     const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    expect(wrapper.find('token-usage-trend-stub').exists()).toBe(false)
+    await wrapper.get('[data-insight="trends"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('token-usage-trend-stub').exists()).toBe(true)
     wrapper.unmount()
@@ -415,7 +418,7 @@ describe('admin UsageView distribution metric toggles', () => {
     expect((wrapper.vm as any).requestedModelStats).toEqual([{ model: 'B', total_tokens: 20 }])
   })
 
-  it('keeps model and group metric toggles independent on the analytics page without refetching chart data', async () => {
+  it('opens independent model and group insights without refetching chart data', async () => {
     routeMeta.usageAnalytics = true
     const wrapper = mount(UsageView, {
       global: {
@@ -451,24 +454,21 @@ describe('admin UsageView distribution metric toggles', () => {
       granularity: 'hour'
     }))
 
-    const modelChart = wrapper.find('[data-test="model-chart"]')
-    const groupChart = wrapper.find('[data-test="group-chart"]')
-
-    expect(modelChart.find('.metric').text()).toBe('tokens')
-    expect(groupChart.find('.metric').text()).toBe('tokens')
-
-    await modelChart.find('.switch-metric').trigger('click')
+    expect(wrapper.findAll('[data-insight]')).toHaveLength(4)
+    expect(wrapper.find('[data-test="model-chart"]').exists()).toBe(false)
+    await wrapper.get('[data-insight="models"]').trigger('click')
     await flushPromises()
-
-    expect(modelChart.find('.metric').text()).toBe('actual_cost')
-    expect(groupChart.find('.metric').text()).toBe('tokens')
-    expect(getSnapshotV2).toHaveBeenCalledTimes(1)
-
-    await groupChart.find('.switch-metric').trigger('click')
+    expect(wrapper.get('[data-test="model-chart"] .metric').text()).toBe('tokens')
+    await wrapper.get('[data-test="model-chart"] .switch-metric').trigger('click')
+    expect(wrapper.get('[data-test="model-chart"] .metric').text()).toBe('actual_cost')
+    await wrapper.get('[data-insight="groups"]').trigger('click')
     await flushPromises()
-
-    expect(modelChart.find('.metric').text()).toBe('actual_cost')
-    expect(groupChart.find('.metric').text()).toBe('actual_cost')
+    expect(wrapper.get('[data-test="group-chart"] .metric').text()).toBe('tokens')
+    await wrapper.get('[data-test="group-chart"] .switch-metric').trigger('click')
+    expect(wrapper.get('[data-test="group-chart"] .metric').text()).toBe('actual_cost')
+    await wrapper.get('[data-insight="models"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="model-chart"] .metric').text()).toBe('actual_cost')
     expect(getSnapshotV2).toHaveBeenCalledTimes(1)
   })
 })

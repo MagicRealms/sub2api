@@ -23,6 +23,10 @@ func (f *OpsOpenAITokenStatsFilter) IsTopNMode() bool {
 }
 
 type OpsOpenAITokenStatsItem struct {
+	TotalPromptTokens    int64 `json:"total_prompt_tokens"`
+	TotalCacheReadTokens int64 `json:"total_cache_read_tokens"`
+	// CacheHitRate is a percentage weighted by prompt tokens, including cache writes.
+	CacheHitRate           float64  `json:"cache_hit_rate"`
 	Model                  string   `json:"model"`
 	RequestCount           int64    `json:"request_count"`
 	AvgTokensPerSec        *float64 `json:"avg_tokens_per_sec"`

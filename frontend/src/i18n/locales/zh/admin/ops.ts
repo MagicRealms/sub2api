@@ -162,6 +162,7 @@ export default {
         custom: '自定义'
       },
       openaiTokenStats: {
+        cacheHitRateHint: '按 Token 加权：缓存读取 / 全部输入（未缓存 + 缓存写入 + 缓存读取）',
         title: 'Token 请求统计',
         viewModeTopN: 'TopN',
         viewModePagination: '分页',
@@ -172,6 +173,7 @@ export default {
         failedToLoad: '加载 Token 请求统计失败',
         empty: '当前筛选条件下暂无 Token 请求统计数据',
         table: {
+          cacheHitRate: '缓存命中率',
           model: '模型',
           requestCount: '请求数',
           avgTokensPerSec: '平均 Tokens/秒',

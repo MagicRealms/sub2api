@@ -37,6 +37,8 @@ func (r *opsRepository) GetOpenAITokenStats(ctx context.Context, filter *service
 WITH stats AS (
   SELECT
     ul.model AS model,
+    COALESCE(SUM(COALESCE(ul.input_tokens, 0)::bigint + COALESCE(ul.cache_creation_tokens, 0)::bigint + COALESCE(ul.cache_read_tokens, 0)::bigint), 0)::bigint AS total_prompt_tokens,
+    COALESCE(SUM(ul.cache_read_tokens), 0)::bigint AS total_cache_read_tokens,
     COUNT(*)::bigint AS request_count,
     ROUND(
       AVG(
@@ -72,7 +74,10 @@ SELECT
   avg_first_token_ms,
   total_output_tokens,
   avg_duration_ms,
-  requests_with_first_token
+  requests_with_first_token,
+  total_prompt_tokens,
+  total_cache_read_tokens,
+  COALESCE(total_cache_read_tokens * 100.0 / NULLIF(total_prompt_tokens, 0), 0)::float8 AS cache_hit_rate
 FROM stats
 ORDER BY request_count DESC, model ASC`
 
@@ -107,6 +112,9 @@ ORDER BY request_count DESC, model ASC`
 			&item.TotalOutputTokens,
 			&item.AvgDurationMs,
 			&item.RequestsWithFirstToken,
+			&item.TotalPromptTokens,
+			&item.TotalCacheReadTokens,
+			&item.CacheHitRate,
 		); err != nil {
 			return nil, err
 		}

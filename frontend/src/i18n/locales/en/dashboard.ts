@@ -1,5 +1,17 @@
 export default {
   workspace: {
+    globalRecords: 'Global Records',
+    globalRecordsDescription: 'Requests and usage insights across your site, with details a click away.',
+    insightDetails: 'Explore details',
+    modelsUsed: 'models',
+    groupsUsed: 'groups',
+    endpointsUsed: 'endpoints',
+    leadingShare: '{value}% of total',
+    noActivity: 'No usage in this period',
+    trendSnapshot: 'Cache, cost & usage trends',
+    trendSummary: 'Cache hit rate',
+    trendDetailHint: 'Explore trends and select a point to view its requests.',
+
     moreFilters: 'More filters',
     lessFilters: 'Fewer filters',
     compactView: 'Compact view',

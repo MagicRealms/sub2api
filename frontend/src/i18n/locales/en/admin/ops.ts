@@ -166,6 +166,7 @@ export default {
         endTime: 'End Time'
       },
       openaiTokenStats: {
+        cacheHitRateHint: 'Token weighted: cache reads / all input (uncached + cache writes + cache reads)',
         title: 'Token Request Stats',
         viewModeTopN: 'TopN',
         viewModePagination: 'Pagination',
@@ -176,6 +177,7 @@ export default {
         failedToLoad: 'Failed to load token request stats',
         empty: 'No token request stats for the current filters',
         table: {
+          cacheHitRate: 'Cache hit rate',
           model: 'Model',
           requestCount: 'Requests',
           avgTokensPerSec: 'Avg Tokens/sec',

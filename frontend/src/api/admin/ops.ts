@@ -222,6 +222,9 @@ export interface OpsDashboardSnapshotV2Response {
 export type OpsOpenAITokenStatsTimeRange = '30m' | '1h' | '1d' | '15d' | '30d'
 
 export interface OpsOpenAITokenStatsItem {
+  total_prompt_tokens: number
+  total_cache_read_tokens: number
+  cache_hit_rate: number
   model: string
   request_count: number
   avg_tokens_per_sec?: number | null

@@ -62,6 +62,9 @@ const sampleResponse = {
       total_output_tokens: 1234,
       avg_duration_ms: 321,
       requests_with_first_token: 10,
+      total_prompt_tokens: 1000,
+      total_cache_read_tokens: 820,
+      cache_hit_rate: 82,
     },
   ],
   total: 40,
@@ -181,6 +184,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       })
     )
 
+    expect(wrapper.get('[data-testid="model-cache-hit-rate"]').text()).toBe('82.0%')
     const selects = wrapper.findAllComponents(SelectStub)
     await selects[0].vm.$emit('update:modelValue', '1h')
     await flushPromises()

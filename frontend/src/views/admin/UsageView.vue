@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div class="console-usage-page console-admin-usage sw-page">
-      <UsageWorkspaceHeader :analysis="analysisMode" admin />
+      <UsageWorkspaceHeader admin />
       <UsageStatsCards :stats="usageStats" />
       <!-- Charts Section -->
       <div class="space-y-4">
@@ -23,58 +23,14 @@
             </div>
           </div>
         </div>
-        <UsageFilters compact v-if="analysisMode" v-model="filters" :exporting="false" :show-actions="false" :model-options="modelNameOptions" :start-date="startDate" :end-date="endDate" @change="applyFilters" />
-        <div v-if="analysisMode" class="sw-chart-grid">
-          <ModelDistributionChart compact
-            :title="t('admin.dashboard.consumptionDistribution')"
-            v-model:source="modelDistributionSource"
-            v-model:metric="modelDistributionMetric"
-            :model-stats="requestedModelStats"
-            :upstream-model-stats="upstreamModelStats"
-            :mapping-model-stats="mappingModelStats"
-            :loading="modelStatsLoading"
-            :show-source-toggle="true"
-            :show-metric-toggle="true"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-          />
-          <GroupDistributionChart compact
-            v-model:metric="groupDistributionMetric"
-            :group-stats="groupStats"
-            :loading="chartsLoading"
-            :show-metric-toggle="true"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-          />
-        </div>
-        <div v-if="analysisMode" class="sw-chart-grid">
-          <EndpointDistributionChart compact
-            v-model:source="endpointDistributionSource"
-            v-model:metric="endpointDistributionMetric"
-            :endpoint-stats="inboundEndpointStats"
-            :upstream-endpoint-stats="upstreamEndpointStats"
-            :endpoint-path-stats="endpointPathStats"
-            :loading="endpointStatsLoading"
-            :show-source-toggle="true"
-            :show-metric-toggle="true"
-            :title="t('usage.endpointDistribution')"
-            :start-date="startDate"
-            :end-date="endDate"
-            :filters="breakdownFilters"
-          />
-        </div>
-          <TokenUsageTrend
-            :trend-data="trendData"
-            :loading="chartsLoading"
-            :title="t('usage.performanceTrends')"
-            interactive
-            @point-select="openTrendPoint"
-          />
+        <UsageInsightCards
+          :model-stats="modelDistributionSource === 'upstream' ? upstreamModelStats : modelDistributionSource === 'mapping' ? mappingModelStats : requestedModelStats" :group-stats="groupStats" :endpoint-stats="inboundEndpointStats" :trend-data="trendData"
+          :model-loading="modelStatsLoading" :distribution-loading="chartsLoading" :endpoint-loading="endpointStatsLoading"
+          @open="activeInsight = $event"
+        />
       </div>
       <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
-      <div v-if="!analysisMode" class="card sw-log-card">
+      <div class="card sw-log-card">
         <div class="flex flex-wrap items-center border-b border-gray-200 px-2 dark:border-dark-700 sm:px-4">
           <button
             v-for="tab in detailTabs"
@@ -177,6 +133,53 @@
       <OpsErrorDetailModal v-model:show="showErrorModal" :error-id="selectedErrorId" :error-type="'request'" />
     </div>
   </AppLayout>
+  <BaseDialog :show="activeInsight !== null" :title="insightTitle" width="extra-wide" :close-on-click-outside="true" @close="closeInsight">
+    <div class="mb-3 text-xs text-gray-500 dark:text-gray-400">{{ startDate }} — {{ endDate }}</div>
+          <ModelDistributionChart v-if="activeInsight === 'models'" compact
+            :title="t('admin.dashboard.consumptionDistribution')"
+            v-model:source="modelDistributionSource"
+            v-model:metric="modelDistributionMetric"
+            :model-stats="requestedModelStats"
+            :upstream-model-stats="upstreamModelStats"
+            :mapping-model-stats="mappingModelStats"
+            :loading="modelStatsLoading"
+            :show-source-toggle="true"
+            :show-metric-toggle="true"
+            :start-date="startDate"
+            :end-date="endDate"
+            :filters="breakdownFilters"
+          />
+          <GroupDistributionChart v-if="activeInsight === 'groups'" compact
+            v-model:metric="groupDistributionMetric"
+            :group-stats="groupStats"
+            :loading="chartsLoading"
+            :show-metric-toggle="true"
+            :start-date="startDate"
+            :end-date="endDate"
+            :filters="breakdownFilters"
+          />
+          <EndpointDistributionChart v-if="activeInsight === 'endpoints'" compact
+            v-model:source="endpointDistributionSource"
+            v-model:metric="endpointDistributionMetric"
+            :endpoint-stats="inboundEndpointStats"
+            :upstream-endpoint-stats="upstreamEndpointStats"
+            :endpoint-path-stats="endpointPathStats"
+            :loading="endpointStatsLoading"
+            :show-source-toggle="true"
+            :show-metric-toggle="true"
+            :title="t('usage.endpointDistribution')"
+            :start-date="startDate"
+            :end-date="endDate"
+            :filters="breakdownFilters"
+          />
+          <TokenUsageTrend v-if="activeInsight === 'trends'"
+            :trend-data="trendData"
+            :loading="chartsLoading"
+            :title="t('usage.performanceTrends')"
+            interactive
+            @point-select="openTrendPoint"
+          />
+  </BaseDialog>
   <BaseDialog :show="!!selectedTrendPoint" :title="selectedTrendPoint ? `${t('usage.pointRequests')} · ${selectedTrendPoint.date}` : t('usage.pointRequests')" width="extra-wide" @close="closeTrendPoint">
     <div class="mb-3 flex items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
       <span>{{ t('usage.pointRequests') }}: {{ pointLogTotal.toLocaleString() }}</span>
@@ -232,6 +235,7 @@ import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import { getTrendPointRange } from '@/utils/trendPointRange'
 import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
+import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
@@ -254,7 +258,9 @@ type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
 type ModelDistributionSource = 'requested' | 'upstream' | 'mapping'
 const route = useRoute()
-const analysisMode = computed(() => route?.meta?.usageAnalytics === true)
+const activeInsight = ref<UsageInsight | null>(null)
+const insightTitle = computed(() => t(activeInsight.value === 'models' ? 'admin.dashboard.consumptionDistribution' : activeInsight.value === 'groups' ? 'admin.dashboard.groupDistribution' : activeInsight.value === 'endpoints' ? 'usage.endpointDistribution' : 'usage.performanceTrends'))
+const closeInsight = () => { activeInsight.value = null }
 const usageStats = ref<AdminUsageStatsResponse | null>(null); const usageLogs = ref<AdminUsageLog[]>([]); const loading = ref(false); const exporting = ref(false)
 const trendData = ref<TrendDataPoint[]>([]); const requestedModelStats = ref<ModelStat[]>([]); const upstreamModelStats = ref<ModelStat[]>([]); const mappingModelStats = ref<ModelStat[]>([]); const groupStats = ref<GroupStat[]>([]); const chartsLoading = ref(false); const modelStatsLoading = ref(false); const granularity = ref<'day' | 'hour'>('hour')
 const trendTimezone = ref('UTC')

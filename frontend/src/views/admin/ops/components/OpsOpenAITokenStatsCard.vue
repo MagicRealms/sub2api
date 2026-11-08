@@ -70,6 +70,10 @@ const pageSizeOptions = computed(() => [
   { value: 100, label: '100' }
 ])
 
+function formatCacheHitRate(v?: number | null): string {
+  return typeof v === 'number' && Number.isFinite(v) ? `${v.toFixed(1)}%` : '—'
+}
+
 function formatRate(v?: number | null): string {
   if (typeof v !== 'number' || !Number.isFinite(v)) return '-'
   return v.toFixed(2)
@@ -223,6 +227,10 @@ function onNextPage() {
                   <span class="text-gray-500 dark:text-gray-400">{{ t('admin.ops.openaiTokenStats.table.requestCount') }}</span>
                   <span class="text-gray-700 dark:text-gray-200">{{ formatInt(row.request_count) }}</span>
                 </div>
+                <div class="flex items-baseline justify-between gap-2" :title="t('admin.ops.openaiTokenStats.cacheHitRateHint')">
+                  <span class="text-gray-500 dark:text-gray-400">{{ t('admin.ops.openaiTokenStats.table.cacheHitRate') }}</span>
+                  <span class="font-medium text-emerald-600 dark:text-emerald-400" data-testid="model-cache-hit-rate">{{ formatCacheHitRate(row.cache_hit_rate) }}</span>
+                </div>
                 <div class="flex items-baseline justify-between gap-2">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('admin.ops.openaiTokenStats.table.avgTokensPerSec') }}</span>
                   <span class="text-gray-700 dark:text-gray-200">{{ formatRate(row.avg_tokens_per_sec) }}</span>
@@ -251,6 +259,7 @@ function onNextPage() {
               <tr class="border-b border-gray-200 text-gray-500 dark:border-dark-700 dark:text-gray-400">
                 <th class="px-2 py-2 font-semibold">{{ t('admin.ops.openaiTokenStats.table.model') }}</th>
                 <th class="px-2 py-2 font-semibold">{{ t('admin.ops.openaiTokenStats.table.requestCount') }}</th>
+                <th class="px-2 py-2 font-semibold" :title="t('admin.ops.openaiTokenStats.cacheHitRateHint')">{{ t('admin.ops.openaiTokenStats.table.cacheHitRate') }}</th>
                 <th class="px-2 py-2 font-semibold">{{ t('admin.ops.openaiTokenStats.table.avgTokensPerSec') }}</th>
                 <th class="px-2 py-2 font-semibold">{{ t('admin.ops.openaiTokenStats.table.avgFirstTokenMs') }}</th>
                 <th class="px-2 py-2 font-semibold">{{ t('admin.ops.openaiTokenStats.table.totalOutputTokens') }}</th>
@@ -266,6 +275,7 @@ function onNextPage() {
               >
                 <td class="px-2 py-2 font-medium">{{ row.model }}</td>
                 <td class="px-2 py-2">{{ formatInt(row.request_count) }}</td>
+                <td class="px-2 py-2 font-medium tabular-nums text-emerald-600 dark:text-emerald-400" :title="t('admin.ops.openaiTokenStats.cacheHitRateHint')" data-testid="model-cache-hit-rate">{{ formatCacheHitRate(row.cache_hit_rate) }}</td>
                 <td class="px-2 py-2">{{ formatRate(row.avg_tokens_per_sec) }}</td>
                 <td class="px-2 py-2">{{ formatRate(row.avg_first_token_ms) }}</td>
                 <td class="px-2 py-2">{{ formatInt(row.total_output_tokens) }}</td>
