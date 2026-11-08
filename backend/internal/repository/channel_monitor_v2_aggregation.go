@@ -353,13 +353,10 @@ var channelMonitorV2FixedRollupSeconds = []int{300, 3600, 43200, 86400}
 
 func (r *channelMonitorV2Repository) recomputeFixedRollups(ctx context.Context, tx *sql.Tx, start, end time.Time) error {
 	for _, seconds := range channelMonitorV2FixedRollupSeconds {
-		// Coarse buckets are immutable between boundaries during the normal
-		// trailing refresh. Historical backfills and boundary-crossing windows
-		// still rebuild them; this avoids repeatedly regrouping the full current
-		// day/user table every few minutes.
-		if seconds >= 43200 && sameFixedRollupBucket(start, end, seconds) {
-			continue
-		}
+		// Refresh the current coarse buckets too. Skipping an in-bucket window
+		// leaves 7d/30d views stale until a boundary is crossed (or forever after
+		// a missed tick). Retained minute facts cover a complete 12h/day bucket;
+		// bounds below rebuild that whole bucket, including earlier requests.
 		interval := fmt.Sprintf("%d seconds", seconds)
 		for _, table := range []string{
 			"channel_monitor_v2_latency_histograms_rollup",
