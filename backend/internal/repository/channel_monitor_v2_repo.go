@@ -408,7 +408,7 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			fact.GroupID <= 0 {
 			continue
 		}
-		key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, fact.Platform, fact.GroupID, fact.Model)
+		key := channelMonitorV2MatrixDimensionKeyForFilter(filter, groupBy, cfg, fact.Platform, fact.GroupID, fact.Model)
 		acc := accs[key]
 		if acc == nil {
 			acc = &channelMonitorV2MatrixAccumulator{total: newMetricAccumulator(), buckets: make(map[string]*metricAccumulator)}
@@ -433,7 +433,7 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 			histogram.GroupID <= 0 {
 			continue
 		}
-		key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, histogram.Platform, histogram.GroupID, histogram.Model)
+		key := channelMonitorV2MatrixDimensionKeyForFilter(filter, groupBy, cfg, histogram.Platform, histogram.GroupID, histogram.Model)
 		acc := accs[key]
 		if acc == nil {
 			continue
@@ -495,6 +495,19 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 	return result, nil
 }
 
+// Separate presentation identity from model selection so "Other models" filters
+// still use the configured allow-list while group cards show one real model.
+func channelMonitorV2MatrixDimensionKeyForFilter(filter service.ChannelMonitorV2Filter, groupBy service.ChannelMonitorV2GroupBy, cfg service.ChannelMonitorV2Config, platform string, groupID int64, model string) channelMonitorV2MatrixKey {
+	key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, platform, groupID, model)
+	if filter.ExpandModels && (groupBy == service.ChannelMonitorV2GroupByPlatformModel || groupBy == service.ChannelMonitorV2GroupByPlatformGroupModel) {
+		key.model = strings.TrimSpace(model)
+		if key.model == "" {
+			key.model = service.ChannelMonitorV2OtherModel
+		}
+	}
+	return key
+}
+
 func channelMonitorV2MatrixDimensionKey(groupBy service.ChannelMonitorV2GroupBy, cfg service.ChannelMonitorV2Config, platform string, groupID int64, model string) channelMonitorV2MatrixKey {
 	key := channelMonitorV2MatrixKey{platform: platform}
 	if groupBy == service.ChannelMonitorV2GroupByPlatformGroup || groupBy == service.ChannelMonitorV2GroupByPlatformGroupModel {
@@ -534,7 +547,9 @@ func seedChannelMonitorV2MatrixAccumulators(filter service.ChannelMonitorV2Filte
 	for _, platform := range platforms {
 		models := []string{""}
 		if groupBy == service.ChannelMonitorV2GroupByPlatformModel || groupBy == service.ChannelMonitorV2GroupByPlatformGroupModel {
-			models = configuredChannelMonitorV2Models(cfg, platform, filter)
+			if !filter.ExpandModels {
+				models = configuredChannelMonitorV2Models(cfg, platform, filter)
+			}
 			if len(models) == 0 {
 				models = []string{""}
 			}
@@ -1569,7 +1584,7 @@ func (r *channelMonitorV2Repository) loadIgnoredErrorCountsByMatrixKey(
 			continue
 		}
 		bucketKey := bucket.UTC().Format(time.RFC3339Nano)
-		key := channelMonitorV2MatrixDimensionKey(groupBy, cfg, platform, groupID, model)
+		key := channelMonitorV2MatrixDimensionKeyForFilter(filter, groupBy, cfg, platform, groupID, model)
 		byDim[key] += count
 		if byDimBucket[key] == nil {
 			byDimBucket[key] = map[string]int64{}

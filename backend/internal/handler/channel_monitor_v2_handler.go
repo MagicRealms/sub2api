@@ -90,14 +90,16 @@ func (h *ChannelMonitorV2Handler) Dimensions(c *gin.Context) {
 	response.Success(c, result)
 }
 
-func (h *ChannelMonitorV2Handler) Snapshot(c *gin.Context)      { h.snapshot(c, false) }
-func (h *ChannelMonitorV2Handler) AdminSnapshot(c *gin.Context) { h.snapshot(c, true) }
-func (h *ChannelMonitorV2Handler) Models(c *gin.Context)        { h.models(c, false) }
-func (h *ChannelMonitorV2Handler) AdminModels(c *gin.Context)   { h.models(c, true) }
-func (h *ChannelMonitorV2Handler) Matrix(c *gin.Context)        { h.matrix(c, false) }
-func (h *ChannelMonitorV2Handler) AdminMatrix(c *gin.Context)   { h.matrix(c, true) }
-func (h *ChannelMonitorV2Handler) Users(c *gin.Context)         { h.users(c, false) }
-func (h *ChannelMonitorV2Handler) AdminUsers(c *gin.Context)    { h.users(c, true) }
+func (h *ChannelMonitorV2Handler) Snapshot(c *gin.Context)        { h.snapshot(c, false) }
+func (h *ChannelMonitorV2Handler) AdminSnapshot(c *gin.Context)   { h.snapshot(c, true) }
+func (h *ChannelMonitorV2Handler) Models(c *gin.Context)          { h.models(c, false) }
+func (h *ChannelMonitorV2Handler) AdminModels(c *gin.Context)     { h.models(c, true) }
+func (h *ChannelMonitorV2Handler) Matrix(c *gin.Context)          { h.matrix(c, false) }
+func (h *ChannelMonitorV2Handler) AdminMatrix(c *gin.Context)     { h.matrix(c, true) }
+func (h *ChannelMonitorV2Handler) GroupCards(c *gin.Context)      { h.groupCards(c, false) }
+func (h *ChannelMonitorV2Handler) AdminGroupCards(c *gin.Context) { h.groupCards(c, true) }
+func (h *ChannelMonitorV2Handler) Users(c *gin.Context)           { h.users(c, false) }
+func (h *ChannelMonitorV2Handler) AdminUsers(c *gin.Context)      { h.users(c, true) }
 
 func (h *ChannelMonitorV2Handler) snapshot(c *gin.Context, admin bool) {
 	filter, ok := h.parseFilter(c)
@@ -145,6 +147,19 @@ func (h *ChannelMonitorV2Handler) matrix(c *gin.Context, admin bool) {
 		return
 	}
 	result, err := h.service.Matrix(c.Request.Context(), filter, groupBy, admin)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
+func (h *ChannelMonitorV2Handler) groupCards(c *gin.Context, admin bool) {
+	filter, ok := h.parseFilter(c)
+	if !ok || !h.scopeFilter(c, &filter, admin) {
+		return
+	}
+	result, err := h.service.GroupCards(c.Request.Context(), filter, admin)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

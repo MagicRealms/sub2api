@@ -83,9 +83,11 @@ type ChannelMonitorV2Filter struct {
 	AllowedGroupIDs []int64
 	RestrictGroups  bool
 	Models          []string
-	Start           time.Time
-	End             time.Time
-	Bucket          time.Duration
+	// ExpandModels is internal presentation state, never accepted from query input.
+	ExpandModels bool
+	Start        time.Time
+	End          time.Time
+	Bucket       time.Duration
 }
 
 type ChannelMonitorV2Metric struct {

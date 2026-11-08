@@ -3,7 +3,7 @@
     <div class="space-y-6 pb-12">
       <!-- Ops-style elevated shell: title toolbar + filters (mirrors OpsDashboardHeader) -->
       <section
-        class="card sticky top-0 z-20 !rounded-3xl !border-0 p-0 shadow-sm ring-1 ring-gray-900/5 backdrop-blur-sm dark:!bg-dark-800 dark:ring-dark-700 supports-[backdrop-filter]:bg-white/95 dark:supports-[backdrop-filter]:bg-dark-800/95"
+        class="card !rounded-3xl !border-0 p-0 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700"
       >
         <header class="page-header mb-0 flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 dark:border-dark-700 sm:px-6">
           <div class="min-w-0">
@@ -43,15 +43,7 @@
               </span>
             </div>
           </div>
-          <button
-            class="btn btn-secondary btn-icon flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
-            type="button"
-            :title="t('common.refresh')"
-            :disabled="loading"
-            @click="reload(false)"
-          >
-            <Icon name="refresh" size="sm" :class="loading ? 'animate-spin' : ''" />
-          </button>
+
         </header>
 
         <!-- First-upgrade silent backfill: show until 30d product window is covered -->
@@ -89,8 +81,8 @@
           </div>
         </div>
 
-        <!-- Single compact toolbar row: range · filters · view controls -->
-        <div class="monitor-toolbar flex flex-nowrap items-center gap-1.5 overflow-x-auto px-4 py-3 sm:gap-2 sm:px-5">
+        <!-- Compact controls wrap on narrow screens so health modes stay together. -->
+        <div class="monitor-toolbar flex flex-wrap items-center gap-1.5 px-4 py-3 sm:gap-2 sm:px-5">
           <div
             class="tabs inline-flex shrink-0"
             role="group"
@@ -143,53 +135,49 @@
 
           <span class="mx-0.5 hidden h-5 w-px shrink-0 bg-gray-200 dark:bg-dark-700 md:block" aria-hidden="true"></span>
 
-          <Select
-            v-model="matrixGroupBy"
-            :options="matrixGroupOptions"
-            :placeholder="t('channelMonitorV2.groupBy.label')"
-            class="monitor-toolbar-select w-[7.5rem] shrink-0 sm:w-[8.5rem]"
+          <div
+            class="monitor-health-controls inline-flex shrink-0 items-center gap-2"
+          >
+            <div
+              class="tabs inline-flex"
+              role="group"
+              :aria-label="t('channelMonitorV2.healthMode.label')"
+            >
+              <button
+                v-for="option in healthModeOptions"
+                :key="option.value"
+                type="button"
+                class="tab !px-2 !py-1 text-xs"
+                :class="healthMode === option.value ? 'tab-active' : ''"
+                @click="healthMode = option.value"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+            <button
+              class="btn btn-secondary btn-icon shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600"
+              type="button"
+              :title="t('common.refresh')"
+              :aria-label="t('common.refresh')"
+              :disabled="loading || refreshing"
+              @click="reload(false)"
+            >
+              <Icon name="refresh" size="sm" :class="loading || refreshing ? 'animate-spin' : ''" />
+            </button>
+          </div>
+        </div>
+        <div class="border-t border-gray-100 p-4 dark:border-dark-700 sm:p-5" :aria-busy="loading || refreshing">
+          <MonitorGroupCards
+            v-if="cards"
+            :cards="groupCards"
+            :coverage="cards.coverage"
+            :health-mode="healthMode"
+            :range-label="rangeLabel"
           />
-
-          <div
-            class="tabs inline-flex shrink-0"
-            role="group"
-            :aria-label="t('channelMonitorV2.trendView.label')"
-          >
-            <button
-              type="button"
-              class="tab !px-2 !py-1 text-xs"
-              :class="trendView === 'pulse' ? 'tab-active' : ''"
-              @click="trendView = 'pulse'"
-            >
-              {{ t('channelMonitorV2.trendView.pulse') }}
-            </button>
-            <button
-              type="button"
-              class="tab !px-2 !py-1 text-xs"
-              :class="trendView === 'line' ? 'tab-active' : ''"
-              @click="trendView = 'line'"
-            >
-              {{ t('channelMonitorV2.trendView.line') }}
-            </button>
+          <div v-else-if="loading" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+            <div v-for="index in 6" :key="index" class="h-64 animate-pulse rounded-3xl bg-gray-100 dark:bg-dark-700" />
           </div>
-
-          <div
-            v-if="trendView === 'pulse'"
-            class="tabs inline-flex shrink-0"
-            role="group"
-            :aria-label="t('channelMonitorV2.healthMode.label')"
-          >
-            <button
-              v-for="option in healthModeOptions"
-              :key="option.value"
-              type="button"
-              class="tab !px-2 !py-1 text-xs"
-              :class="healthMode === option.value ? 'tab-active' : ''"
-              @click="healthMode = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
+          <p v-else class="py-12 text-center text-sm text-gray-500">{{ t('channelMonitorV2.empty.title') }}</p>
         </div>
       </section>
 
@@ -197,7 +185,7 @@
       <section
         v-if="snapshot"
         class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-        :class="showThroughput ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+        :class="showThroughput ? 'xl:grid-cols-5' : 'sm:grid-cols-3'"
         :aria-label="t('channelMonitorV2.summaryAria')"
       >
         <MetricCell
@@ -237,7 +225,7 @@
       <section
         v-else-if="loading"
         class="grid grid-cols-2 gap-3 sm:grid-cols-3"
-        :class="showThroughput ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+        :class="showThroughput ? 'xl:grid-cols-5' : 'sm:grid-cols-3'"
         aria-hidden="true"
       >
         <div
@@ -247,27 +235,6 @@
         />
       </section>
 
-      <div class="relative min-h-[320px]">
-        <MonitorTrendChart
-          v-if="trendView === 'line'"
-          :trend="snapshot?.trend || []"
-          :coverage="snapshot?.coverage || null"
-          :loading="loading && !snapshot"
-        />
-        <RelayPulseMatrix
-          v-else-if="matrix"
-          :rows="matrixRows"
-          :coverage="matrix.coverage"
-          :health-mode="healthMode"
-          :show-throughput="showThroughput"
-        />
-        <div
-          v-else-if="loading"
-          class="card flex min-h-[320px] items-center justify-center !rounded-3xl !border-0 text-sm text-gray-400 shadow-sm ring-1 ring-gray-900/5 dark:ring-dark-700"
-        >
-          <span class="animate-pulse">{{ t('common.loading') }}</span>
-        </div>
-      </div>
 
       <section class="card flex min-h-0 flex-col overflow-hidden !rounded-3xl !border-0 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700">
         <div class="border-b border-gray-100 px-5 pt-4 dark:border-dark-700 sm:px-6">
@@ -464,12 +431,10 @@ import { useRoute, useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import Select from '@/components/common/Select.vue'
 import FilterMultiSelect from '@/features/channel-monitor-v2/FilterMultiSelect.vue'
 import MetricCell from '@/features/channel-monitor-v2/MetricCell.vue'
 import MonitorRankBadge from '@/features/channel-monitor-v2/MonitorRankBadge.vue'
-import MonitorTrendChart from '@/features/channel-monitor-v2/MonitorTrendChart.vue'
-import RelayPulseMatrix from '@/features/channel-monitor-v2/RelayPulseMatrix.vue'
+import MonitorGroupCards from '@/features/channel-monitor-v2/MonitorGroupCards.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
@@ -481,8 +446,8 @@ import type {
   MonitorErrorRow,
   MonitorFilter,
   MonitorHealth,
-  MonitorMatrixGroupBy,
-  MonitorMatrixResponse,
+  MonitorGroupCard,
+  MonitorGroupCardsResponse,
   MonitorModelRow,
   MonitorRange,
   MonitorSnapshot,
@@ -503,7 +468,6 @@ import {
 
 type Tab = 'models' | 'errors' | 'users'
 type HealthMode = 'overall' | 'success' | 'ttft' | 'cache'
-type TrendView = 'pulse' | 'line'
 
 const route = useRoute()
 const router = useRouter()
@@ -532,12 +496,6 @@ const tabs = computed(() => {
   }
   return items
 })
-const matrixGroupOptions = computed(() => [
-  { value: 'platform' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platform') },
-  { value: 'platform_group' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platformGroup') },
-  { value: 'platform_model' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platformModel') },
-  { value: 'platform_group_model' as MonitorMatrixGroupBy, label: t('channelMonitorV2.groupBy.platformGroupModel') },
-])
 const healthModeOptions = computed(() => [
   { value: 'overall' as HealthMode, label: t('channelMonitorV2.healthMode.overall') },
   { value: 'success' as HealthMode, label: t('channelMonitorV2.healthMode.success') },
@@ -552,12 +510,10 @@ const filter = ref<MonitorFilter>({
   models: csv(route.query.model),
 })
 const activeTab = ref<Tab>(parseTab(route.query.tab, showUserRanking.value))
-const matrixGroupBy = ref<MonitorMatrixGroupBy>(parseMatrixGroupBy(route.query.group_by))
 const healthMode = ref<HealthMode>(parseHealthMode(route.query.health_mode))
-const trendView = ref<TrendView>(parseTrendView(route.query.trend_view))
 const dimensions = ref<MonitorDimensions>({ platforms: [], groups: [], models: [] })
 const snapshot = ref<MonitorSnapshot | null>(null)
-const matrix = ref<MonitorMatrixResponse | null>(null)
+const cards = ref<MonitorGroupCardsResponse | null>(null)
 const modelRows = ref<MonitorModelRow[]>([])
 const errorRows = ref<MonitorErrorRow[]>([])
 const userRows = ref<MonitorUserRow[]>([])
@@ -652,13 +608,27 @@ const bootstrapPercent = computed(() => {
   if (typeof raw !== 'number' || Number.isNaN(raw)) return 0
   return Math.min(100, Math.max(0, Math.round(raw)))
 })
-const matrixRows = computed(() => {
-  const items = matrix.value?.items || []
-  // platform_group views should only show real groups, never bare platform placeholders.
-  if (matrixGroupBy.value === 'platform_group' || matrixGroupBy.value === 'platform_group_model') {
-    return items.filter((row) => row.group_id != null && Number(row.group_id) > 0)
+const rangeLabel = computed(() => t(`channelMonitorV2.ranges.${filter.value.range}`))
+const groupCards = computed<MonitorGroupCard[]>(() => {
+  const rows = [...(cards.value?.items || [])]
+  const present = new Set(rows.map(row => row.group_id))
+  // The scoped catalog also includes configured groups with no sampled platform.
+  // Show them explicitly as empty instead of silently omitting the group.
+  for (const group of dimensions.value.groups) {
+    if (present.has(group.id) ||
+        (filter.value.groupIds.length && !filter.value.groupIds.includes(group.id)) ||
+        (filter.value.platforms.length && !filter.value.platforms.includes(group.platform || ''))) continue
+    rows.push({
+      platform: group.platform || '', group_id: group.id, group_name: group.name,
+      has_traffic: false, has_cache_samples: false, buckets: [],
+      metrics: { success_requests: 0, error_requests: 0, request_count: 0, token_count: 0,
+        rpm: 0, tpm: 0, error_rate: 0, cache_rate: 0, cache_rate_numerator: 0, cache_rate_denominator: 0,
+        ttft: { sample_count: 0, p50_ms: null, p95_ms: null, avg_ms: null },
+        duration: { sample_count: 0, p50_ms: null, p95_ms: null, avg_ms: null } },
+      health: { overall: 'unknown', error_rate: 'unknown', ttft: 'unknown', cache: 'unknown', minimum_sample: 0 },
+    })
   }
-  return items
+  return rows.sort((a,b) => Number(b.has_traffic) - Number(a.has_traffic) || (a.group_id || 0) - (b.group_id || 0))
 })
 
 function csv(value: unknown) {
@@ -666,17 +636,6 @@ function csv(value: unknown) {
 }
 function parseRange(value: unknown): MonitorRange {
   return ['90m', '24h', '7d', '30d'].includes(String(value)) ? (value as MonitorRange) : '90m'
-}
-function parseMatrixGroupBy(value: unknown): MonitorMatrixGroupBy {
-  const allowed: MonitorMatrixGroupBy[] = [
-    'platform',
-    'platform_group',
-    'platform_model',
-    'platform_group_model',
-  ]
-  return allowed.includes(value as MonitorMatrixGroupBy)
-    ? (value as MonitorMatrixGroupBy)
-    : 'platform_group'
 }
 function parseTab(value: unknown, allowUsers: boolean): Tab {
   const allowed: Tab[] = allowUsers ? ['models', 'errors', 'users'] : ['models', 'errors']
@@ -686,9 +645,6 @@ function parseHealthMode(value: unknown): HealthMode {
   const allowed: HealthMode[] = ['overall', 'success', 'ttft', 'cache']
   return allowed.includes(value as HealthMode) ? (value as HealthMode) : 'overall'
 }
-function parseTrendView(value: unknown): TrendView {
-  return value === 'line' ? 'line' : 'pulse'
-}
 function syncQuery() {
   void router.replace({
     query: {
@@ -696,9 +652,7 @@ function syncQuery() {
       platform: filter.value.platforms.join(',') || undefined,
       group: filter.value.groupIds.join(',') || undefined,
       model: filter.value.models.join(',') || undefined,
-      group_by: matrixGroupBy.value,
       health_mode: healthMode.value,
-      trend_view: trendView.value === 'line' ? 'line' : undefined,
       tab: activeTab.value,
     },
   })
@@ -717,13 +671,13 @@ async function loadDimensions(signal?: AbortSignal, id = sequence) {
 }
 
 async function loadMetrics(signal?: AbortSignal, id = sequence) {
-  const [nextSnapshot, nextMatrix] = await Promise.all([
+  const [nextSnapshot, nextCards] = await Promise.all([
     api.getSnapshot(filter.value, isAdmin.value, signal),
-    api.getMatrix(filter.value, matrixGroupBy.value, isAdmin.value, signal),
+    api.getGroupCards(filter.value, isAdmin.value, signal),
   ])
   if (id !== sequence) return
   snapshot.value = nextSnapshot
-  matrix.value = nextMatrix
+  cards.value = nextCards
   scheduleAutoRefresh()
   await loadTab(signal, id)
 }
@@ -779,12 +733,16 @@ async function reloadMetricsOnly(silent = true) {
 async function loadTab(signal?: AbortSignal, id = sequence) {
   tabLoading.value = true
   try {
-    if (activeTab.value === 'models') {
-      modelRows.value = (await api.getModels(filter.value, isAdmin.value, signal)).items || []
-    } else if (activeTab.value === 'errors') {
-      errorRows.value = (await api.getErrors(filter.value, isAdmin.value, signal)).items || []
+    const tab = activeTab.value
+    if (tab === 'models') {
+      const response = await api.getModels(filter.value, isAdmin.value, signal)
+      if (id === sequence && activeTab.value === tab) modelRows.value = response.items || []
+    } else if (tab === 'errors') {
+      const response = await api.getErrors(filter.value, isAdmin.value, signal)
+      if (id === sequence && activeTab.value === tab) errorRows.value = response.items || []
     } else if (showUserRanking.value) {
-      userRows.value = (await api.getUsers(filter.value, isAdmin.value, signal)).items || []
+      const response = await api.getUsers(filter.value, isAdmin.value, signal)
+      if (id === sequence && activeTab.value === tab) userRows.value = response.items || []
     } else {
       userRows.value = []
     }
@@ -868,6 +826,7 @@ function latencyKpiSecondary(metric: {
 }
 function formatTime(value: string) {
   return new Intl.DateTimeFormat(locale.value || undefined, {
+    timeZone: 'Asia/Shanghai',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -909,12 +868,7 @@ watch(
   },
   { deep: true }
 )
-watch(matrixGroupBy, () => {
-  syncQuery()
-  void reloadMetricsOnly(true)
-})
 watch(healthMode, syncQuery)
-watch(trendView, syncQuery)
 watch(activeTab, () => {
   syncQuery()
   void loadTab()
@@ -955,9 +909,6 @@ onBeforeUnmount(() => {
 .health-warning  { background: #f59e0b; }
 .health-critical { background: #ef4444; }
 .health-unknown  { background: #9ca3af; }
-.matrix-select {
-  min-width: 10rem;
-}
 details > summary::-webkit-details-marker {
   display: none;
 }

@@ -174,6 +174,16 @@ export interface MonitorMatrixResponse {
   items: MonitorMatrixRow[]
 }
 
+export interface MonitorGroupCard extends MonitorMatrixRow {
+  has_traffic: boolean
+  has_cache_samples: boolean
+}
+
+export interface MonitorGroupCardsResponse {
+  coverage: MonitorCoverage
+  items: MonitorGroupCard[]
+}
+
 export interface MonitorDimensions {
   platforms: Array<{ value: string; label: string; request_count: number }>
   groups: Array<{ id: number; name: string; platform?: string; request_count: number }>
@@ -247,6 +257,10 @@ export async function getSnapshot(filter: MonitorFilter, admin = false, signal?:
 }
 export async function getMatrix(filter: MonitorFilter, groupBy: MonitorMatrixGroupBy, admin = false, signal?: AbortSignal) {
   const { data } = await apiClient.get<MonitorMatrixResponse>(`${base(admin)}/matrix`, requestConfig(filter, signal, { group_by: groupBy }))
+  return data
+}
+export async function getGroupCards(filter: MonitorFilter, admin = false, signal?: AbortSignal) {
+  const { data } = await apiClient.get<MonitorGroupCardsResponse>(`${base(admin)}/cards`, requestConfig(filter, signal))
   return data
 }
 export async function getModels(filter: MonitorFilter, admin = false, signal?: AbortSignal) {

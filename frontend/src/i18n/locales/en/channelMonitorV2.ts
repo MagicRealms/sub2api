@@ -31,6 +31,16 @@ export default {
       label: 'Group by', platform: 'Platform', platformGroup: 'Platform / Group', platformModel: 'Platform / Model', platformGroupModel: 'Platform / Group / Model'
     },
     trendView: { label: 'Trend view', pulse: 'Pulse matrix', line: 'Line chart' },
+    cards: {
+      description: 'Each group shows the model with the highest cache rate in the selected window',
+      passive: 'V2 real traffic samples',
+      selectionHint: 'Models with cache samples are preferred. Ties favor more traffic. Metrics and history refer to the displayed model.',
+      bestCache: 'Top cache', noSamples: 'No model samples', noTraffic: 'No data',
+      healthy: 'Healthy', warning: 'Attention', critical: 'Critical', unknown: 'Insufficient samples',
+      window: 'Last {range} · Beijing time', historyLabel: 'History',
+      historyHint: 'Gray means no traffic or insufficient samples. Colors follow the selected health dimension. Longer windows show the lowest health score within each display interval; hover or tap for its native sample.',
+      sampleAt: 'Sample at {time}',
+    },
     healthMode: { label: 'Health display', overall: 'Overall', success: 'Error rate', ttft: 'First token', cache: 'Cache rate' },
     tabs: { aria: 'Detail dimension', models: 'Models', errors: 'Error reasons', users: 'User ranking' },
     metrics: {
@@ -94,13 +104,13 @@ export default {
       enableHint:
         'Applies when system mode is V2. Turning this off only stops this config’s aggregation; the system mode switch remains under Feature switches.',
       refreshTitle: 'Aggregation interval',
-      refreshHint: 'Affects matrix time granularity and refresh cadence',
+      refreshHint: 'Affects V2 sampling granularity and refresh cadence',
       refreshAria: 'Aggregation interval',
       selectPlatform: 'Select a platform',
       addPlatform: 'Add platform',
       platformsTitle: 'Platforms and models',
       platformsHint:
-        'Leave empty = show all real model names; when filled, only listed models get their own rows and the rest roll into “Other”',
+        'Model details show real names when empty; otherwise unlisted models roll into “Other”. Group cards always select a real model by cache rate',
       modelsPlaceholder: 'Empty = all real models; or list popular models (rest → Other)',
       badgeAllModels: 'All models',
       badgeOther: '+ Other',
@@ -130,7 +140,7 @@ export default {
       userContractTitle: 'User-facing display contract',
       userContract: {
         health: 'Health color weights: error rate 60% + first-token P50 20% + cache rate 20% (thresholds configurable above)',
-        trend: 'Trend can switch between pulse matrix and line chart (error · cache · first token)',
+        trend: 'Group cards show the top-cache model and V2 history (overall / errors / first token / cache)',
         latency: 'Latency shows AVG · P50 · P90; absolute request / error counts are not shown',
         models: 'Empty model lists show real names and never dump everything into “Other”',
       },

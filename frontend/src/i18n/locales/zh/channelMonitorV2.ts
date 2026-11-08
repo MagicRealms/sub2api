@@ -14,7 +14,7 @@ export default {
     },
     timeRange: '时间范围',
     clearFilters: '重置',
-    refreshingFilters: '筛选条件已变化，正在刷新矩阵、趋势和明细…',
+    refreshingFilters: '筛选条件已变化，正在刷新分组卡片和明细…',
     switchingData: '正在切换筛选数据…',
     summaryAria: '筛选范围整体汇总',
     loadFailed: '渠道监控加载失败',
@@ -31,6 +31,16 @@ export default {
       label: '展示维度', platform: '平台', platformGroup: '平台 / 分组', platformModel: '平台 / 模型', platformGroupModel: '平台 / 分组 / 模型'
     },
     trendView: { label: '趋势视图', pulse: '色块矩阵', line: '折线图' },
+    cards: {
+      description: '每个分组展示当前时间范围内缓存率最高的模型',
+      passive: 'V2 实际流量采样',
+      selectionHint: '优先选择有缓存统计的模型；缓存率相同时优先使用流量更多的模型。卡片指标和历史均对应展示模型。',
+      bestCache: '缓存优选', noSamples: '暂无模型样本', noTraffic: '暂无数据',
+      healthy: '正常', warning: '需关注', critical: '异常', unknown: '样本不足',
+      window: '近 {range} · 北京时间', historyLabel: '历史状态',
+      historyHint: '灰色表示无流量或样本不足。历史按所选健康维度着色；较长窗口合并展示区间内最低健康分，悬停或点击查看对应采样点。',
+      sampleAt: '采样点 {time}',
+    },
     healthMode: { label: '健康显示', overall: '综合', success: '错误率', ttft: '首 Token', cache: '缓存率' },
     tabs: { aria: '明细维度', models: '模型', errors: '错误原因', users: '用户排行' },
     metrics: {
@@ -93,7 +103,7 @@ export default {
       enableTitle: '启用 V2 汇总',
       enableHint: '在系统模式为 V2 时生效；关闭后仅停止本配置的汇总，系统模式开关仍在「功能开关」',
       refreshTitle: '汇总频率',
-      refreshHint: '影响矩阵时间粒度与刷新节奏',
+      refreshHint: '影响 V2 采样时间粒度与刷新节奏',
       refreshAria: '汇总频率',
       selectPlatform: '选择平台',
       addPlatform: '添加平台',
@@ -127,7 +137,7 @@ export default {
       userContractTitle: '用户端展示约定',
       userContract: {
         health: '健康色三指标：错误率 60% + 首 Token P50 20% + 缓存率 20%（阈值可在上方配置）',
-        trend: '趋势可切换色块矩阵 / 折线图（错误率 · 缓存率 · 首 Token）',
+        trend: '分组卡片展示缓存优选模型与 V2 历史状态（综合 / 错误率 / 首 Token / 缓存率）',
         latency: '延迟展示 AVG · P50 · P90；不展示绝对请求数 / 错误数',
         models: '模型列表留空时展示真实模型名，不会全部归入「其他」',
       },

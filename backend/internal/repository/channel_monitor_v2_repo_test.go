@@ -12,6 +12,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestChannelMonitorV2CardsKeepOtherFilterButExpandModelIdentity(t *testing.T) {
+	cfg := service.ChannelMonitorV2Config{Platforms: []service.ChannelMonitorV2PlatformConfig{{Platform: "openai", Enabled: true, Models: []string{"listed"}}}}
+	filter := service.ChannelMonitorV2Filter{Models: []string{service.ChannelMonitorV2OtherModel}, ExpandModels: true}
+	require.True(t, channelMonitorV2ModelSelected(filter, cfg, "openai", "new-model"))
+	require.False(t, channelMonitorV2ModelSelected(filter, cfg, "openai", "listed"))
+	key := channelMonitorV2MatrixDimensionKeyForFilter(filter, service.ChannelMonitorV2GroupByPlatformGroupModel, cfg, "openai", 7, "new-model")
+	require.Equal(t, "new-model", key.model)
+	require.Equal(t, int64(7), key.groupID)
+	filter.ExpandModels = false
+	key = channelMonitorV2MatrixDimensionKeyForFilter(filter, service.ChannelMonitorV2GroupByPlatformGroupModel, cfg, "openai", 7, "new-model")
+	require.Equal(t, service.ChannelMonitorV2OtherModel, key.model)
+}
+
 func TestChannelMonitorV2DateBinOriginIsUTC(t *testing.T) {
 	require.Equal(t, "TIMESTAMPTZ '1970-01-01 00:00:00+00'", channelMonitorV2DateBinOrigin)
 	require.Equal(t, "date_bin($1::interval,m.bucket_start,TIMESTAMPTZ '1970-01-01 00:00:00+00')", channelMonitorV2DateBinExpr("m.bucket_start"))
