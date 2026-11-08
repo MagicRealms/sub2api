@@ -39,6 +39,24 @@ function readBlobAsText(blob: Blob): Promise<string> {
 }
 
 describe('UseKeyModal', () => {
+  it('keeps an unavailable catalog hidden and recovers through the localized retry action', async () => {
+    listTestModels.mockRejectedValueOnce(new Error('Catalog unavailable'))
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'sk-test', baseUrl: 'https://example.com/v1', platform: 'openai' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, Icon: true } },
+    })
+    await wrapper.findAll('button').find(b => b.text().includes('cliTabs.opencode'))!.trigger('click')
+    await flushPromises()
+    const status = wrapper.get('[data-testid="opencode-catalog-status"]')
+    expect(status.text()).toContain('keys.useKeyModal.codexModelCatalog.errorDescription')
+    expect(wrapper.find('pre code').exists()).toBe(false)
+    expect(status.get('button').text()).toBe('keys.useKeyModal.codexModelCatalog.retry')
+    listTestModels.mockResolvedValueOnce(['gpt-6.1-sol'])
+    await status.get('button').trigger('click')
+    await flushPromises()
+    expect(Object.keys(JSON.parse(wrapper.get('pre code').text()).provider.openai.models)).toEqual(['gpt-6.1-sol'])
+    wrapper.unmount()
+  })
   it('hides unverified examples, cancels on key changes and ignores an old catalog', async () => {
     let resolveOld!: (models: string[]) => void
     listTestModels.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))

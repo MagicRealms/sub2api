@@ -501,14 +501,16 @@ const invalidateModelStatsCache = () => {
 }
 
 const loadModelStats = async (source: ModelDistributionSource, force = false) => {
+  modelStatsController?.abort()
+  modelStatsController = null
+  const seq = ++modelStatsReqSeq
   if (!force && loadedModelSources[source]) {
+    modelStatsLoading.value = false
     return
   }
 
-  modelStatsController?.abort()
   const controller = new AbortController()
   modelStatsController = controller
-  const seq = ++modelStatsReqSeq
   modelStatsLoading.value = true
   try {
     const requestType = filters.value.request_type

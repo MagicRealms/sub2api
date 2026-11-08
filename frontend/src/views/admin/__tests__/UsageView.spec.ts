@@ -180,6 +180,21 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
 })
 
 describe('admin UsageView route filters', () => {
+  it('cancels an obsolete model query when switching back to a cached source', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    let resolveQuery: (value: any) => void = () => {}
+    getModelStats.mockReturnValueOnce(new Promise(resolve => { resolveQuery = resolve }))
+    const pending = (wrapper.vm as any).loadModelStats('upstream')
+    const signal = getModelStats.mock.calls.at(-1)![1].signal as AbortSignal
+    await (wrapper.vm as any).loadModelStats('requested')
+    expect(signal.aborted).toBe(true)
+    expect((wrapper.vm as any).modelStatsLoading).toBe(false)
+    resolveQuery({ models: [{ model: 'obsolete', total_tokens: 10 }] })
+    await pending
+    expect((wrapper.vm as any).upstreamModelStats).toEqual([])
+    wrapper.unmount()
+  })
   it('cancels replaced aggregate queries and clears the delayed chart on exit', async () => {
     const wrapper = mountRouteFilteredUsageView()
     await flushPromises()

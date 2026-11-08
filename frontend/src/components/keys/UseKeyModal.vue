@@ -142,7 +142,7 @@
 
         <div v-if="needsOpenCodeCatalog && !openCodeModelIDs?.length" data-testid="opencode-catalog-status" class="rounded-lg border border-gray-200 p-3 text-sm dark:border-dark-700" role="status">
           {{ openCodeCatalogError ? t('keys.useKeyModal.codexModelCatalog.errorDescription') : openCodeModelIDs === null ? t('common.loading') : t('common.noData') }}
-          <button v-if="openCodeCatalogError" type="button" class="btn btn-secondary ml-2" @click="loadOpenCodeCatalog">{{ t('common.retry') }}</button>
+          <button v-if="openCodeCatalogError" type="button" class="btn btn-secondary ml-2" @click="loadOpenCodeCatalog">{{ t('keys.useKeyModal.codexModelCatalog.retry') }}</button>
         </div>
         <!-- Code Blocks (Stacked for multi-file platforms) -->
         <div v-else class="space-y-4">
