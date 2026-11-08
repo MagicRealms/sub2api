@@ -6,7 +6,8 @@ import TestCenterView from '../TestCenterView.vue'
 import type { ApiKey } from '@/types'
 import type { ChatTestResult } from '@/api/testCenter'
 
-const { listKeys, listModels, runChat, runImage } = vi.hoisted(() => ({ listKeys: vi.fn(), listModels: vi.fn(), runChat: vi.fn(), runImage: vi.fn() }))
+const { listKeys, listModels, runChat, runImage, listGroups } = vi.hoisted(() => ({ listKeys: vi.fn(), listModels: vi.fn(), runChat: vi.fn(), runImage: vi.fn(), listGroups: vi.fn() }))
+vi.mock('@/api/groups', () => ({ userGroupsAPI: { getAvailable: listGroups } }))
 vi.mock('@/api/keys', () => ({ keysAPI: { list: listKeys } }))
 vi.mock('@/api/testCenter', async () => ({ ...await vi.importActual<typeof import('@/api/testCenter')>('@/api/testCenter'), listTestModels: listModels, runChatTest: runChat, runImageTest: runImage }))
 vi.mock('vue-router', async () => ({ ...await vi.importActual<typeof import('vue-router')>('vue-router'), onBeforeRouteLeave: vi.fn() }))
@@ -16,16 +17,17 @@ vi.mock('vue-i18n', async () => ({ ...await vi.importActual<typeof import('vue-i
 } }) }))
 
 const imageKey = { id: 1, user_id: 7, name: 'My image key', key: 'sk-my-image-key', status: 'active', group_id: 6, group: { id: 6, name: 'Image group', status: 'active', platform: 'openai', allow_image_generation: true }, quota: 0, quota_used: 0 } as ApiKey
-const chatKey = { ...imageKey, id: 2, name: 'My chat key', key: 'sk-my-chat-key', group: { ...imageKey.group!, id: 10, name: 'Text group', allow_image_generation: false } } as ApiKey
+const chatKey = { ...imageKey, id: 2, name: 'My chat key', key: 'sk-my-chat-key', group_id: 10, group: { ...imageKey.group!, id: 10, name: 'Text group', allow_image_generation: false } } as ApiKey
 const result: ChatTestResult = { content: 'Hello', finishReason: 'stop', durationMs: 100, firstTokenMs: 50, requestId: 'req-chat', usage: { inputTokens: 10, outputTokens: 2 } }
 function render() {
   return mount(TestCenterView, { global: {
-    stubs: { AppLayout: defineComponent({ setup: (_, { slots }) => () => h('div', slots.default?.()) }), Icon: true, RouterLink: { template: '<a><slot /></a>' } },
+    stubs: { Select: defineComponent({ props: ['modelValue', 'options', 'disabled'], emits: ['update:modelValue'], setup: (props, { emit }) => () => h('select', { value: props.modelValue, disabled: props.disabled, onChange: (event: Event) => emit('update:modelValue', (event.target as HTMLSelectElement).value) }, props.options.map((option: any) => h('option', { value: option.value, disabled: option.disabled }, option.label))) }), AppLayout: defineComponent({ setup: (_, { slots }) => () => h('div', slots.default?.()) }), Icon: true, RouterLink: { template: '<a><slot /></a>' } },
   } })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listGroups.mockResolvedValue([imageKey.group, chatKey.group])
   listKeys.mockResolvedValue({ items: [imageKey, chatKey], total: 2 })
   listModels.mockResolvedValue(['gpt-6.1-sol', 'gpt-image-2', 'gpt-chat-other'])
   runChat.mockResolvedValue(result)
@@ -45,6 +47,20 @@ describe('user test center', () => {
     expect(wrapper.get('[data-test="test-key-info"]').text()).toContain('Image group')
     expect(wrapper.get('[data-test="test-model"]').findAll('option').map(option => option.text())).not.toContain('gpt-image-2')
     expect(wrapper.text()).toContain('正常计费')
+    wrapper.unmount()
+  })
+
+  it('generates images using a later selected group while the first group only allows chat', async () => {
+    listKeys.mockResolvedValue({ items: [{ ...chatKey, group_ids: [10, 6] }], total: 1 })
+    const wrapper = render()
+    await flushPromises()
+    await wrapper.get('#test-image-tab').trigger('click')
+    expect(wrapper.find('[data-test="test-image-permission"]').exists()).toBe(false)
+    await wrapper.get('[data-test="test-image-prompt"]').setValue('A small sun')
+    await wrapper.get('[data-test="test-image-send"]').trigger('submit')
+    await flushPromises()
+    expect(runImage).toHaveBeenCalledWith(expect.objectContaining({ apiKey: chatKey.key, model: 'gpt-image-2' }))
+    expect(wrapper.find('[data-test="test-image-result"]').exists()).toBe(true)
     wrapper.unmount()
   })
 

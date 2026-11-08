@@ -1,7 +1,6 @@
 <template>
-  <AppLayout>
+  <AppLayout :header-title="t('usage.title')" :header-subtitle="t('workspace.recordsDescription')" header-icon="analysis">
     <div class="console-usage-page sw-page">
-      <UsageWorkspaceHeader />
       <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
@@ -262,7 +261,6 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
-import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
 import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'

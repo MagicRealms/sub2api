@@ -2,7 +2,7 @@
   <header class="sunworld-header glass sticky top-0 z-40 border-b border-gray-200/50 dark:border-dark-700/50">
     <div class="flex h-16 items-center justify-between gap-3 px-3 sm:px-5 md:px-7">
       <!-- Left: Mobile Menu Toggle + Page Title -->
-      <div class="flex shrink-0 items-center gap-2 sm:gap-4">
+      <div class="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
         <button
           @click="toggleMobileSidebar"
           class="btn-ghost btn-icon lg:hidden"
@@ -13,7 +13,8 @@
           <Icon name="menu" size="md" />
         </button>
 
-        <div class="sw-breadcrumb hidden lg:flex"><WorkspaceIcon name="board" /><span>/</span><strong>{{ pageTitle }}</strong></div>
+        <div v-if="heading" class="sw-header-identity" data-testid="page-header-identity"><span class="sw-header-mark"><WorkspaceIcon :name="icon || 'board'" /></span><h1>{{ heading }}</h1><p v-if="subtitle">{{ subtitle }}</p></div>
+        <div v-else class="sw-breadcrumb hidden lg:flex"><WorkspaceIcon name="board" /><span>/</span><strong>{{ pageTitle }}</strong></div>
       </div>
 
       <!-- Actions -->
@@ -232,6 +233,8 @@ import { FeatureFlags, isFeatureFlagEnabled } from '@/utils/featureFlags'
 import { resolveRouteMetaKeys } from '@/router/title'
 import { resolveSiteBillingMode } from '@/utils/siteBillingMode'
 
+defineProps<{ heading?: string; subtitle?: string; icon?: string }>()
+
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -371,4 +374,14 @@ onBeforeUnmount(() => {
   opacity: 0;
   transform: scale(0.95) translateY(-4px);
 }
+</style>
+
+<style scoped>
+.sw-header-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sw-header-mark { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border: 1px solid var(--sw-line); border-radius: 11px; background: var(--sw-soft); color: var(--sw-mint); }
+.sw-header-mark svg { width: 20px; height: 20px; }
+.sw-header-identity h1 { white-space: nowrap; font-size: 15px; font-weight: 720; color: var(--sw-ink); }
+.sw-header-identity p { min-width: 0; border-left: 1px solid var(--sw-line); padding-left: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--sw-muted); font-size: 11px; }
+@media (max-width: 1279px) { .sw-header-identity p { display: none; } }
+@media (max-width: 639px) { .sw-header-mark { display: none; } .sw-header-identity h1 { font-size: 13px; } }
 </style>

@@ -3,9 +3,9 @@ import {
   isTestChatModel, isTestImageModel, keyUnavailableReason, listTestModels,
   runChatTest, runImageTest, supportsTestImages,
 } from '../testCenter'
-import type { ApiKey } from '@/types'
+import type { ApiKey, Group } from '@/types'
 
-const key = { status: 'active', group_id: 1, group: { status: 'active', platform: 'openai', allow_image_generation: true }, quota: 0, quota_used: 0 } as ApiKey
+const key = { status: 'active', group_id: 1, group: { id: 1, status: 'active', platform: 'openai', allow_image_generation: true }, quota: 0, quota_used: 0 } as ApiKey
 const opts = { apiKey: 'sk-selected-user-key', model: 'gpt-chat', messages: [{ role: 'user' as const, content: '你好' }] }
 const delta = (content: string) => ({ choices: [{ index: 0, delta: { content }, finish_reason: null }] })
 const end = (reason = 'stop') => ({ choices: [{ index: 0, delta: {}, finish_reason: reason }] })
@@ -113,6 +113,16 @@ describe('key availability and model capabilities', () => {
     expect(keyUnavailableReason({ ...key, quota: 10, quota_used: 10 })).toBe('keyQuotaExhausted')
     expect(keyUnavailableReason({ ...key, group_id: null })).toBe('keyGroupUnavailable')
     expect(keyUnavailableReason({ ...key, group: { ...key.group!, status: 'inactive' } })).toBe('keyGroupUnavailable')
+  })
+
+  it('accepts image permission on a later selected group, but never on unrelated or disabled groups', () => {
+    const text = { ...key.group!, allow_image_generation: false }
+    const image = { ...key.group!, id: 2 }
+    const routed = { ...key, group: text, group_ids: [1, 2] }
+    expect(supportsTestImages(routed, [text, image])).toBe(true)
+    expect(supportsTestImages({ ...routed, group_ids: [1] }, [text, image])).toBe(false)
+    expect(supportsTestImages(routed, [text, { ...image, status: 'inactive' } as Group])).toBe(false)
+    expect(keyUnavailableReason({ ...routed, group: { ...text, status: 'inactive' } }, Date.now(), [image])).toBeNull()
   })
 
   it('enforces image permission in addition to protocol capability', () => {

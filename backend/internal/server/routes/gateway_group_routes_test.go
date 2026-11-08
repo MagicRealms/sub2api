@@ -64,6 +64,7 @@ func orderedTestEngine(t *testing.T, groups []*service.Group, handler gin.Handle
 	}
 	engine.Use(orderedKeyGroupRoutingWithSupport(engine, keys, supports))
 	engine.POST("/v1/responses", gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(keys, nil, cfg)), handler)
+	engine.POST("/v1/images/generations", gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(keys, nil, cfg)), handler)
 	return engine
 }
 
@@ -441,4 +442,29 @@ func TestOrderedGroupPrelookupHonorsAuthAbuseAndHeaderLimits(t *testing.T) {
 			require.Equal(t, want, response.Code)
 		})
 	}
+}
+
+// A text-only first group must neither reject an image route nor determine its billing floor.
+func TestOrderedGroupImagesUseLaterCapableGroup(t *testing.T) {
+	groups := orderedTestGroups()
+	groups[1].AllowImageGeneration = true
+	var reached []int64
+	handler := func(c *gin.Context) {
+		key, _ := middleware.GetAPIKeyFromContext(c)
+		reached = append(reached, key.Group.ID)
+		require.Equal(t, int64(2), key.RoutingBillingFloor.ID)
+		c.JSON(200, gin.H{"data": []any{}})
+	}
+	engine := orderedTestEngine(t, groups, handler, func(_ context.Context, group *service.Group, model, path string) (bool, error) {
+		require.Equal(t, "gpt-image-2", model)
+		require.Equal(t, "/v1/images/generations", path)
+		return group.AllowImageGeneration, nil
+	})
+	request := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-2","prompt":"a small sun"}`))
+	request.Header.Set("Authorization", "Bearer sk-ordered-route-test-key")
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Equal(t, []int64{2}, reached)
 }

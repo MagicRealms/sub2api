@@ -1,12 +1,11 @@
 <template>
-  <AppLayout>
+  <AppLayout :header-title="t('keys.title')" header-subtitle="一把密钥，连接你的模型与灵感。管理权限、分组和用量。" header-icon="key">
     <div class="sw-page sw-keys-page">
-      <div class="sw-page-heading"><div><div class="sw-page-kicker">ACCESS / KEYS</div><h1>{{ t('keys.title') }}</h1><p>一把密钥，连接你的模型与灵感。管理权限、分组和用量。</p></div></div>
       <section class="sw-api-connect" aria-label="推荐 API 地址">
         <div><div class="sw-page-kicker">QUICK / CONNECT</div><h2>使用 API 密钥，连接你的客户端</h2><p>复制对应协议的地址，在客户端填入本站密钥。多分组 Key 仍按你设置的顺序自动路由。</p><div class="sw-api-badges"><span>OpenAI Compatible</span><span>Claude Code / Anthropic</span><span>一个 Key · 多组路由</span></div></div>
         <div class="sw-api-addresses">
-          <div class="sw-api-address"><WorkspaceIcon name="channels" /><div><label>OpenAI · 推荐 API 地址</label><code :title="recommendedEndpoint">{{ recommendedEndpoint }}</code></div><button type="button" class="btn btn-secondary" :aria-label="recommendedEndpointCopied ? '已复制' : '复制 OpenAI 地址'" @click="copyRecommendedEndpoint"><Icon :name="recommendedEndpointCopied ? 'check' : 'clipboard'" size="sm" /></button></div>
-          <div class="sw-api-address"><WorkspaceIcon name="models" /><div><label>Anthropic / Claude Code · 根地址</label><code :title="recommendedRootEndpoint">{{ recommendedRootEndpoint }}</code></div><button type="button" class="btn btn-secondary" :aria-label="rootEndpointCopied ? '已复制' : '复制 Anthropic 地址'" @click="copyRootEndpoint"><Icon :name="rootEndpointCopied ? 'check' : 'clipboard'" size="sm" /></button></div>
+          <div class="sw-api-address"><WorkspaceIcon name="channels" /><div><label>OpenAI · 推荐 API 地址</label><code :title="recommendedEndpoint">{{ recommendedEndpoint }}</code></div><EndpointLatencyButton :endpoint="recommendedRootEndpoint" /><button type="button" class="btn btn-secondary" :aria-label="recommendedEndpointCopied ? '已复制' : '复制 OpenAI 地址'" @click="copyRecommendedEndpoint"><Icon :name="recommendedEndpointCopied ? 'check' : 'clipboard'" size="sm" /></button></div>
+          <div class="sw-api-address"><WorkspaceIcon name="models" /><div><label>Anthropic / Claude Code · 根地址</label><code :title="recommendedRootEndpoint">{{ recommendedRootEndpoint }}</code></div><EndpointLatencyButton :endpoint="recommendedRootEndpoint" /><button type="button" class="btn btn-secondary" :aria-label="rootEndpointCopied ? '已复制' : '复制 Anthropic 地址'" @click="copyRootEndpoint"><Icon :name="rootEndpointCopied ? 'check' : 'clipboard'" size="sm" /></button></div>
           <EndpointPopover v-if="(publicSettings?.custom_endpoints?.length ?? 0) > 0" :api-base-url="recommendedRootEndpoint" :custom-endpoints="publicSettings?.custom_endpoints || []" />
         </div>
       </section>
@@ -1143,6 +1142,7 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import EndpointLatencyButton from '@/components/common/EndpointLatencyButton.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 	import DataTable from '@/components/common/DataTable.vue'

@@ -1,5 +1,5 @@
 import { buildGatewayUrl } from './url'
-import type { ApiKey } from '@/types'
+import type { ApiKey, Group } from '@/types'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -80,11 +80,19 @@ export async function listTestModels(options: RequestOptions): Promise<string[]>
   return [...new Set<string>(payload.data.flatMap((item: { id?: unknown }) => typeof item?.id === 'string' && item.id.trim() ? [item.id] : []))].sort()
 }
 
-export function keyUnavailableReason(key: ApiKey, now = Date.now()): string | null {
+function selectedKeyGroups(key: ApiKey, groups: readonly Group[]): Group[] {
+  const ids = key.group_ids?.length ? key.group_ids : key.group_id ? [key.group_id] : []
+  return ids.flatMap(id => {
+    const group = groups.find(group => group.id === id) ?? (key.group?.id === id ? key.group : undefined)
+    return group ? [group] : []
+  })
+}
+
+export function keyUnavailableReason(key: ApiKey, now = Date.now(), groups: readonly Group[] = []): string | null {
   if (key.status !== 'active') return key.status === 'expired' ? 'keyExpired' : key.status === 'quota_exhausted' ? 'keyQuotaExhausted' : 'keyInactive'
   if (key.expires_at && Date.parse(key.expires_at) <= now) return 'keyExpired'
   if (key.quota > 0 && key.quota_used >= key.quota) return 'keyQuotaExhausted'
-  if (!key.group_id || !key.group || key.group.status !== 'active') return 'keyGroupUnavailable'
+  if (!selectedKeyGroups(key, groups).some(group => group.status === 'active')) return 'keyGroupUnavailable'
   return null
 }
 
@@ -96,8 +104,8 @@ export function isTestChatModel(model: string): boolean {
   return !isTestImageModel(model) && !/(?:embed|whisper|\btts\b|\baudio\b|realtime|moderation|transcri|\bvideo\b|^sora|grok-imagine)/i.test(model)
 }
 
-export function supportsTestImages(key: ApiKey): boolean {
-  return key.group?.allow_image_generation === true && ['openai', 'grok', 'composite'].includes(key.group.platform)
+export function supportsTestImages(key: ApiKey, groups: readonly Group[] = []): boolean {
+  return selectedKeyGroups(key, groups).some(group => group.status === 'active' && group.allow_image_generation === true && ['openai', 'grok', 'composite'].includes(group.platform))
 }
 
 /** Consume complete SSE frames, including split UTF-8, CRLF and multiline data. */

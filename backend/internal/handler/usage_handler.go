@@ -550,7 +550,7 @@ func (h *UsageHandler) DashboardSnapshotV2(c *gin.Context) {
 	}
 
 	granularity := strings.TrimSpace(c.DefaultQuery("granularity", "day"))
-	if granularity != "hour" {
+	if granularity != "hour" && granularity != "week" {
 		granularity = "day"
 	}
 	includeTrend, ok := parseBoolQueryWithDefault(c, "include_trend", true)

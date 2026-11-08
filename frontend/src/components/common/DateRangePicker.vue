@@ -141,6 +141,15 @@ const presets: DatePreset[] = [
     }
   },
   {
+    labelKey: 'dates.thisWeek',
+    value: 'thisWeek',
+    getRange: () => {
+      const start = calendarNow()
+      start.setDate(start.getDate() - (start.getDay() + 6) % 7)
+      return { start: formatDateToString(start), end: today() }
+    }
+  },
+  {
     labelKey: 'dates.yesterday',
     value: 'yesterday',
     getRange: () => {
@@ -250,7 +259,10 @@ const selectPreset = (preset: DatePreset) => {
 }
 
 const onDateChange = () => {
-  // Check if current dates match any preset
+  // Preserve an explicitly chosen preset when equivalent ranges overlap (Sunday's
+  // current week equals the last seven days; Monday's week equals today).
+  const current = presets.find(preset => preset.value === activePreset.value)?.getRange()
+  if (current?.start === localStartDate.value && current.end === localEndDate.value) return
   activePreset.value = null
   for (const preset of presets) {
     const range = preset.getRange()

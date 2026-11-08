@@ -1,7 +1,6 @@
 <template>
-  <AppLayout>
+  <AppLayout :header-title="t('workspace.globalRecords')" :header-subtitle="t('workspace.globalRecordsDescription')" header-icon="analysis">
     <div class="console-usage-page console-admin-usage sw-page">
-      <UsageWorkspaceHeader admin />
       <UsageStatsCards :stats="usageStats" />
       <!-- Charts Section -->
       <div class="space-y-4">
@@ -235,7 +234,6 @@ import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import { getTrendPointRange } from '@/utils/trendPointRange'
-import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
 import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
 import { DASHBOARD_TIMEZONE, dashboardDate } from '@/utils/dashboardTime'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'

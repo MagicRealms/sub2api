@@ -19,6 +19,7 @@ vi.mock('vue-i18n', async () => {
 })
 
 vi.mock('vue-chartjs', () => ({
+  Bar: { props: ['data', 'options'], template: '<div class="bar-data" @click="options.onClick({}, [{ index: 0 }])">{{ JSON.stringify(data) }}</div>' },
   Line: {
     props: ['data', 'options'],
     template: '<div class="chart-data" @click="options.onClick({}, [{ index: 0 }])">{{ JSON.stringify(data) }}</div>',
@@ -35,6 +36,19 @@ describe('TokenUsageTrend', () => {
     await wrapper.findAll('.sw-trend-overview button')[0].trigger('click')
     expect(JSON.parse(wrapper.get('.chart-data').text()).datasets[0].data).toEqual([75])
   })
+  it('switches to rounded token bars and preserves point drill-down without mixing percentages into token bars', async () => {
+    const point = { date: '2026-11-08', requests: 1, input_tokens: 100, output_tokens: 20, cache_read_tokens: 40, cache_creation_tokens: 0, total_tokens: 160, cost: 5, actual_cost: 2.5 }
+    const wrapper = mount(TokenUsageTrend, { props: { trendData: [point], displayMode: 'bar', interactive: true } })
+    const data = JSON.parse(wrapper.get('.bar-data').text())
+    expect(data.datasets).toHaveLength(4)
+    expect(data.datasets[0]).toMatchObject({ data: [100], borderRadius: 5 })
+    await wrapper.get('.bar-data').trigger('click')
+    expect(wrapper.emitted('pointSelect')?.[0]).toEqual([point])
+    await wrapper.setProps({ displayMode: 'line' })
+    expect(wrapper.find('.chart-data').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('switches between request counts and actual charges using the same data', async () => {
     const wrapper = mount(TokenUsageTrend, { props: { trendData: [
       { date: '2026-11-08', requests: 12, input_tokens: 100, output_tokens: 20, cache_read_tokens: 40, cache_creation_tokens: 0, total_tokens: 160, cost: 5, actual_cost: 2.5 }

@@ -1,5 +1,7 @@
 export default {
   workspace: {
+    testConnection: 'Test connection latency',
+    connectionHint: 'Browser-to-site HTTP round trip. No tokens are used.',
     globalRecords: 'Global Records',
     globalRecordsDescription: 'Requests and usage insights across your site, with details a click away.',
     insightDetails: 'Explore details',
@@ -25,6 +27,9 @@ export default {
     personalScope: 'Usage for your account only',
   },
   dashboard: {
+    week: 'Week',
+    barChart: 'Bars',
+    lineChart: 'Area',
     title: 'Data Board',
     welcomeMessage: "Welcome back! Here's an overview of your account.",
     balance: 'Balance',

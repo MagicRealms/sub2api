@@ -16,10 +16,10 @@
       :inert="mobileNavOpen"
     >
       <!-- Header -->
-      <AppHeader />
+      <AppHeader :heading="headerTitle" :subtitle="headerSubtitle" :icon="headerIcon" />
 
       <!-- Main Content -->
-      <main class="sunworld-main relative p-4 md:p-6 lg:p-8">
+      <main class="sunworld-main relative p-4 md:p-6 lg:p-8" :class="{ 'sw-main-fill': fill }">
         <slot />
       </main>
     </div>
@@ -36,6 +36,8 @@ import { useOnboardingTour } from '@/composables/useOnboardingTour'
 import { useOnboardingStore } from '@/stores/onboarding'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
+
+defineProps<{ headerTitle?: string; headerSubtitle?: string; headerIcon?: string; fill?: boolean }>()
 
 const appStore = useAppStore()
 const authStore = useAuthStore()
@@ -57,3 +59,9 @@ onMounted(() => {
 
 defineExpose({ replayTour })
 </script>
+
+<style scoped>
+.sw-main-fill { height: calc(100dvh - 5rem); width: 100%; max-width: none; display: flex; flex-direction: column; min-height: 0; padding: 16px; }
+@media (max-width: 767px) { .sw-main-fill { height: calc(100dvh - 74px); } }
+@media (min-width: 768px) { .sw-main-fill { padding: 20px 24px; } }
+</style>

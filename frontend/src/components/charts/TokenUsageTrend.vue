@@ -13,7 +13,7 @@
     </div>
     <div class="mb-3 flex flex-wrap items-baseline gap-2"><strong class="sw-chart-total">{{ summaryValue }}</strong><span class="sw-chart-sub">{{ metric === 'unit_cost' ? t('usage.unitCostPerMillion') : metric === 'cache_hit_rate' ? t('usage.cacheHitRate') : t('usage.inSelectedRange') }}</span><span v-if="interactive" class="ml-auto text-xs text-gray-400">{{ t('usage.chartPointHint') }}</span></div>
     <div v-if="loading" class="flex h-48 items-center justify-center"><LoadingSpinner /></div>
-    <div v-else-if="trendData.length > 0 && chartData" :class="['h-48', { 'cursor-crosshair': interactive }]"><Line :data="chartData" :options="lineOptions" /></div>
+    <div v-else-if="trendData.length > 0 && chartData" :class="['h-48', { 'cursor-crosshair': interactive }]"><Bar v-if="displayMode === 'bar'" :data="barData" :options="barOptions" /><Line v-else :data="chartData" :options="lineOptions" /></div>
     <div v-else class="flex h-48 items-center justify-center text-xs text-gray-400">{{ t('admin.dashboard.noDataAvailable') }}</div>
   </div>
 </template>
@@ -30,12 +30,15 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
   Filler
 } from 'chart.js'
-import { Line } from 'vue-chartjs'
+import { Line, Bar } from 'vue-chartjs'
+import type { ChartData, ChartOptions } from 'chart.js'
+import { useChartTooltip } from '@/composables/useChartTooltip'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import type { TrendDataPoint } from '@/types'
 
@@ -44,6 +47,7 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -51,11 +55,13 @@ ChartJS.register(
 )
 
 const { t } = useI18n()
+const externalTooltip = useChartTooltip()
 
 const props = defineProps<{
   trendData: TrendDataPoint[]
   loading?: boolean
   title?: string
+  displayMode?: 'line' | 'bar'
   interactive?: boolean
 }>()
 const emit = defineEmits<{ pointSelect: [point: TrendDataPoint] }>()
@@ -220,6 +226,8 @@ const lineOptions = computed(() => ({
       }
     },
     tooltip: {
+      enabled: false,
+      external: externalTooltip,
       callbacks: {
         label: (context: any) => {
           if (context.dataset.yAxisID === 'yPercent') {
@@ -281,6 +289,18 @@ const lineOptions = computed(() => ({
       }
     }
   }
+}))
+
+const barData = computed<ChartData<'bar'>>(() => ({
+  labels: chartData.value?.labels ?? [],
+  datasets: (chartData.value?.datasets ?? []).filter(dataset => metric.value !== 'tokens' || dataset.yAxisID !== 'yPercent').map(dataset => ({
+    label: dataset.label, data: dataset.data, yAxisID: dataset.yAxisID,
+    backgroundColor: dataset.borderColor, borderRadius: 5, borderSkipped: false, maxBarThickness: 24, categoryPercentage: .65,
+  })),
+}))
+const barOptions = computed<ChartOptions<'bar'>>(() => ({
+  ...lineOptions.value,
+  scales: { ...lineOptions.value.scales, y: { ...lineOptions.value.scales.y, beginAtZero: true }, yPercent: { ...lineOptions.value.scales.yPercent, display: metric.value === 'cache_hit_rate' } },
 }))
 
 const formatTokens = (value: number): string => {

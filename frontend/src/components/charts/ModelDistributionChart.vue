@@ -99,6 +99,7 @@
     <div v-if="activeView === 'model_distribution' && loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
     </div>
+    <div v-else-if="displayMode === 'bar' && activeView === 'model_distribution' && displayModelStats.length > 0 && barData" class="h-64"><Bar :data="barData" :options="barOptions" /></div>
     <div v-else-if="compact && activeView === 'model_distribution' && displayModelStats.length > 0 && chartData" class="sw-distribution">
       <div class="sw-donut">
         <Doughnut :data="chartData" :options="doughnutOptions" />
@@ -262,8 +263,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
-import { Doughnut } from 'vue-chartjs'
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js'
+import type { ChartData, ChartOptions } from 'chart.js'
+import { useChartTooltip } from '@/composables/useChartTooltip'
+import { Doughnut, Bar } from 'vue-chartjs'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
 import { workspacePalette, formatTokenMillions } from '@/utils/workspace'
@@ -271,9 +274,10 @@ import UserBreakdownSubTable from './UserBreakdownSubTable.vue'
 import type { ModelStat, UserSpendingRankingItem, UserBreakdownItem } from '@/types'
 import { getUserBreakdown } from '@/api/admin/dashboard'
 
-ChartJS.register(ArcElement, Tooltip, Legend)
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
 const { t } = useI18n()
+const externalTooltip = useChartTooltip()
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type ModelSource = 'requested' | 'upstream' | 'mapping'
@@ -282,6 +286,7 @@ const props = withDefaults(defineProps<{
   modelStats: ModelStat[]
   title?: string
   compact?: boolean
+  displayMode?: 'line' | 'bar'
   upstreamModelStats?: ModelStat[]
   mappingModelStats?: ModelStat[]
   source?: ModelSource
@@ -473,6 +478,8 @@ const doughnutOptions = computed(() => ({
       display: false
     },
     tooltip: {
+      enabled: false,
+      external: externalTooltip,
       callbacks: {
         label: (context: any) => {
           const value = context.raw as number
@@ -488,6 +495,21 @@ const doughnutOptions = computed(() => ({
   }
 }))
 
+const barData = computed<ChartData<'bar'>>(() => ({
+  labels: displayModelStats.value.map(model => model.model),
+  datasets: [{ label: props.metric === 'actual_cost' ? t('usage.cost') : 'Token', data: displayModelStats.value.map(model => Number(props.metric === 'actual_cost' ? model.actual_cost : model.total_tokens)), backgroundColor: displayModelStats.value.map((_, index) => workspacePalette[index % workspacePalette.length]), borderRadius: 7, borderSkipped: false, maxBarThickness: 42, categoryPercentage: .65 }],
+}))
+const barOptions = computed<ChartOptions<'bar'>>(() => ({
+  responsive: true, maintainAspectRatio: false,
+  animation: doughnutOptions.value.animation,
+  plugins: { legend: { display: false }, tooltip: { enabled: false, external: externalTooltip, callbacks: doughnutOptions.value.plugins.tooltip.callbacks } },
+  onClick: (_event, elements) => { const index = elements[0]?.index; const model = index === undefined ? undefined : displayModelStats.value[index]; if (props.enableBreakdown && model) void toggleBreakdown('model', model.model) },
+  scales: {
+    x: { border: { display: false }, grid: { display: false }, ticks: { color: '#8794a9', font: { size: 10 }, callback: function(value) { const label = this.getLabelForValue(Number(value)); return label.length > 19 ? `${label.slice(0, 17)}…` : label } } },
+    y: { beginAtZero: true, border: { display: false }, grid: { color: 'rgba(138,163,193,.12)' }, ticks: { color: '#8794a9', font: { size: 10 }, callback: value => props.metric === 'actual_cost' ? `$${formatCost(Number(value))}` : formatTokenMillions(Number(value)) } },
+  },
+}))
+
 const rankingDoughnutOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -496,6 +518,8 @@ const rankingDoughnutOptions = computed(() => ({
       display: false
     },
     tooltip: {
+      enabled: false,
+      external: externalTooltip,
       callbacks: {
         label: (context: any) => {
           const value = context.raw as number

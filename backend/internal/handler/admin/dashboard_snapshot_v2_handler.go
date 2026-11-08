@@ -76,7 +76,7 @@ type dashboardSnapshotV2CacheKey struct {
 func (h *DashboardHandler) GetSnapshotV2(c *gin.Context) {
 	startTime, endTime := parseTimeRange(c)
 	granularity := strings.TrimSpace(c.DefaultQuery("granularity", "day"))
-	if granularity != "hour" {
+	if granularity != "hour" && granularity != "week" {
 		granularity = "day"
 	}
 

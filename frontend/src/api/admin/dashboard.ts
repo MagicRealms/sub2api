@@ -48,7 +48,7 @@ export interface TrendParams {
   timezone?: string
   start_date?: string
   end_date?: string
-  granularity?: 'day' | 'hour'
+  granularity?: 'day' | 'hour' | 'week'
   user_id?: number
   api_key_id?: number
   model?: string

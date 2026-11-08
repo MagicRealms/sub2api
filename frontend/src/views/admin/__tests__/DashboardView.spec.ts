@@ -139,7 +139,7 @@ describe('admin DashboardView', () => {
     expect(chart.props('data').datasets[0].data).toEqual([5])
   })
 
-  it('uses last 24 hours as default dashboard range', async () => {
+  it('uses today in Beijing as the default dashboard range', async () => {
     mount(DashboardView, {
       global: {
         stubs: {
@@ -158,11 +158,10 @@ describe('admin DashboardView', () => {
     await flushPromises()
 
     const now = new Date()
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
     expect(getSnapshotV2).toHaveBeenCalledTimes(1)
     expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
-      start_date: dashboardDate(yesterday),
+      start_date: dashboardDate(now),
       end_date: dashboardDate(now),
       timezone: 'Asia/Shanghai',
       granularity: 'hour'

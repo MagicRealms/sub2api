@@ -30,54 +30,6 @@
           <div><span>{{ t('admin.dashboard.avgResponse') }}</span><b>{{ formatDuration(stats.average_duration_ms) }}</b></div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="card p-4">
-          <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.dashboard.quickActions') }}
-            </h2>
-          </div>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <button
-              v-if="canUseBatchImage"
-              type="button"
-              class="group flex items-center gap-3 rounded-lg bg-gray-50 p-3 text-left transition-colors hover:bg-sky-50 dark:bg-dark-800/50 dark:hover:bg-sky-900/20"
-              @click="router.push('/batch-image')"
-            >
-              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
-                <Icon name="sparkles" size="md" :stroke-width="2" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                  {{ t('admin.dashboard.batchImage') }}
-                </span>
-                <span class="block text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.dashboard.batchImageDesc') }}
-                </span>
-              </span>
-              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-sky-500" />
-            </button>
-            <button
-              type="button"
-              class="group flex items-center gap-3 rounded-lg bg-gray-50 p-3 text-left transition-colors hover:bg-emerald-50 dark:bg-dark-800/50 dark:hover:bg-emerald-900/20"
-              @click="router.push('/admin/groups')"
-            >
-              <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                <Icon name="grid" size="md" :stroke-width="2" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-sm font-medium text-gray-900 dark:text-white">
-                  {{ t('admin.dashboard.groupPricing') }}
-                </span>
-                <span class="block text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.dashboard.groupPricingDesc') }}
-                </span>
-              </span>
-              <Icon name="chevronRight" size="sm" class="text-gray-400 group-hover:text-emerald-500" />
-            </button>
-          </div>
-        </div>
-
         <!-- Charts Section -->
         <div class="space-y-6">
           <!-- Date Range Filter -->
@@ -97,7 +49,7 @@
               <button @click="loadDashboardStats" :disabled="chartsLoading" class="btn btn-secondary">
                 {{ t('common.refresh') }}
               </button>
-              <div class="ml-auto flex items-center gap-2">
+              <div class="ml-auto flex flex-wrap items-center gap-2">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >{{ t('admin.dashboard.granularity') }}:</span
                 >
@@ -108,13 +60,14 @@
                     @change="loadChartData"
                   />
                 </div>
+                <ChartDisplayToggle v-model="displayMode" />
               </div>
             </div>
           </div>
 
           <!-- Charts Grid -->
           <div class="sw-chart-grid">
-            <ModelDistributionChart compact
+            <ModelDistributionChart compact :display-mode="displayMode" show-metric-toggle v-model:metric="distributionMetric"
               :model-stats="modelStats"
               :filters="{ timezone: DASHBOARD_TIMEZONE }"
               :title="t('admin.dashboard.consumptionDistribution')"
@@ -130,7 +83,7 @@
               :end-date="endDate"
               @ranking-click="goToUserUsage"
             />
-            <TokenUsageTrend
+            <TokenUsageTrend :display-mode="displayMode"
               :trend-data="trendData"
               :loading="chartsLoading"
               :title="t('admin.dashboard.modelCallAnalysis')"
@@ -153,6 +106,7 @@
               <div v-if="userTrendLoading" class="flex h-full items-center justify-center">
                 <LoadingSpinner size="md" />
               </div>
+              <Bar v-else-if="displayMode === 'bar' && userTrendChartData" :data="userTrendBarData" :options="barOptions" />
               <Line v-else-if="userTrendChartData" :data="userTrendChartData" :options="lineOptions" />
               <div
                 v-else
@@ -185,16 +139,15 @@ import type {
 } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import Icon from '@/components/icons/Icon.vue'
 import SunworldWorkspaceHero from '@/components/layout/SunworldWorkspaceHero.vue'
 import { DASHBOARD_TIMEZONE, dashboardDate } from '@/utils/dashboardTime'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import MetricCard from '@/components/workspace/MetricCard.vue'
-import { formatTokenMillions } from '@/utils/workspace'
+import { formatTokenMillions, workspacePalette } from '@/utils/workspace'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
+import ChartDisplayToggle from '@/components/charts/ChartDisplayToggle.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
-import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 
 import {
   Chart as ChartJS,
@@ -202,11 +155,14 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Tooltip,
   Legend,
   Filler
 } from 'chart.js'
-import { Line } from 'vue-chartjs'
+import { Line, Bar } from 'vue-chartjs'
+import type { ChartOptions } from 'chart.js'
+import { useChartTooltip } from '@/composables/useChartTooltip'
 
 // Register Chart.js components
 ChartJS.register(
@@ -214,14 +170,17 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Tooltip,
   Legend,
   Filler
 )
 
+const externalTooltip = useChartTooltip()
 const appStore = useAppStore()
 const router = useRouter()
-const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
+const distributionMetric = ref<'tokens' | 'actual_cost'>('actual_cost')
+const displayMode = ref<'line' | 'bar'>('line')
 const stats = ref<DashboardStats | null>(null)
 const loading = ref(false)
 const chartsLoading = ref(false)
@@ -246,25 +205,17 @@ const rankingLimit = 12
 // Calendar dates use the same Beijing reporting clock as the API.
 const formatLocalDate = dashboardDate
 
-const getLast24HoursRangeDates = (): { start: string; end: string } => {
-  const end = new Date()
-  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000)
-  return {
-    start: formatLocalDate(start),
-    end: formatLocalDate(end)
-  }
-}
-
 // Date range
-const granularity = ref<'day' | 'hour'>('hour')
-const defaultRange = getLast24HoursRangeDates()
+const granularity = ref<'day' | 'hour' | 'week'>('hour')
+const defaultRange = { start: formatLocalDate(), end: formatLocalDate() }
 const startDate = ref(defaultRange.start)
 const endDate = ref(defaultRange.end)
 
 // Granularity options for Select component
 const granularityOptions = computed(() => [
   { value: 'day', label: t('admin.dashboard.day') },
-  { value: 'hour', label: t('admin.dashboard.hour') }
+  { value: 'hour', label: t('admin.dashboard.hour') },
+  { value: 'week', label: t('dashboard.week') }
 ])
 
 // Dark mode detection
@@ -300,6 +251,7 @@ const lineOptions = computed(() => ({
       }
     },
     tooltip: {
+      enabled: false, external: externalTooltip,
       itemSort: (a: any, b: any) => {
         const aValue = typeof a?.raw === 'number' ? a.raw : Number(a?.parsed?.y ?? 0)
         const bValue = typeof b?.raw === 'number' ? b.raw : Number(b?.parsed?.y ?? 0)
@@ -371,20 +323,7 @@ const userTrendChartData = computed(() => {
   })
 
   const sortedDates = Array.from(allDates).sort()
-  const colors = [
-    '#3b82f6',
-    '#10b981',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
-    '#f97316',
-    '#6366f1',
-    '#84cc16',
-    '#06b6d4',
-    '#a855f7'
-  ]
+  const colors = workspacePalette
 
   const datasets = Array.from(userGroups.values()).map((group, idx) => ({
     label: group.name,
@@ -400,6 +339,9 @@ const userTrendChartData = computed(() => {
     datasets
   }
 })
+
+const userTrendBarData = computed(() => ({ labels: userTrendChartData.value?.labels ?? [], datasets: (userTrendChartData.value?.datasets ?? []).map(dataset => ({ label: dataset.label, data: dataset.data, backgroundColor: dataset.borderColor, borderRadius: 4, borderSkipped: false, maxBarThickness: 20 })) }))
+const barOptions = computed<ChartOptions<'bar'>>(() => ({ ...lineOptions.value, scales: { ...lineOptions.value.scales, y: { ...lineOptions.value.scales.y, beginAtZero: true } } }))
 
 // Format helpers
 const formatUserTrendValue = (value: number): string =>
@@ -469,11 +411,7 @@ const onDateRangeChange = (range: {
   const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 
   // If range is 1 day, use hourly granularity
-  if (daysDiff <= 1) {
-    granularity.value = 'hour'
-  } else {
-    granularity.value = 'day'
-  }
+  if (granularity.value !== 'week') granularity.value = daysDiff <= 1 ? 'hour' : 'day'
 
   loadChartData()
 }
@@ -595,7 +533,6 @@ const loadChartData = async () => {
 }
 
 onMounted(() => {
-  void refreshBatchImageAccess()
   loadDashboardStats()
 })
 </script>

@@ -1,5 +1,7 @@
 export default {
   workspace: {
+    testConnection: '测试连接延迟',
+    connectionHint: '从你的浏览器测试到本站的 HTTP 往返延迟，不消耗 Token。',
     globalRecords: '全局记录',
     globalRecordsDescription: '全站请求与用量洞察，重点一眼可见，详情按需展开。',
     insightDetails: '查看分析详情',
@@ -25,6 +27,9 @@ export default {
     personalScope: '仅展示当前账户用量',
   },
   dashboard: {
+    week: '按周',
+    barChart: '柱状图',
+    lineChart: '面积图',
     title: '数据看板',
     welcomeMessage: '欢迎回来！这是您账户的概览。',
     balance: '余额',

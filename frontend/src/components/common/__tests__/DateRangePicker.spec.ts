@@ -5,6 +5,7 @@ import { ref } from 'vue'
 import DateRangePicker from '../DateRangePicker.vue'
 
 const messages: Record<string, string> = {
+  'dates.thisWeek': 'This week',
   'dates.today': 'Today',
   'dates.yesterday': 'Yesterday',
   'dates.last24Hours': 'Last 24 Hours',
@@ -34,6 +35,20 @@ const formatLocalDate = (date: Date): string => {
 }
 
 describe('DateRangePicker', () => {
+  it('selects the current Beijing week from Monday through today, across the UTC date boundary', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-08T17:00:00Z'))
+    const wrapper = mount(DateRangePicker, { props: { startDate: '2026-11-08', endDate: '2026-11-08', timeZone: 'Asia/Shanghai' }, global: { stubs: { Teleport: true } }, attachTo: document.body })
+    await wrapper.find('button').trigger('click')
+    const button = Array.from(document.querySelectorAll<HTMLButtonElement>('.date-picker-preset')).find(button => button.textContent?.trim() === 'This week')!
+    button.click()
+    await wrapper.vm.$nextTick()
+    await wrapper.get('.date-picker-apply').trigger('click')
+    expect(wrapper.emitted('update:startDate')?.at(-1)).toEqual(['2026-11-09'])
+    expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-11-09'])
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
   it('uses last 24 hours as the default recognized preset', () => {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
