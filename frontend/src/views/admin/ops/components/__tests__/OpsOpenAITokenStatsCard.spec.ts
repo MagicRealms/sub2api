@@ -105,7 +105,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       platform: undefined,
       group_id: undefined,
       top_n: 20,
-    })
+    }, { signal: expect.any(AbortSignal) })
     for (const model of models) {
       expect(wrapper.text()).toContain(model)
     }
@@ -139,7 +139,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     await flushPromises()
     await wrapper.findAll('button')[1].trigger('click')
     await flushPromises()
-    expect(mockGetOpenAITokenStats).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+    expect(mockGetOpenAITokenStats).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), { signal: expect.any(AbortSignal) })
 
     mockGetOpenAITokenStats.mockClear()
     await wrapper.setProps({ platformFilter: platform })
@@ -152,7 +152,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       group_id: 7,
       page: 1,
       page_size: 20,
-    })
+    }, { signal: expect.any(AbortSignal) })
     expect(wrapper.text()).toContain(model)
     expect(wrapper.text()).not.toContain('gpt-4o-mini')
   })
@@ -181,7 +181,7 @@ describe('OpsOpenAITokenStatsCard', () => {
         platform: 'openai',
         group_id: 7,
         top_n: 20,
-      })
+      }), { signal: expect.any(AbortSignal) }
     )
 
     expect(wrapper.get('[data-testid="model-cache-hit-rate"]').text()).toBe('82.0%')
@@ -194,7 +194,7 @@ describe('OpsOpenAITokenStatsCard', () => {
         time_range: '1h',
         platform: 'openai',
         group_id: 7,
-      })
+      }), { signal: expect.any(AbortSignal) }
     )
   })
 
@@ -229,7 +229,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       expect.objectContaining({
         page: 1,
         page_size: 20,
-      })
+      }), { signal: expect.any(AbortSignal) }
     )
 
     const buttons = wrapper.findAll('button')
@@ -241,7 +241,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       expect.objectContaining({
         page: 2,
         page_size: 20,
-      })
+      }), { signal: expect.any(AbortSignal) }
     )
 
     selects = wrapper.findAllComponents(SelectStub)
@@ -254,7 +254,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     expect(mockGetOpenAITokenStats).toHaveBeenCalledWith(
       expect.objectContaining({
         top_n: 50,
-      })
+      }), { signal: expect.any(AbortSignal) }
     )
   })
 
@@ -337,10 +337,30 @@ describe('OpsOpenAITokenStatsCard', () => {
     })
     await wrapper.setProps({ platformFilter: 'anthropic' })
     await flushPromises()
+    expect(mockGetOpenAITokenStats.mock.calls[0][1].signal.aborted).toBe(true)
+    expect(mockGetOpenAITokenStats.mock.calls[1][1].signal.aborted).toBe(false)
     completeOld(sampleResponse)
     await flushPromises()
     expect(wrapper.text()).toContain('new-model')
     expect(wrapper.text()).not.toContain('gpt-4o-mini')
+  })
+
+
+  it('aborts an in-flight query on unmount without logging a cancellation as an error', async () => {
+    let rejectPending!: (error: Error) => void
+    mockGetOpenAITokenStats.mockImplementationOnce(() => new Promise((_, reject) => { rejectPending = reject }))
+    const wrapper = mount(OpsOpenAITokenStatsCard, {
+      global: { stubs: { Select: SelectStub, EmptyState: EmptyStateStub } }
+    })
+    const signal = mockGetOpenAITokenStats.mock.calls[0][1].signal as AbortSignal
+    expect(signal.aborted).toBe(false)
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+    rejectPending(new Error('request canceled'))
+    await flushPromises()
+    expect(errorLog).not.toHaveBeenCalled()
+    errorLog.mockRestore()
   })
 
 })

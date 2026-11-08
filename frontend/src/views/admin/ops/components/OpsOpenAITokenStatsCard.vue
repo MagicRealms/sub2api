@@ -29,7 +29,12 @@ const loading = ref(false)
 const errorMessage = ref('')
 const response = ref<OpsOpenAITokenStatsResponse | null>(null)
 let loadSequence = 0
-onUnmounted(() => { loadSequence += 1 })
+let loadController: AbortController | null = null
+onUnmounted(() => {
+  loadSequence += 1
+  loadController?.abort()
+  loadController = null
+})
 
 const timeRange = ref<OpsOpenAITokenStatsTimeRange>('30d')
 const viewMode = ref<ViewMode>('topn')
@@ -103,12 +108,15 @@ function buildParams() {
 }
 
 async function loadData() {
+  loadController?.abort()
+  const requestController = new AbortController()
+  loadController = requestController
   const sequence = ++loadSequence
   loading.value = true
   errorMessage.value = ''
   try {
-    const data = await opsAPI.getOpenAITokenStats(buildParams())
-    if (sequence !== loadSequence) return
+    const data = await opsAPI.getOpenAITokenStats(buildParams(), { signal: requestController.signal })
+    if (sequence !== loadSequence || requestController.signal.aborted) return
     response.value = data
     // 防御：若 total 变化导致当前页超出最大页，则回退到末页并重新拉取一次。
     if (viewMode.value === 'pagination' && page.value > totalPages.value) {
@@ -116,12 +124,15 @@ async function loadData() {
       return // The page watcher fetches the corrected page once.
     }
   } catch (err: any) {
-    if (sequence !== loadSequence) return
+    if (sequence !== loadSequence || requestController.signal.aborted) return
     console.error('[OpsOpenAITokenStatsCard] Failed to load data', err)
     response.value = null
     errorMessage.value = err?.message || t('admin.ops.openaiTokenStats.failedToLoad')
   } finally {
-    if (sequence === loadSequence) loading.value = false
+    if (sequence === loadSequence) {
+      loading.value = false
+      if (loadController === requestController) loadController = null
+    }
   }
 }
 
