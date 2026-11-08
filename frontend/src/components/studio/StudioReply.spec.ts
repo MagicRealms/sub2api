@@ -10,8 +10,14 @@ describe('studio reply rendering', () => {
     expect(wrapper.get('a').attributes()).toMatchObject({ target: '_blank', rel: 'noopener noreferrer', href: 'https://example.com' })
     expect(wrapper.find('script').exists()).toBe(false)
   })
+  it('keeps complete HTML and SVG replies visible as inert code', () => {
+    const source = '<svg onload="alert(1)"><circle r="4" /></svg>'
+    const wrapper = mount(StudioReply, { props: { content: source } })
+    expect(wrapper.get('pre code').text()).toBe(source)
+    expect(wrapper.find('svg, circle').exists()).toBe(false)
+  })
   it('removes executable markup, external images and unsafe links from model output', () => {
-    const wrapper = mount(StudioReply, { props: { content: '<img src="https://example.com/track" onerror="alert(1)"><svg onload="alert(1)"></svg><iframe src="https://example.com"></iframe><a href="javascript:alert(1)">unsafe</a>' } })
+    const wrapper = mount(StudioReply, { props: { content: 'Answer\n\n<img src="https://example.com/track" onerror="alert(1)"><svg onload="alert(1)"></svg><iframe src="https://example.com"></iframe><a href="javascript:alert(1)">unsafe</a>' } })
     expect(wrapper.find('img, svg, iframe, script').exists()).toBe(false)
     expect(wrapper.find('a').attributes('href')).toBeUndefined()
     expect(wrapper.html()).not.toMatch(/onerror|onload|javascript:/)

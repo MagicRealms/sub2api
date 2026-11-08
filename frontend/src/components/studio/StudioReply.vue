@@ -5,7 +5,10 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 const props = defineProps<{ content: string }>()
 // Generated markup is text to discuss, never executable page content.
-const html = computed(() => DOMPurify.sanitize(marked.parse(props.content, { async: false, gfm: true, breaks: true }), {
+const escapeMarkup = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const html = computed(() => DOMPurify.sanitize(/^\s*</.test(props.content)
+  ? `<pre><code>${escapeMarkup(props.content)}</code></pre>`
+  : marked.parse(props.content, { async: false, gfm: true, breaks: true }), {
   ALLOWED_TAGS: ['p','br','strong','em','del','blockquote','ul','ol','li','pre','code','h1','h2','h3','h4','h5','h6','hr','a','table','thead','tbody','tr','th','td'],
   ALLOWED_ATTR: ['href','title','start'],
 }).replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" '))
