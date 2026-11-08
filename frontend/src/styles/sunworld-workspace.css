@@ -226,3 +226,7 @@ body:has([data-overlay-dialog]){overflow:hidden}
 .btn:disabled,.btn[aria-disabled="true"]{box-shadow:none!important;cursor:not-allowed}
 /* Chart.js can retain a desktop inline width during a resize/theme redraw. */
 .sw-content canvas{max-width:100%!important}
+/* Filter controls may wrap as a group on narrow screens. */
+.sw-filterbar .sw-filter-end{min-width:0;max-width:100%;flex-wrap:wrap}
+/* Decorative hero rings must never cover controls or capture their pointer. */
+.sunworld-hero::before,.sunworld-hero::after,.sunworld-catalog-hero::before,.sunworld-catalog-hero::after{pointer-events:none}

@@ -1,7 +1,7 @@
 export default {
   channelIQ: {
     title: 'Channel IQ',
-    description: 'Choose one upstream key and run a scheduled prompt test. Results use the four structural checks from the pelican test.',
+    description: 'Select one upstream key to generate scheduled animations and display the model self-reports for four structural criteria.',
     loadError: 'Failed to load Channel IQ configuration',
     saveError: 'Failed to save Channel IQ configuration',
     runError: 'Channel IQ test failed',
@@ -31,14 +31,14 @@ export default {
       disabled: 'Paused',
       prompt: 'Test prompt',
       promptPlaceholder: 'For example: generate a pelican riding a bicycle as an HTML/SVG animation; output code only.',
-      promptHint: 'The test checks two wheels, legs connected to pedals, a consistent view, and a pelican beak and pouch; the card safely renders the animation.',
+      promptHint: 'The model self-reports on two wheels, legs connected to pedals, a consistent view, and a pelican beak and pouch. These scores have no independent visual verification.',
       runNow: 'Run now (admin)',
     },
     results: {
       title: 'Latest six results',
       startedAt: 'Started',
       finishedAt: 'Finished',
-      description: 'Each card renders the HTML/SVG animation and shows the four structural checks, test model, and reasoning effort. A successful request alone does not pass the ability test.',
+      description: 'Each card shows the HTML/SVG animation, model and reasoning effort. Structural scores are model self-reports without independent visual verification; review the animation to confirm them.',
       count: '{count} records',
       autoModel: 'Account default',
       autoReasoning: 'Default reasoning',
@@ -50,9 +50,9 @@ export default {
       animationUnavailable: 'This result does not contain a renderable SVG animation.',
       empty: 'The test failed and has no animation result.',
       emptyState: 'Save the configuration and run a test, or wait for the next scheduled test.',
-      rubricTitle: 'Pelican ability rubric',
+      rubricTitle: 'Structural self-report (reference only)',
       grades: {
-        baseline: 'All four pass',
+        baseline: 'Four self-reported passes',
         mild: 'Mild degradation',
         moderate: 'Moderate degradation',
         severe: 'Severe degradation',

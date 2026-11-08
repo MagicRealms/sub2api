@@ -1,7 +1,7 @@
 export default {
   channelIQ: {
     title: '渠道智商',
-    description: '选择一个上游 Key，使用独立提示词定时测试模型；结果按鹈鹕测试四项结构标准展示。',
+    description: '选择一个上游 Key 定时生成动画，并展示模型对四项结构标准的自评结果。',
     loadError: '渠道智商配置加载失败',
     saveError: '渠道智商配置保存失败',
     runError: '渠道智商立即测试失败',
@@ -31,14 +31,14 @@ export default {
       disabled: '已暂停',
       prompt: '测试提示词',
       promptPlaceholder: '例如：请生成一个鹈鹕骑自行车的 HTML/SVG 动画，只输出完整代码。',
-      promptHint: '测试会按两个车轮、腿连到脚踏、视角统一、鹈鹕喙与喉囊四项标准判定；卡片只安全渲染动画。',
+      promptHint: '模型会自评两个车轮、腿连到脚踏、视角统一、鹈鹕喙与喉囊四项；这些结果尚未经过独立视觉校验。',
       runNow: '立即测试（管理员）',
     },
     results: {
       title: '最近六次结果',
       startedAt: '开始',
       finishedAt: '完成',
-      description: '每张卡片渲染 HTML/SVG 动画，并显示四项结构判定、测试模型和思考强度。生成成功不等于能力通过。',
+      description: '每张卡片渲染 HTML/SVG 动画，并显示模型和思考强度。结构评分来自模型自评，尚未经过独立视觉校验，请结合动画核验。',
       count: '共 {count} 条',
       autoModel: '账号默认模型',
       autoReasoning: '默认思考',
@@ -50,9 +50,9 @@ export default {
       animationUnavailable: '本次结果没有检测到可渲染的 SVG 动画。',
       empty: '测试失败，暂无动画结果',
       emptyState: '保存配置后点击立即测试，或等待下一次自动测试。',
-      rubricTitle: '鹈鹕结构能力判定',
+      rubricTitle: '结构自评（仅供参考）',
       grades: {
-        baseline: '四项均通过',
+        baseline: '四项自评通过',
         mild: '轻度退化',
         moderate: '中度退化',
         severe: '重度退化',

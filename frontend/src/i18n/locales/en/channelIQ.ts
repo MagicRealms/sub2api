@@ -1,7 +1,7 @@
 export default {
   channelIQ: {
     title: 'Intelligence Status',
-    description: 'An administrator schedules one upstream key to test model ability. Results use the four structural checks from the pelican test.',
+    description: 'View the latest six pelican animations. Scores are self-reported by the model, without independent visual verification. Check the wheels, pedals, viewpoint and pouch in the animation.',
     loadError: 'Failed to load intelligence status',
     footnote: 'Results are updated by the administrator task. This page is read-only for users.',
     status: {
@@ -31,9 +31,9 @@ export default {
       running: 'This test is running. The result will update when it finishes.',
       checkedAt: 'Checked {time}',
       notChecked: 'Not checked yet',
-      rubricTitle: 'Pelican ability rubric',
+      rubricTitle: 'Structural self-report (reference only)',
       grades: {
-        baseline: 'All four pass',
+        baseline: 'Four self-reported passes',
         mild: 'Mild degradation',
         moderate: 'Moderate degradation',
         severe: 'Severe degradation',
