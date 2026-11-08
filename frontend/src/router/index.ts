@@ -232,7 +232,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Test Center',
+      title: 'Inspiration Studio',
       titleKey: 'testCenter.title',
       descriptionKey: 'testCenter.description'
     }
@@ -484,7 +484,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Test Center'
+      title: 'Inspiration Studio'
     }
   },
   {

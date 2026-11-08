@@ -299,7 +299,7 @@ const GuideIcon = { render: () => h(WorkspaceIcon, { name: 'guide' }) }
 
 const BatchImageIcon = { render: () => h(WorkspaceIcon, { name: 'image' }) }
 
-const TestCenterIcon = { render: () => h(WorkspaceIcon, { name: 'lab' }) }
+const TestCenterIcon = { render: () => h(WorkspaceIcon, { name: 'bot' }) }
 
 const SparklesIcon = { render: () => h(WorkspaceIcon, { name: 'sun' }) }
 
