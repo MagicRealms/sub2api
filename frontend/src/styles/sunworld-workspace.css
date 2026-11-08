@@ -209,3 +209,20 @@ body:has([data-overlay-dialog]){overflow:hidden}
 .sw-workbench .sw-platform-grid>div{position:relative;overflow:hidden}.sw-workbench .sw-platform-grid>div:before{content:'';position:absolute;right:-12px;top:-25px;width:100px;height:100px;border-radius:50%;background:#9c8adc06;pointer-events:none}
 
 .sw-admin-filters>div>div:first-child>div{min-width:160px!important;flex:1}.sw-admin-filters .input-label{font-size:10px;color:var(--sw-muted)}.sw-admin-filters>div{gap:12px}.sw-admin-filters>div>div:first-child{gap:12px}
+
+/* Visible interaction states share the workspace palette, including portaled menus. */
+:root{--sw-hover:#e6effc;--sw-selected:#dceafb;--sw-control-line:#a9c1df;--sw-focus:#3977bd;--sw-focus-halo:#649cf02b}
+.dark{--sw-hover:#293b55;--sw-selected:#304969;--sw-control-line:#58779f;--sw-focus:#a4ccff;--sw-focus-halo:#649cf042}
+.btn-secondary:hover:not(:disabled):not([aria-disabled="true"]){background:var(--sw-hover)!important;border-color:var(--sw-control-line)!important;color:var(--sw-ink)!important;box-shadow:0 2px 7px #47679114!important}
+.btn-secondary:active:not(:disabled){background:var(--sw-selected)!important;box-shadow:inset 0 1px 3px #4767911a!important}
+:where(button,a,[role="button"],[role="option"],input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{outline:2px solid var(--sw-focus)!important;outline-offset:3px}
+.input:focus{border-color:var(--sw-focus)!important;box-shadow:0 0 0 3px var(--sw-focus-halo)!important}
+.sidebar-link:hover,.sunworld-action-row:hover,.sunworld-usage-row:hover{background:var(--sw-hover)!important}
+.sw-group-selector>div>label:hover{background:var(--sw-hover);border-color:var(--sw-control-line)}
+.sw-group-selector>div>label:has(input:checked){background:var(--sw-selected);border-color:var(--sw-control-line)}
+.sw-day.is-selected,.sw-model-kinds button.is-active{background:var(--sw-selected)!important;border-color:var(--sw-control-line)!important;color:var(--sw-ink)!important}
+[role="option"][aria-selected="true"]{background:var(--sw-selected)!important;color:var(--sw-ink)!important}
+[role="option"]:hover:not([aria-disabled="true"]){background:var(--sw-hover)!important}
+.btn:disabled,.btn[aria-disabled="true"]{box-shadow:none!important;cursor:not-allowed}
+/* Chart.js can retain a desktop inline width during a resize/theme redraw. */
+.sw-content canvas{max-width:100%!important}

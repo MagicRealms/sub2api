@@ -19,6 +19,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 )
 
+var errModelsDevProviderUnmatched = errors.New("no model metadata provider matches account base URL")
+
 const (
 	upstreamModelsBodyLimit             int64 = 8 << 20
 	modelsDevRegistryURL                      = "https://models.dev/api.json"
@@ -299,6 +301,11 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 					source = "models.dev"
 				}
 			}
+		} else if errors.Is(registryErr, errModelsDevProviderUnmatched) {
+			// Custom relay hosts need not exist in the public capability registry.
+			// Keep the catalog's partial-capability warning, without a false outage alert.
+			slog.Info("upstream model metadata registry has no matching provider",
+				"account_id", upstreamModelSyncAccountID(account), "platform", upstreamModelSyncPlatform(account))
 		} else {
 			slog.Warn("upstream model capability metadata enrichment failed",
 				"account_id", upstreamModelSyncAccountID(account),
@@ -553,7 +560,7 @@ func (s *AccountTestService) fetchModelsDevMetadata(
 	}
 	provider, ok := matchModelsDevProvider(registry, upstreamModelRegistryBaseURL(account))
 	if !ok {
-		return nil, fmt.Errorf("no model metadata provider matches account base URL")
+		return nil, errModelsDevProviderUnmatched
 	}
 
 	metadata := make(map[string]UpstreamModelMetadata)

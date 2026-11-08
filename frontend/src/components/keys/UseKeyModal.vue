@@ -140,8 +140,12 @@
           </nav>
         </div>
 
+        <div v-if="needsOpenCodeCatalog && !openCodeModelIDs?.length" data-testid="opencode-catalog-status" class="rounded-lg border border-gray-200 p-3 text-sm dark:border-dark-700" role="status">
+          {{ openCodeCatalogError ? t('keys.useKeyModal.codexModelCatalog.errorDescription') : openCodeModelIDs === null ? t('common.loading') : t('common.noData') }}
+          <button v-if="openCodeCatalogError" type="button" class="btn btn-secondary ml-2" @click="loadOpenCodeCatalog">{{ t('common.retry') }}</button>
+        </div>
         <!-- Code Blocks (Stacked for multi-file platforms) -->
-        <div class="space-y-4">
+        <div v-else class="space-y-4">
           <div
             v-for="(file, index) in currentFiles"
             :key="index"
@@ -274,13 +278,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, watch, type Component } from 'vue'
+import { ref, computed, h, watch, onUnmounted, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildCodexModelCatalogUrl, fetchCodexModelsManifest } from '@/api/codex'
+import { listTestModels, isTestChatModel } from '@/api/testCenter'
 import type { Group, GroupPlatform } from '@/types'
 import { buildCodexApiKeyAuthConfig } from '@/utils/codexAuthConfig'
 import {
@@ -333,6 +338,37 @@ const { copyToClipboard: clipboardCopy } = useClipboard()
 const copiedIndex = ref<number | null>(null)
 const activeTab = ref<string>('unix')
 const activeClientTab = ref<string>('claude')
+const openCodeModelIDs = ref<string[] | null>(null)
+const openCodeCatalogError = ref(false)
+let openCodeCatalogController: AbortController | null = null
+// Only the OpenAI-compatible configuration used to advertise static models
+// unrelated to the selected key. Fetch its real catalog on opening this tab.
+const needsOpenCodeCatalog = computed(() => props.show && activeClientTab.value === 'opencode' &&
+  !['anthropic', 'gemini', 'antigravity', 'grok', 'typesafe'].includes(effectivePlatform.value || ''))
+async function loadOpenCodeCatalog() {
+  openCodeCatalogController?.abort()
+  if (!needsOpenCodeCatalog.value || !props.apiKey) return
+  const controller = new AbortController()
+  openCodeCatalogController = controller
+  openCodeModelIDs.value = null
+  openCodeCatalogError.value = false
+  try {
+    const models = await listTestModels({ apiKey: props.apiKey, signal: controller.signal })
+    if (!controller.signal.aborted && openCodeCatalogController === controller) openCodeModelIDs.value = models.filter(isTestChatModel)
+  } catch {
+    if (!controller.signal.aborted && openCodeCatalogController === controller) openCodeCatalogError.value = true
+  }
+}
+watch(() => [needsOpenCodeCatalog.value, props.apiKey], () => {
+  openCodeCatalogController?.abort()
+  openCodeModelIDs.value = null
+  openCodeCatalogError.value = false
+  if (needsOpenCodeCatalog.value) void loadOpenCodeCatalog()
+})
+onUnmounted(() => {
+  openCodeCatalogController?.abort()
+  resetCodexModelManifest()
+})
 type CodexAuthMode = 'legacy' | 'api-key'
 const codexAuthMode = ref<CodexAuthMode>('api-key')
 type CodexModelManifestState = 'idle' | 'loading' | 'ready' | 'error'
@@ -2056,7 +2092,9 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].name = 'Antigravity (Gemini)'
     provider[platform].models = antigravityGeminiModels
   } else if (platform === 'openai') {
-    provider[platform].models = openaiModels
+    provider[platform].models = Object.fromEntries((openCodeModelIDs.value || []).map(model => [
+      model, openaiModels[model as keyof typeof openaiModels] || { name: model, options: { store: false } }
+    ]))
   } else if (platform === 'grok') {
     // Custom provider pointing at Sub2API OpenAI-compatible Responses/Chat endpoints.
     provider[platform].npm = '@ai-sdk/openai-compatible'

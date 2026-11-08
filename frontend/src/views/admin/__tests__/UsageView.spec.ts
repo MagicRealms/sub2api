@@ -180,6 +180,21 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
 })
 
 describe('admin UsageView route filters', () => {
+  it('cancels replaced aggregate queries and clears the delayed chart on exit', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    const first = [getStats.mock.calls.at(-1)![1].signal, getModelStats.mock.calls.at(-1)![1].signal] as AbortSignal[]
+    ;(wrapper.vm as any).refreshData()
+    await flushPromises()
+    expect(first.every(signal => signal.aborted)).toBe(true)
+    const latest = [getStats.mock.calls.at(-1)![1].signal, getModelStats.mock.calls.at(-1)![1].signal, getSnapshotV2.mock.calls.at(-1)![1].signal] as AbortSignal[]
+    const charts = getSnapshotV2.mock.calls.length
+    wrapper.unmount()
+    vi.advanceTimersByTime(200)
+    await flushPromises()
+    expect(latest.every(signal => signal.aborted)).toBe(true)
+    expect(getSnapshotV2).toHaveBeenCalledTimes(charts)
+  })
   it('opens the interactive trend chart from the records insight card', async () => {
     const wrapper = mountRouteFilteredUsageView()
     await flushPromises()
@@ -224,9 +239,9 @@ describe('admin UsageView route filters', () => {
     await flushPromises()
     const range = { start_date: '2026-11-08', end_date: '2026-11-08', timezone: 'Asia/Shanghai' }
     expect(list).toHaveBeenCalledWith(expect.objectContaining(range), expect.anything())
-    expect(getStats).toHaveBeenCalledWith(expect.objectContaining(range))
-    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining(range))
-    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining(range))
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining(range), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining(range), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining(range), expect.objectContaining({ signal: expect.any(AbortSignal) }))
     wrapper.unmount()
   })
 
@@ -343,9 +358,9 @@ describe('admin UsageView native compaction filter', () => {
       expect.objectContaining({ native_compaction_v2: true }),
       expect.anything()
     )
-    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }))
-    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }))
-    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }))
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
 
     list.mockClear()
     getStats.mockClear()
@@ -361,9 +376,9 @@ describe('admin UsageView native compaction filter', () => {
       expect.objectContaining({ native_compaction_v2: null }),
       expect.anything()
     )
-    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }))
-    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }))
-    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }))
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
 })
 
@@ -468,7 +483,7 @@ describe('admin UsageView distribution metric toggles', () => {
       start_date: formatLocalDate(yesterday),
       end_date: formatLocalDate(now),
       granularity: 'hour'
-    }))
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
 
     expect(wrapper.findAll('[data-insight]')).toHaveLength(4)
     expect(wrapper.find('[data-test="model-chart"]').exists()).toBe(false)

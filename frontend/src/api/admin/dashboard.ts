@@ -106,8 +106,8 @@ export interface ModelStatsResponse {
  * @param params - Query parameters for filtering
  * @returns Model usage statistics
  */
-export async function getModelStats(params?: ModelStatsParams): Promise<ModelStatsResponse> {
-  const { data } = await apiClient.get<ModelStatsResponse>('/admin/dashboard/models', { params })
+export async function getModelStats(params?: ModelStatsParams, options?: { signal?: AbortSignal }): Promise<ModelStatsResponse> {
+  const { data } = await apiClient.get<ModelStatsResponse>('/admin/dashboard/models', { params, signal: options?.signal })
   return data
 }
 
@@ -205,9 +205,9 @@ export async function getUserBreakdown(params: UserBreakdownParams): Promise<Use
 /**
  * Get dashboard snapshot v2 (aggregated response for heavy admin pages).
  */
-export async function getSnapshotV2(params?: DashboardSnapshotV2Params): Promise<DashboardSnapshotV2Response> {
+export async function getSnapshotV2(params?: DashboardSnapshotV2Params, options?: { signal?: AbortSignal }): Promise<DashboardSnapshotV2Response> {
   const { data } = await apiClient.get<DashboardSnapshotV2Response>('/admin/dashboard/snapshot-v2', {
-    params
+    params, signal: options?.signal
   })
   return data
 }

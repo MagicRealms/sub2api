@@ -31,6 +31,23 @@ type countingEstimator struct {
 	priced bool
 }
 
+type admissionEstimator struct{ countingEstimator }
+
+func (*admissionEstimator) ValidateRequestPricing(context.Context, *service.APIKey, service.InflightEstimateRequest) error {
+	return service.ErrModelPricingUnavailable
+}
+
+func TestPricingAdmissionIndependentOfInflightReservation(t *testing.T) {
+	key := &service.APIKey{User: &service.User{ID: 1}}
+	est := &admissionEstimator{}
+	for _, subscription := range []*service.UserSubscription{nil, {}} {
+		_, done, err := reserveInflightBalanceCtx(context.Background(), nil, est, key, subscription, tokenInflightEstimate("unpriced", nil))
+		require.ErrorIs(t, err, service.ErrModelPricingUnavailable)
+		done()
+	}
+	require.Zero(t, est.calls, "unpriced requests must fail before reservation or forwarding")
+}
+
 func (e *countingEstimator) EstimateInflightReservation(context.Context, *service.APIKey, service.InflightEstimateRequest) (float64, bool) {
 	e.calls++
 	return e.cost, e.priced

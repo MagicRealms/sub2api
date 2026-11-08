@@ -1701,7 +1701,8 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 	if isOpenAIImageGenerationModel(model) {
 		for _, candidate := range []string{"gpt-image-2", "gpt-image-1.5", "gpt-image-1"} {
 			if pricing, ok := s.pricingData[candidate]; ok {
-				logger.LegacyPrintf("service.pricing", "[Pricing] OpenAI image fallback matched %s -> %s", model, candidate)
+				logger.With(zap.String("component", "service.pricing"), zap.String("model", model), zap.String("pricing_model", candidate)).
+					Debug("openai_image_pricing_fallback_matched")
 				return pricing
 			}
 		}

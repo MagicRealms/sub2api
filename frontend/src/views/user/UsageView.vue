@@ -378,6 +378,9 @@ const applyErrorFilters = () => {
 }
 
 let abortController: AbortController | null = null
+let statsController: AbortController | null = null
+let modelStatsController: AbortController | null = null
+let chartController: AbortController | null = null
 let chartReqSeq = 0
 let statsReqSeq = 0
 let modelStatsReqSeq = 0
@@ -519,17 +522,20 @@ const loadLogs = async () => {
 }
 
 const loadStats = async () => {
+  statsController?.abort()
+  const controller = new AbortController()
+  statsController = controller
   const seq = ++statsReqSeq
   endpointStatsLoading.value = true
   try {
-    const stats = await usageAPI.getStats(normalizedFilters.value)
-    if (seq !== statsReqSeq) return
+    const stats = await usageAPI.getStats(normalizedFilters.value, undefined, { signal: controller.signal })
+    if (controller.signal.aborted || seq !== statsReqSeq) return
     usageStats.value = stats
     inboundEndpointStats.value = stats.endpoints || []
     upstreamEndpointStats.value = []
     endpointPathStats.value = []
   } catch (error) {
-    if (seq !== statsReqSeq) return
+    if (controller.signal.aborted || seq !== statsReqSeq) return
     console.error('Failed to load usage stats:', error)
     inboundEndpointStats.value = []
     upstreamEndpointStats.value = []
@@ -540,18 +546,21 @@ const loadStats = async () => {
 }
 
 const loadModelStats = async () => {
+  modelStatsController?.abort()
+  const controller = new AbortController()
+  modelStatsController = controller
   const seq = ++modelStatsReqSeq
   modelStatsLoading.value = true
   try {
     const response = await usageAPI.getDashboardModels({
       ...normalizedFilters.value,
       model_source: 'requested',
-    })
-    if (seq !== modelStatsReqSeq) return
+    }, { signal: controller.signal })
+    if (controller.signal.aborted || seq !== modelStatsReqSeq) return
     requestedModelStats.value = response.models || []
     refreshModelOptions(response.models || [])
   } catch (error) {
-    if (seq !== modelStatsReqSeq) return
+    if (controller.signal.aborted || seq !== modelStatsReqSeq) return
     console.error('Failed to load model stats:', error)
     requestedModelStats.value = []
   } finally {
@@ -560,6 +569,9 @@ const loadModelStats = async () => {
 }
 
 const loadChartData = async () => {
+  chartController?.abort()
+  const controller = new AbortController()
+  chartController = controller
   const seq = ++chartReqSeq
   chartsLoading.value = true
   try {
@@ -569,13 +581,13 @@ const loadChartData = async () => {
       include_trend: true,
       include_model_stats: false,
       include_group_stats: true,
-    })
-    if (seq !== chartReqSeq) return
+    }, { signal: controller.signal })
+    if (controller.signal.aborted || seq !== chartReqSeq) return
     trendData.value = snapshot.trend || []
     trendTimezone.value = snapshot.timezone || 'UTC'
     groupStats.value = snapshot.groups || []
   } catch (error) {
-    if (seq !== chartReqSeq) return
+    if (controller.signal.aborted || seq !== chartReqSeq) return
     console.error('Failed to load chart data:', error)
     trendData.value = []
     groupStats.value = []
@@ -1059,6 +1071,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  statsController?.abort()
+  modelStatsController?.abort()
+  chartController?.abort()
   abortController?.abort()
   pointAbortController?.abort()
   document.removeEventListener('click', handleColumnClickOutside)

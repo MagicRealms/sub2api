@@ -12,7 +12,7 @@ import (
 )
 
 // 本文件覆盖：worker 池已停止（进程关停窗口）时，计费任务不得静默丢失，
-// 必须降级为内联同步执行；显式配置的 drop/sample 溢出丢弃仍按配置语义保留。
+// 必须降级为内联同步执行；文本与媒体计费均不受 drop/sample 丢弃策略影响。
 
 func newStoppedUsageRecordPoolForTest() *service.UsageRecordWorkerPool {
 	pool := service.NewUsageRecordWorkerPoolWithOptions(service.UsageRecordWorkerPoolOptions{
@@ -45,7 +45,7 @@ func TestOpenAIGatewayHandlerSubmitUsageRecordTask_StoppedPoolFallsBackToSync(t 
 	require.True(t, executed, "池已停止时计费任务必须内联同步执行")
 }
 
-func TestGatewayHandlerSubmitUsageRecordTask_DropPolicyOverflowStillDrops(t *testing.T) {
+func TestGatewayHandlerSubmitUsageRecordTask_DropPolicyStillBills(t *testing.T) {
 	pool := service.NewUsageRecordWorkerPoolWithOptions(service.UsageRecordWorkerPoolOptions{
 		WorkerCount:    1,
 		QueueSize:      1,
@@ -73,5 +73,9 @@ func TestGatewayHandlerSubmitUsageRecordTask_DropPolicyOverflowStillDrops(t *tes
 		executed.Store(true)
 	})
 	time.Sleep(50 * time.Millisecond)
-	require.False(t, executed.Load(), "drop 溢出策略是运维显式配置的取舍，不应被同步兜底覆盖")
+	require.True(t, executed.Load(), "计费任务即便配置 drop 策略也必须执行")
+	var openAICalls atomic.Int64
+	openai := &OpenAIGatewayHandler{usageRecordWorkerPool: pool}
+	openai.submitOpenAIUsageRecordTask(context.Background(), &service.OpenAIForwardResult{}, func(context.Context) { openAICalls.Add(1) })
+	require.Equal(t, int64(1), openAICalls.Load(), "纯文本计费也不能丢失或重复")
 }

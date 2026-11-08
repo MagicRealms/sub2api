@@ -48,6 +48,14 @@ func TestBillingErrorDetails_BillingServiceUnavailableMapsTo503(t *testing.T) {
 	require.Equal(t, 0, retryAfter, "non-RPM errors should not set Retry-After")
 }
 
+func TestBillingErrorDetails_MissingPricingMapsTo503(t *testing.T) {
+	status, code, message, retryAfter := billingErrorDetails(service.ErrModelPricingUnavailable)
+	require.Equal(t, http.StatusServiceUnavailable, status)
+	require.Equal(t, "model_pricing_unavailable", code)
+	require.NotEmpty(t, message)
+	require.Zero(t, retryAfter)
+}
+
 func TestBillingErrorDetails_UnknownErrorFallsBackTo403(t *testing.T) {
 	status, code, msg, _ := billingErrorDetails(service.ErrInsufficientBalance)
 	require.Equal(t, http.StatusForbidden, status)

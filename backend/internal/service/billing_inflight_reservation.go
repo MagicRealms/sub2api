@@ -392,7 +392,8 @@ type inflightEstimateDeps struct {
 	resolver       *ModelPricingResolver
 	resolveMapping func(ctx context.Context, groupID int64, model string) ChannelMappingResult
 	userGroupRate  func(ctx context.Context, userID, groupID int64, groupDefault float64) float64
-	// accountMappedModels 返回调度器可选账号对 model 的账号级映射结果（去重，不含 model 本身）。
+	// accountMappedModels 返回调度器可选账号的去重计费候选；生产装配包含受支持的未映射模型，
+	// 使缺价准入校验能覆盖所有可选账号，不能只用其中一个有价别名替其他账号放行。
 	// 准入时账号尚未选定，计费侧 billableModelWithFallback 会回退到实际转发模型（UpstreamModel，
 	// 即账号映射后的模型），因此这里取所有候选映射模型的最高估算。
 	// 仅在首选/渠道候选均无法定价（或 composite 分组）时才调用；实现只读调度器快照，
@@ -405,7 +406,7 @@ type inflightSnapshotLister func(ctx context.Context, groupID *int64, platform s
 
 // inflightAccountMappedModelsFromSnapshot 基于调度器快照在内存中匹配账号级映射（支持通配规则）。
 // resolvePlatform 返回与调度器一致的平台；无分组 API Key 使用调度器的未分组账号池（groupID=nil）。
-func inflightAccountMappedModelsFromSnapshot(list inflightSnapshotLister, resolvePlatform func(ctx context.Context, apiKey *APIKey, model string) (string, bool, bool)) func(ctx context.Context, apiKey *APIKey, model string) []string {
+func inflightAccountMappedModelsFromSnapshot(list inflightSnapshotLister, resolvePlatform func(ctx context.Context, apiKey *APIKey, model string) (string, bool, bool), includeUnmapped ...bool) func(ctx context.Context, apiKey *APIKey, model string) []string {
 	if list == nil || resolvePlatform == nil {
 		return nil
 	}
@@ -422,18 +423,21 @@ func inflightAccountMappedModelsFromSnapshot(list inflightSnapshotLister, resolv
 		if err != nil {
 			return nil
 		}
-		return accountMappedModelsFrom(accounts, model)
+		return accountMappedModelsFrom(accounts, model, includeUnmapped...)
 	}
 }
 
-func accountMappedModelsFrom(accounts []Account, model string) []string {
+func accountMappedModelsFrom(accounts []Account, model string, includeUnmapped ...bool) []string {
 	var seen map[string]struct{}
 	var out []string
 	for i := range accounts {
 		mapped, matched := accounts[i].ResolveMappedModel(model)
 		mapped = strings.TrimSpace(mapped)
 		if !matched || mapped == "" || mapped == model {
-			continue
+			if len(includeUnmapped) == 0 || !includeUnmapped[0] || !accounts[i].IsModelSupported(model) {
+				continue
+			}
+			mapped = model
 		}
 		if seen == nil {
 			seen = map[string]struct{}{}
@@ -728,6 +732,7 @@ func (s *GatewayService) inflightEstimateDeps() inflightEstimateDeps {
 				platform, forced, err := s.resolvePlatform(ctx, apiKey.GroupID, apiKey.Group, model)
 				return platform, forced, err == nil
 			},
+			true,
 		)
 	}
 	return d
@@ -762,6 +767,7 @@ func (s *OpenAIGatewayService) inflightEstimateDeps() inflightEstimateDeps {
 				}
 				return NormalizeOpenAICompatiblePlatform(platform), false, true
 			},
+			true,
 		)
 	}
 	return d

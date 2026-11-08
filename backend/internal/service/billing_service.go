@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"maps"
 	"math"
 	"strings"
@@ -1464,10 +1464,11 @@ func (s *BillingService) getModelPricingAt(model string, pricingAt time.Time) (*
 	// 2. 使用硬编码回退价格
 	fallback := s.getFallbackPricing(model)
 	if fallback != nil {
-		// 按模型名去重:每个模型每进程最多打一条 warn,避免热路径每请求刷屏（issue #3394）。
+		// Successful static fallback is informational; missing pricing still fails below.
+		// Deduplicate by model so catalog reads cannot flood operational logs.
 		// model 在函数入口已 ToLower,故 GLM-5.2 / glm-5.2 视为同一条目。
 		if _, seen := s.fallbackWarnSeen.LoadOrStore(model, struct{}{}); !seen {
-			log.Printf("[Billing] Using fallback pricing for model: %s", model)
+			slog.Info("billing_static_pricing_fallback", "model", model)
 		}
 		return s.applyModelSpecificPricingPolicyEx(model, fallback, true, pricingAt), nil
 	}

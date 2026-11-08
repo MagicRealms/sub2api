@@ -170,7 +170,8 @@ export async function query(
  */
 export async function getStats(
   paramsOrPeriod: (UsageQueryParams & { period?: string; timezone?: string }) | string = 'today',
-  apiKeyId?: number
+  apiKeyId?: number,
+  options?: { signal?: AbortSignal }
 ): Promise<UsageStatsResponse> {
   const params: Record<string, unknown> = typeof paramsOrPeriod === 'string'
     ? { period: paramsOrPeriod }
@@ -181,7 +182,7 @@ export async function getStats(
   }
 
   const { data } = await apiClient.get<UsageStatsResponse>('/usage/stats', {
-    params
+    params, signal: options?.signal
   })
   return data
 }
@@ -293,8 +294,8 @@ export async function getDashboardModels(params?: {
   billing_type?: number | null
   billing_mode?: string | null
   timezone?: string
-}): Promise<ModelStatsResponse> {
-  const { data } = await apiClient.get<ModelStatsResponse>('/usage/dashboard/models', { params })
+}, options?: { signal?: AbortSignal }): Promise<ModelStatsResponse> {
+  const { data } = await apiClient.get<ModelStatsResponse>('/usage/dashboard/models', { params, signal: options?.signal })
   return data
 }
 
@@ -316,11 +317,12 @@ export async function getMyApiKeyDailyUsage(
 }
 
 export async function getDashboardSnapshotV2(
-  params?: UsageDashboardSnapshotV2Params
+  params?: UsageDashboardSnapshotV2Params,
+  options?: { signal?: AbortSignal }
 ): Promise<UsageDashboardSnapshotV2Response> {
   const { data } = await apiClient.get<UsageDashboardSnapshotV2Response>(
     '/usage/dashboard/snapshot-v2',
-    { params }
+    { params, signal: options?.signal }
   )
   return data
 }

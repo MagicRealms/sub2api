@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
@@ -1755,7 +1756,7 @@ func (s *UsageLogRepoSuite) TestKeyDisplayResetsPreserveBillingAndSeparatePeriod
 	fresh, err := keys.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err)
 	s.Require().Equal(float64(9), fresh.QuotaUsed)
-	count, err := s.client.UsageLog.Query().Count(s.ctx)
+	count, err := s.client.UsageLog.Query().Where(usagelog.APIKeyID(key.ID)).Count(s.ctx)
 	s.Require().NoError(err)
 	s.Require().Equal(3, count)
 	s.Require().Error(keys.ResetDisplayUsage(s.ctx, key.ID, user.ID+999, "total"))

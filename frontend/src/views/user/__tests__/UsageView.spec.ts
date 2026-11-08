@@ -241,10 +241,25 @@ describe('user UsageView', () => {
       include_trend: true,
       include_model_stats: false,
       include_group_stats: true,
-    }))
+    }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(list).toHaveBeenCalledTimes(1)
     expect(list).toHaveBeenCalledWith(1, 100)
     expect(getAvailable).toHaveBeenCalled()
+  })
+
+  it('cancels superseded aggregates and all work when leaving the page', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const signals = () => [getStats.mock.calls.at(-1)![2].signal, getDashboardModels.mock.calls.at(-1)![1].signal, getDashboardSnapshotV2.mock.calls.at(-1)![1].signal] as AbortSignal[]
+    const first = signals()
+    ;(wrapper.vm as any).refreshData()
+    await flushPromises()
+    expect(first.every(signal => signal.aborted)).toBe(true)
+    const latest = signals()
+    expect(latest.every(signal => !signal.aborted)).toBe(true)
+    wrapper.unmount()
+    expect(latest.every(signal => signal.aborted)).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
   })
 
   it('includes API keys after the first page in both record filters and queries by the selected key', async () => {
@@ -356,9 +371,9 @@ describe('user UsageView', () => {
       expect.objectContaining({ native_compaction_v2: true }),
       expect.anything()
     )
-    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }))
-    expect(getDashboardModels).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }))
-    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }))
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }), undefined, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getDashboardModels).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: true }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
 
     query.mockClear()
     getStats.mockClear()
@@ -373,9 +388,9 @@ describe('user UsageView', () => {
       expect.objectContaining({ native_compaction_v2: null }),
       expect.anything()
     )
-    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }))
-    expect(getDashboardModels).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }))
-    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }))
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }), undefined, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getDashboardModels).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({ native_compaction_v2: null }), expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
 
   it('exports csv with current filters and without admin-only fields', async () => {

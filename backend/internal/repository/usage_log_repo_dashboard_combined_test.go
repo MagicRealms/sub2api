@@ -45,6 +45,23 @@ func TestUsageTrendTimezonePreservesExplicitOffsets(t *testing.T) {
 	} {
 		at, err := time.Parse(time.RFC3339, tc.value)
 		require.NoError(t, err)
+		// Parse may reuse time.Local when its current offset matches. Explicit
+		// offset inputs must exercise an unnamed zone independently of other
+		// tests that initialize the process timezone to Asia/Shanghai.
+		if _, offset := at.Zone(); offset != 0 {
+			at = at.In(time.FixedZone("", offset))
+		}
 		require.Equal(t, tc.zone, usageTrendTimezone(at))
+	}
+}
+
+func TestUsageTrendTimezonePreservesNamedZones(t *testing.T) {
+	for _, name := range []string{"Asia/Shanghai", "America/Los_Angeles"} {
+		loc, err := time.LoadLocation(name)
+		require.NoError(t, err)
+		for _, month := range []time.Month{time.January, time.July} {
+			at := time.Date(2026, month, 8, 12, 0, 0, 0, loc)
+			require.Equal(t, name, usageTrendTimezone(at))
+		}
 	}
 }

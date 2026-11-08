@@ -71,6 +71,15 @@ func reserveInflightBalanceCtx(
 	subscription *service.UserSubscription,
 	req service.InflightEstimateRequest,
 ) (context.Context, func(), error) {
+	// Missing pricing must fail closed even when reservations are disabled or
+	// this is a subscription. Both production gateway services implement this.
+	if validator, ok := estimator.(interface {
+		ValidateRequestPricing(context.Context, *service.APIKey, service.InflightEstimateRequest) error
+	}); ok {
+		if err := validator.ValidateRequestPricing(ctx, apiKey, req); err != nil {
+			return ctx, inflightNoop, err
+		}
+	}
 	if billing == nil || estimator == nil || apiKey == nil || apiKey.User == nil || !billing.InflightReservationEnabled() {
 		return ctx, inflightNoop, nil
 	}

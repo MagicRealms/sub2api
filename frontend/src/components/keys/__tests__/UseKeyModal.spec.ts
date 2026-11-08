@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
-const { copyToClipboardMock, saveAsMock } = vi.hoisted(() => ({
+const { copyToClipboardMock, saveAsMock, listTestModels } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn().mockResolvedValue(true),
+  listTestModels: vi.fn(),
   saveAsMock: vi.fn()
 }))
 
@@ -23,6 +24,8 @@ vi.mock('file-saver', () => ({
   saveAs: saveAsMock
 }))
 
+vi.mock('@/api/testCenter', async (importOriginal) => ({ ...await importOriginal<typeof import('@/api/testCenter')>(), listTestModels }))
+
 import UseKeyModal from '../UseKeyModal.vue'
 import type { Group } from '@/types'
 
@@ -36,6 +39,43 @@ function readBlobAsText(blob: Blob): Promise<string> {
 }
 
 describe('UseKeyModal', () => {
+  it('hides unverified examples, cancels on key changes and ignores an old catalog', async () => {
+    let resolveOld!: (models: string[]) => void
+    listTestModels.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'sk-old', baseUrl: 'https://example.com/v1', platform: 'openai' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, Icon: true } },
+    })
+    await wrapper.findAll('button').find(b => b.text().includes('cliTabs.opencode'))!.trigger('click')
+    expect(wrapper.find('pre code').exists()).toBe(false)
+    const oldSignal = listTestModels.mock.calls[0][0].signal as AbortSignal
+    listTestModels.mockResolvedValueOnce(['gpt-6.1-sol'])
+    await wrapper.setProps({ apiKey: 'sk-new' })
+    await flushPromises()
+    expect(oldSignal.aborted).toBe(true)
+    resolveOld(['gpt-6-luna'])
+    await flushPromises()
+    expect(Object.keys(JSON.parse(wrapper.get('pre code').text()).provider.openai.models)).toEqual(['gpt-6.1-sol'])
+    wrapper.unmount()
+  })
+  it('uses the selected key catalog and does not advertise unsupported preset models', async () => {
+    listTestModels.mockResolvedValueOnce(['gpt-6.1-sol', 'custom-chat', 'gpt-image-2.6-flare'])
+    const wrapper = mount(UseKeyModal, {
+      props: { show: true, apiKey: 'sk-catalog', baseUrl: 'https://example.com/v1', platform: 'openai' },
+      global: { stubs: { BaseDialog: { template: '<div><slot /></div>' }, Icon: true } },
+    })
+    expect(listTestModels).not.toHaveBeenCalled()
+    await wrapper.findAll('button').find(b => b.text().includes('cliTabs.opencode'))!.trigger('click')
+    await flushPromises()
+    expect(listTestModels).toHaveBeenCalledWith({ apiKey: 'sk-catalog', signal: expect.any(AbortSignal) })
+    const config = JSON.parse(wrapper.get('pre code').text())
+    expect(Object.keys(config.provider.openai.models)).toEqual(['gpt-6.1-sol', 'custom-chat'])
+    expect(config.provider.openai.models['custom-chat']).toEqual({ name: 'custom-chat', options: { store: false } })
+    const signal = listTestModels.mock.calls[0][0].signal as AbortSignal
+    wrapper.unmount()
+    expect(signal.aborted).toBe(true)
+  })
+  beforeEach(() => listTestModels.mockReset().mockResolvedValue(['gpt-6', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.4-mini']))
   it.each(['/v1', '/v1/', '/v1///'])('switches a multi-group key from GPT to Claude and normalizes the Anthropic root URL (%s)', async (suffix) => {
     const wrapper = mount(UseKeyModal, {
       props: {
@@ -250,7 +290,7 @@ describe('UseKeyModal', () => {
     )
     expect(opencodeTab).toBeDefined()
     await opencodeTab!.trigger('click')
-    await nextTick()
+    await flushPromises()
 
     const parsed = JSON.parse(wrapper.find('pre code').text())
     expect(parsed.provider.grok.npm).toBe('@ai-sdk/openai-compatible')
@@ -738,7 +778,7 @@ describe('UseKeyModal', () => {
 
     expect(opencodeTab).toBeDefined()
     await opencodeTab!.trigger('click')
-    await nextTick()
+    await flushPromises()
 
     const codeBlock = wrapper.find('pre code')
     expect(codeBlock.exists()).toBe(true)
@@ -771,7 +811,7 @@ describe('UseKeyModal', () => {
     )
     expect(opencodeTab).toBeDefined()
     await opencodeTab!.trigger('click')
-    await nextTick()
+    await flushPromises()
 
     const parsed = JSON.parse(wrapper.find('pre code').text())
     const models = parsed.provider.openai.models
@@ -850,7 +890,7 @@ describe('UseKeyModal', () => {
 
     expect(opencodeTab).toBeDefined()
     await opencodeTab!.trigger('click')
-    await nextTick()
+    await flushPromises()
 
     const claudeConfig = wrapper.findAll('pre code')
       .map((code) => code.text())
