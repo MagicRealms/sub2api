@@ -1,6 +1,6 @@
 export default {
   dashboard: {
-    title: '仪表盘',
+    title: '数据看板',
     welcomeMessage: '欢迎回来！这是您账户的概览。',
     balance: '余额',
     apiKeys: 'API 密钥',

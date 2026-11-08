@@ -1,6 +1,6 @@
 export default {
   dashboard: {
-    title: 'Dashboard',
+    title: 'Data Board',
     welcomeMessage: "Welcome back! Here's an overview of your account.",
     balance: 'Balance',
     apiKeys: 'API Keys',
