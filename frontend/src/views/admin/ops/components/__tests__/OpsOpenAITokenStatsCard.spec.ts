@@ -89,7 +89,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     })
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
-      props: { refreshToken: 0 },
+      props: {},
       global: {
         stubs: {
           Select: SelectStub,
@@ -126,7 +126,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     }))
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
-      props: { platformFilter: 'openai', groupIdFilter: 7, refreshToken: 0 },
+      props: { platformFilter: 'openai', groupIdFilter: 7 },
       global: {
         stubs: {
           Select: SelectStub,
@@ -164,7 +164,7 @@ describe('OpsOpenAITokenStatsCard', () => {
       props: {
         platformFilter: 'openai',
         groupIdFilter: 7,
-        refreshToken: 0,
+
       },
       global: {
         stubs: {
@@ -210,7 +210,7 @@ describe('OpsOpenAITokenStatsCard', () => {
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
       props: {
-        refreshToken: 0,
+
       },
       global: {
         stubs: {
@@ -266,7 +266,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     })
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
-      props: { refreshToken: 0 },
+      props: {},
       global: {
         stubs: {
           Select: SelectStub,
@@ -283,7 +283,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     mockGetOpenAITokenStats.mockResolvedValue(sampleResponse)
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
-      props: { refreshToken: 0 },
+      props: {},
       global: {
         stubs: {
           Select: SelectStub,
@@ -300,7 +300,7 @@ describe('OpsOpenAITokenStatsCard', () => {
     mockGetOpenAITokenStats.mockRejectedValue(new Error('加载失败'))
 
     const wrapper = mount(OpsOpenAITokenStatsCard, {
-      props: { refreshToken: 0 },
+      props: {},
       global: {
         stubs: {
           Select: SelectStub,
@@ -312,4 +312,35 @@ describe('OpsOpenAITokenStatsCard', () => {
 
     expect(wrapper.text()).toContain('加载失败')
   })
+  it('stays stable across parent refreshes and only reloads on its own refresh button', async () => {
+    mockGetOpenAITokenStats.mockResolvedValue(sampleResponse)
+    const wrapper = mount(OpsOpenAITokenStatsCard, {
+      global: { stubs: { Select: SelectStub, EmptyState: EmptyStateStub } }
+    })
+    await flushPromises()
+    expect(mockGetOpenAITokenStats).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ platformFilter: '' })
+    wrapper.vm.$forceUpdate()
+    await flushPromises()
+    expect(mockGetOpenAITokenStats).toHaveBeenCalledTimes(1)
+    await wrapper.get('[data-testid="refresh-token-stats"]').trigger('click')
+    await flushPromises()
+    expect(mockGetOpenAITokenStats).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps newer filter results when an older request completes later', async () => {
+    let completeOld!: (value: typeof sampleResponse) => void
+    mockGetOpenAITokenStats.mockImplementationOnce(() => new Promise(resolve => { completeOld = resolve }))
+    mockGetOpenAITokenStats.mockResolvedValueOnce({ ...sampleResponse, items: [{ ...sampleResponse.items[0], model: 'new-model' }] })
+    const wrapper = mount(OpsOpenAITokenStatsCard, {
+      global: { stubs: { Select: SelectStub, EmptyState: EmptyStateStub } }
+    })
+    await wrapper.setProps({ platformFilter: 'anthropic' })
+    await flushPromises()
+    completeOld(sampleResponse)
+    await flushPromises()
+    expect(wrapper.text()).toContain('new-model')
+    expect(wrapper.text()).not.toContain('gpt-4o-mini')
+  })
+
 })

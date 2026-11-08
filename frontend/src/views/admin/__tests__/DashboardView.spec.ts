@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+import { dashboardDate } from '@/utils/dashboardTime'
 import type { DashboardStats } from '@/types'
 import DashboardView from '../DashboardView.vue'
 
@@ -47,12 +48,7 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+
 
 const createDashboardStats = (): DashboardStats => ({
   total_users: 0,
@@ -166,8 +162,9 @@ describe('admin DashboardView', () => {
 
     expect(getSnapshotV2).toHaveBeenCalledTimes(1)
     expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining({
-      start_date: formatLocalDate(yesterday),
-      end_date: formatLocalDate(now),
+      start_date: dashboardDate(yesterday),
+      end_date: dashboardDate(now),
+      timezone: 'Asia/Shanghai',
       granularity: 'hour'
     }))
   })

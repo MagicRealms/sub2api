@@ -93,4 +93,17 @@ describe('DateRangePicker', () => {
       }
     ])
   })
+  it('uses Beijing calendar presets even while the browser is on a different day', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-08T16:30:00Z'))
+    const wrapper = mount(DateRangePicker, { props: { startDate: '2026-11-09', endDate: '2026-11-09', timeZone: 'Asia/Shanghai' }, global: { stubs: { Teleport: true, Icon: true } } })
+    try {
+      await wrapper.find('button').trigger('click')
+      const preset = wrapper.findAll('.date-picker-preset').find(button => button.text() === 'Yesterday')!
+      await preset.trigger('click')
+      expect(wrapper.findAll('input')[0].element.value).toBe('2026-11-08')
+      expect(wrapper.findAll('input')[1].element.value).toBe('2026-11-08')
+    } finally { wrapper.unmount(); vi.useRealTimers() }
+  })
+
 })

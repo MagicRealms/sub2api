@@ -50,7 +50,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
 import { formatTokenMillions } from '@/utils/workspace'
 import Icon from '@/components/icons/Icon.vue'
-import { formatDateTime } from '@/utils/format'
+import { dashboardDateTime as formatDateTime } from '@/utils/dashboardTime'
 import type { UsageLog } from '@/types'
 
 defineProps<{

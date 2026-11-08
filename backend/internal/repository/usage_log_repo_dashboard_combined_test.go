@@ -4,6 +4,7 @@ package repository
 
 import (
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
@@ -34,4 +35,16 @@ func TestUserDashboardCombinedScansPreserveRatesAndTotals(t *testing.T) {
 	require.Equal(t, 2., stats.TotalActualCost)
 	require.Equal(t, .8, stats.TodayActualCost)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUsageTrendTimezonePreservesExplicitOffsets(t *testing.T) {
+	for _, tc := range []struct{ value, zone string }{
+		{"2026-11-08T16:30:00+08:00", "UTC-08:00:00"},
+		{"2026-11-08T16:30:00-05:30", "UTC+05:30:00"},
+		{"2026-11-08T16:30:00Z", "UTC"},
+	} {
+		at, err := time.Parse(time.RFC3339, tc.value)
+		require.NoError(t, err)
+		require.Equal(t, tc.zone, usageTrendTimezone(at))
+	}
 }

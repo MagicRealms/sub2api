@@ -4,7 +4,7 @@
       <SunworldWorkspaceHero
         eyebrow="ADMIN / DATA BOARD"
         title="运营数据看板"
-        subtitle="从用户、渠道、模型到请求质量，集中查看中转站的实时运行状态。"
+        subtitle="按北京时间（UTC+8）统计每日用量，从用户、渠道到模型集中查看运行状态。"
         action-label="查看渠道管理"
         action-path="/admin/accounts"
         status-label="系统状态"
@@ -88,6 +88,7 @@
                   >{{ t('admin.dashboard.timeRange') }}:</span
                 >
                 <DateRangePicker
+                  :time-zone="DASHBOARD_TIMEZONE"
                   v-model:start-date="startDate"
                   v-model:end-date="endDate"
                   @change="onDateRangeChange"
@@ -115,6 +116,7 @@
           <div class="sw-chart-grid">
             <ModelDistributionChart compact
               :model-stats="modelStats"
+              :filters="{ timezone: DASHBOARD_TIMEZONE }"
               :title="t('admin.dashboard.consumptionDistribution')"
               :enable-ranking-view="true"
               :ranking-items="rankingItems"
@@ -185,6 +187,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
 import SunworldWorkspaceHero from '@/components/layout/SunworldWorkspaceHero.vue'
+import { DASHBOARD_TIMEZONE, dashboardDate } from '@/utils/dashboardTime'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import MetricCard from '@/components/workspace/MetricCard.vue'
@@ -240,10 +243,8 @@ let usersTrendLoadSeq = 0
 let rankingLoadSeq = 0
 const rankingLimit = 12
 
-// Helper function to format date in local timezone
-const formatLocalDate = (date: Date): string => {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
+// Calendar dates use the same Beijing reporting clock as the API.
+const formatLocalDate = dashboardDate
 
 const getLast24HoursRangeDates = (): { start: string; end: string } => {
   const end = new Date()
@@ -450,7 +451,8 @@ const goToUserUsage = (item: UserSpendingRankingItem) => {
     query: {
       user_id: String(item.user_id),
       start_date: startDate.value,
-      end_date: endDate.value
+      end_date: endDate.value,
+      timezone: DASHBOARD_TIMEZONE
     }
   })
 }
@@ -487,6 +489,7 @@ const loadDashboardSnapshot = async (includeStats: boolean) => {
     const response = await adminAPI.dashboard.getSnapshotV2({
       start_date: startDate.value,
       end_date: endDate.value,
+      timezone: DASHBOARD_TIMEZONE,
       granularity: granularity.value,
       include_stats: includeStats,
       include_trend: true,
@@ -526,6 +529,7 @@ const loadUsersTrend = async () => {
     const response = await adminAPI.dashboard.getUserUsageTrend({
       start_date: startDate.value,
       end_date: endDate.value,
+      timezone: DASHBOARD_TIMEZONE,
       granularity: granularity.value,
       limit: 12,
       metric: userTrendMetric.value
@@ -551,6 +555,7 @@ const loadUserSpendingRanking = async () => {
     const response = await adminAPI.dashboard.getUserSpendingRanking({
       start_date: startDate.value,
       end_date: endDate.value,
+      timezone: DASHBOARD_TIMEZONE,
       limit: rankingLimit
     })
     if (currentSeq !== rankingLoadSeq) return

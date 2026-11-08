@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import Icon from '@/components/icons/Icon.vue'
 import { opsAPI, type OpsOpenAITokenStatsResponse, type OpsOpenAITokenStatsTimeRange } from '@/api/admin/ops'
 import { formatNumber } from '@/utils/format'
 
 interface Props {
   platformFilter?: string
   groupIdFilter?: number | null
-  refreshToken: number
 }
 
 type ViewMode = 'topn' | 'pagination'
@@ -28,6 +28,8 @@ const isDesktopViewport = useMediaQuery('(min-width: 768px)')
 const loading = ref(false)
 const errorMessage = ref('')
 const response = ref<OpsOpenAITokenStatsResponse | null>(null)
+let loadSequence = 0
+onUnmounted(() => { loadSequence += 1 })
 
 const timeRange = ref<OpsOpenAITokenStatsTimeRange>('30d')
 const viewMode = ref<ViewMode>('topn')
@@ -101,21 +103,25 @@ function buildParams() {
 }
 
 async function loadData() {
+  const sequence = ++loadSequence
   loading.value = true
   errorMessage.value = ''
   try {
-    response.value = await opsAPI.getOpenAITokenStats(buildParams())
+    const data = await opsAPI.getOpenAITokenStats(buildParams())
+    if (sequence !== loadSequence) return
+    response.value = data
     // 防御：若 total 变化导致当前页超出最大页，则回退到末页并重新拉取一次。
     if (viewMode.value === 'pagination' && page.value > totalPages.value) {
       page.value = totalPages.value
-      response.value = await opsAPI.getOpenAITokenStats(buildParams())
+      return // The page watcher fetches the corrected page once.
     }
   } catch (err: any) {
+    if (sequence !== loadSequence) return
     console.error('[OpsOpenAITokenStatsCard] Failed to load data', err)
     response.value = null
     errorMessage.value = err?.message || t('admin.ops.openaiTokenStats.failedToLoad')
   } finally {
-    loading.value = false
+    if (sequence === loadSequence) loading.value = false
   }
 }
 
@@ -127,8 +133,7 @@ watch(
     page: page.value,
     pageSize: pageSize.value,
     platform: props.platformFilter,
-    groupId: props.groupIdFilter,
-    refreshToken: props.refreshToken
+    groupId: props.groupIdFilter
   }),
   (next, prev) => {
     // 避免“筛选变化 -> 重置页码 -> 触发两次请求”：
@@ -162,7 +167,7 @@ function onNextPage() {
 </script>
 
 <template>
-  <section class="card p-4 md:p-5">
+  <section class="card p-4 md:p-5" data-testid="token-request-stats">
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h3 class="text-sm font-bold text-gray-900 dark:text-white">
         {{ t('admin.ops.openaiTokenStats.title') }}
@@ -199,6 +204,10 @@ function onNextPage() {
             {{ t('admin.ops.openaiTokenStats.pageInfo', { page, total: totalPages }) }}
           </span>
         </template>
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="loading" data-testid="refresh-token-stats" @click="loadData">
+          <Icon name="refresh" size="sm" :class="{ 'animate-spin': loading }" />
+          {{ t('common.refresh') }}
+        </button>
       </div>
     </div>
 

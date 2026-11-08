@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <div class="sw-filterbar">
       <span>{{ t('dashboard.timeRange') }}</span>
-      <DateRangePicker :start-date="startDate" :end-date="endDate" @update:startDate="$emit('update:startDate', $event)" @update:endDate="$emit('update:endDate', $event)" @change="$emit('dateRangeChange', $event)" />
+      <DateRangePicker :time-zone="DASHBOARD_TIMEZONE" :start-date="startDate" :end-date="endDate" @update:startDate="$emit('update:startDate', $event)" @update:endDate="$emit('update:endDate', $event)" @change="$emit('dateRangeChange', $event)" />
       <div class="sw-filter-end">
         <div class="sw-segmented">
           <button v-for="unit in ['day','hour']" :key="unit" :class="{ 'is-active': granularity === unit }" :aria-pressed="granularity === unit" @click="$emit('update:granularity', unit); $emit('granularityChange')">{{ t(`dashboard.${unit}`) }}</button>
@@ -18,6 +18,7 @@
 </template>
 <script setup lang="ts">
 import { ref } from 'vue'
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'

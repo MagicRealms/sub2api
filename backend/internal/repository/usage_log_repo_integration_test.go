@@ -692,7 +692,7 @@ func (s *UsageLogRepoSuite) TestListWithFilters() {
 
 func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 	now := time.Now().UTC()
-	todayStart := truncateToDayUTC(now)
+	todayStart := usagestats.DashboardDay(now)
 	baseStats, err := s.repo.GetDashboardStats(s.ctx)
 	s.Require().NoError(err, "GetDashboardStats base")
 
@@ -806,7 +806,7 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 
 func (s *UsageLogRepoSuite) TestDashboardStatsWithRange_Fallback() {
 	now := time.Now().UTC()
-	todayStart := truncateToDayUTC(now)
+	todayStart := usagestats.DashboardDay(now)
 	rangeStart := todayStart.Add(-24 * time.Hour)
 	rangeEnd := now.Add(1 * time.Second)
 
@@ -901,8 +901,8 @@ func (s *UsageLogRepoSuite) TestGetUserDashboardStatsCombinedWindows() {
 	inactive := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-combined-inactive", Name: "inactive"})
 	s.Require().NoError(s.client.APIKey.UpdateOneID(inactive.ID).SetStatus("inactive").Exec(s.ctx))
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "combined-dashboard"})
-	s.createUsageLog(user, key, account, 10, 5, .5, timezone.Today().Add(-time.Hour))
-	s.createUsageLog(user, key, account, 20, 7, .7, timezone.Today().Add(time.Hour))
+	s.createUsageLog(user, key, account, 10, 5, .5, usagestats.DashboardDay(time.Now()).Add(-time.Hour))
+	s.createUsageLog(user, key, account, 20, 7, .7, usagestats.DashboardDay(time.Now()).Add(time.Hour))
 	for i := 0; i < 6; i++ {
 		s.createUsageLog(user, key, account, 3, 2, .1, time.Now().Add(-time.Minute))
 	}

@@ -81,7 +81,7 @@ type DashboardStats = usagestats.DashboardStats
 func (r *usageLogRepository) GetDashboardStats(ctx context.Context) (*DashboardStats, error) {
 	stats := &DashboardStats{}
 	now := timezone.Now()
-	todayStart := timezone.Today()
+	todayStart := usagestats.DashboardDay(now)
 
 	if err := r.fillDashboardEntityStats(ctx, stats, todayStart, now); err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (r *usageLogRepository) GetDashboardStatsWithRange(ctx context.Context, sta
 
 	stats := &DashboardStats{}
 	now := timezone.Now()
-	todayStart := timezone.Today()
+	todayStart := usagestats.DashboardDay(now)
 
 	if err := r.fillDashboardEntityStats(ctx, stats, todayStart, now); err != nil {
 		return nil, err
@@ -231,23 +231,23 @@ func (r *usageLogRepository) fillDashboardUsageStatsAggregated(ctx context.Conte
 
 	todayStatsQuery := `
 		SELECT
-			total_requests as today_requests,
-			input_tokens as today_input_tokens,
-			output_tokens as today_output_tokens,
-			cache_creation_tokens as today_cache_creation_tokens,
-			cache_read_tokens as today_cache_read_tokens,
-			total_cost as today_cost,
-			actual_cost as today_actual_cost,
-			account_cost as today_account_cost,
-			active_users as active_users
-		FROM usage_dashboard_daily
-		WHERE bucket_date = $1::date
+			COUNT(*),
+			COALESCE(SUM(input_tokens), 0),
+			COALESCE(SUM(output_tokens), 0),
+			COALESCE(SUM(cache_creation_tokens), 0),
+			COALESCE(SUM(cache_read_tokens), 0),
+			COALESCE(SUM(total_cost), 0),
+			COALESCE(SUM(actual_cost), 0),
+			COALESCE(SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1)), 0),
+			COUNT(DISTINCT user_id)
+		FROM usage_logs
+		WHERE created_at >= $1 AND created_at < $2
 	`
 	if err := scanSingleRow(
 		ctx,
 		r.sql,
 		todayStatsQuery,
-		[]any{todayUTC},
+		[]any{todayUTC, todayUTC.AddDate(0, 0, 1)},
 		&stats.TodayRequests,
 		&stats.TodayInputTokens,
 		&stats.TodayOutputTokens,
@@ -380,10 +380,10 @@ type PlatformDashboardStats = usagestats.PlatformDashboardStats
 // GetUserDashboardStats 获取用户专属的仪表盘统计
 func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID int64) (*UserDashboardStats, error) {
 	stats := &UserDashboardStats{}
-	today := timezone.Today()
+	today := usagestats.DashboardDay(time.Now())
 
 	// Two key counts share one scan; totals, today's counters and rolling rates
-	// share one usage scan and the same snapshot. Keep existing timezone,
+	// share one usage scan and the same Beijing reporting day. Keep existing
 	// placeholder inclusion, and five-minute integer-average semantics.
 	if err := scanSingleRow(ctx, r.sql, `
 		SELECT COUNT(*), COUNT(*) FILTER (WHERE status = $2)

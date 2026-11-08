@@ -236,6 +236,9 @@ func (s *DashboardService) getCachedDashboardStats(ctx context.Context) (*usages
 		s.evictDashboardStatsCache(errors.New("仪表盘缓存缺少统计数据"))
 		return nil, false, ErrDashboardStatsCacheMiss
 	}
+	if !usagestats.DashboardDay(time.Unix(entry.UpdatedAt, 0)).Equal(usagestats.DashboardDay(time.Now())) {
+		return nil, false, ErrDashboardStatsCacheMiss
+	}
 
 	age := time.Since(time.Unix(entry.UpdatedAt, 0))
 	return entry.Stats, age <= s.cacheFreshTTL, nil

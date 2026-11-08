@@ -10,6 +10,7 @@
             <div class="flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
               <DateRangePicker
+                :time-zone="filters.timezone"
                 v-model:start-date="startDate"
                 v-model:end-date="endDate"
                 @change="onDateRangeChange"
@@ -236,6 +237,7 @@ import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usag
 import { getTrendPointRange } from '@/utils/trendPointRange'
 import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
 import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
+import { DASHBOARD_TIMEZONE, dashboardDate } from '@/utils/dashboardTime'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
@@ -299,6 +301,7 @@ const balanceHistoryUser = ref<AdminUser | null>(null)
 
 const breakdownFilters = computed(() => {
   const f: Record<string, any> = {}
+  if (filters.value.timezone) f.timezone = filters.value.timezone
   if (filters.value.user_id) f.user_id = filters.value.user_id
   if (filters.value.api_key_id) f.api_key_id = filters.value.api_key_id
   if (filters.value.account_id) f.account_id = filters.value.account_id
@@ -335,6 +338,7 @@ const handleRankingSelectUser = (userId: number, email: string) => {
 const granularityOptions = computed(() => [{ value: 'day', label: t('admin.dashboard.day') }, { value: 'hour', label: t('admin.dashboard.hour') }])
 // Use local timezone to avoid UTC timezone issues
 const formatLD = (d: Date) => {
+  if (route.query.timezone === DASHBOARD_TIMEZONE) return dashboardDate(d)
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
@@ -390,6 +394,7 @@ const applyRouteQueryFilters = () => {
   filters.value = {
     ...filters.value,
     user_id: queryUserId,
+    timezone: getSingleQueryValue(route.query.timezone) === DASHBOARD_TIMEZONE ? DASHBOARD_TIMEZONE : undefined,
     start_date: startDate.value,
     end_date: endDate.value
   }
@@ -503,6 +508,7 @@ const loadModelStats = async (source: ModelDistributionSource, force = false) =>
     const baseParams = {
       start_date: filters.value.start_date || startDate.value,
       end_date: filters.value.end_date || endDate.value,
+      timezone: filters.value.timezone,
       user_id: filters.value.user_id,
       model: filters.value.model,
       api_key_id: filters.value.api_key_id,
@@ -553,6 +559,7 @@ const loadChartData = async () => {
     const snapshot = await adminAPI.dashboard.getSnapshotV2({
       start_date: filters.value.start_date || startDate.value,
       end_date: filters.value.end_date || endDate.value,
+      timezone: filters.value.timezone,
       granularity: granularity.value,
       user_id: filters.value.user_id,
       model: filters.value.model,
@@ -672,7 +679,7 @@ const resetFilters = () => {
   const range = getLast24HoursRangeDates()
   startDate.value = range.start
   endDate.value = range.end
-  filters.value = { start_date: startDate.value, end_date: endDate.value, request_type: undefined, native_compaction_v2: null, billing_type: null, billing_mode: undefined }
+  filters.value = { timezone: filters.value.timezone, start_date: startDate.value, end_date: endDate.value, request_type: undefined, native_compaction_v2: null, billing_type: null, billing_mode: undefined }
   granularity.value = getGranularityForRange(startDate.value, endDate.value)
   applyFilters()
 }

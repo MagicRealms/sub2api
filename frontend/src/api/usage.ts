@@ -223,11 +223,13 @@ export async function getStatsByDateRange(
 export async function getByDateRange(
   startDate: string,
   endDate: string,
-  apiKeyId?: number
+  apiKeyId?: number,
+  timezone?: string
 ): Promise<PaginatedResponse<UsageLog>> {
   const params: UsageQueryParams = {
     start_date: startDate,
     end_date: endDate,
+    timezone,
     page: 1,
     page_size: 100
   }
@@ -258,8 +260,8 @@ export async function getById(id: number): Promise<UsageLog> {
  * Get user dashboard statistics
  * @returns Dashboard statistics for current user
  */
-export async function getDashboardStats(): Promise<UserDashboardStats> {
-  const { data } = await apiClient.get<UserDashboardStats>('/usage/dashboard/stats')
+export async function getDashboardStats(timezone?: string): Promise<UserDashboardStats> {
+  const { data } = await apiClient.get<UserDashboardStats>('/usage/dashboard/stats', { params: { timezone } })
   return data
 }
 

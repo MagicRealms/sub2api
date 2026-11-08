@@ -214,6 +214,22 @@ describe('admin UsageView route filters', () => {
     vi.useRealTimers()
   })
 
+  it('preserves the Beijing reporting range when opening dashboard request details', async () => {
+    routeQuery.timezone = 'Asia/Shanghai'
+    routeQuery.start_date = '2026-11-08'
+    routeQuery.end_date = '2026-11-08'
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    vi.advanceTimersByTime(120)
+    await flushPromises()
+    const range = { start_date: '2026-11-08', end_date: '2026-11-08', timezone: 'Asia/Shanghai' }
+    expect(list).toHaveBeenCalledWith(expect.objectContaining(range), expect.anything())
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining(range))
+    expect(getSnapshotV2).toHaveBeenCalledWith(expect.objectContaining(range))
+    expect(getModelStats).toHaveBeenCalledWith(expect.objectContaining(range))
+    wrapper.unmount()
+  })
+
   it('shows the routed user while applying user_id to usage requests', async () => {
     routeQuery.user_id = '42'
     getById.mockResolvedValue({ id: 42, email: 'route-user@test.com' })

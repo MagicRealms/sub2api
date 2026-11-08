@@ -393,3 +393,12 @@ func TestDashboardService_AggDisabled_UsesUsageLogsFallback(t *testing.T) {
 	require.False(t, repo.rangeEnd.IsZero())
 	require.Equal(t, truncateToDayUTC(repo.rangeEnd.AddDate(0, 0, -7)), repo.rangeStart)
 }
+
+func TestDashboardServiceRejectsPreviousBeijingDayCache(t *testing.T) {
+	payload, err := json.Marshal(dashboardStatsCacheEntry{Stats: &usagestats.DashboardStats{TodayRequests: 999}, UpdatedAt: usagestats.DashboardDay(time.Now()).Add(-time.Second).Unix()})
+	require.NoError(t, err)
+	cache := &dashboardCacheStub{get: func(context.Context) (string, error) { return string(payload), nil }}
+	svc := &DashboardService{cache: cache, cacheFreshTTL: 24 * time.Hour}
+	_, _, err = svc.getCachedDashboardStats(context.Background())
+	require.ErrorIs(t, err, ErrDashboardStatsCacheMiss)
+}

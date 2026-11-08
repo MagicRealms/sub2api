@@ -298,7 +298,7 @@ const buildPayload = (): CreateUsageCleanupTaskRequest | null => {
   const payload: CreateUsageCleanupTaskRequest = {
     start_date: localStartDate.value,
     end_date: localEndDate.value,
-    timezone: getUserTimezone()
+    timezone: localFilters.value.timezone || getUserTimezone()
   }
 
   if (localFilters.value.user_id && localFilters.value.user_id > 0) {

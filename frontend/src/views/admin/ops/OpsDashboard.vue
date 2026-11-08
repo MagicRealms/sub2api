@@ -89,7 +89,6 @@
         <OpsOpenAITokenStatsCard
           :platform-filter="platform"
           :group-id-filter="groupId"
-          :refresh-token="dashboardRefreshToken"
         />
       </div>
 
