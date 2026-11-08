@@ -34,9 +34,10 @@ body{background:var(--sw-bg)!important;color:var(--sw-ink)}
 .sw-breadcrumb{display:flex;align-items:center;gap:.65rem;color:var(--sw-muted);font-size:12px}
 .sw-breadcrumb svg{width:18px;height:18px;color:var(--sw-mint)}
 .sw-breadcrumb strong{font-size:13px;font-weight:600;color:var(--sw-ink)}
+@media(max-width:1023px){.sunworld-header .sw-breadcrumb{display:none}}
 .sunworld-live-pill{border:1px solid var(--sw-line)!important;background:var(--sw-surface)!important;color:var(--sw-ink)!important;box-shadow:var(--sw-shadow);letter-spacing:0}
 .sunworld-live-dot{width:5px;height:5px;background:var(--sw-mint);box-shadow:0 0 0 3px #37b49c16}
-.sunworld-community-button{display:inline-flex;height:34px;align-items:center;justify-content:center;gap:7px;padding:0 10px;border:1px solid #37b49c38;border-radius:10px;background:#37b49c0a;color:var(--sw-ink);font-size:11px;font-weight:600;white-space:nowrap;transition:background .18s,border-color .18s,color .18s}
+.sunworld-community-button{display:inline-flex;flex-shrink:0;height:34px;align-items:center;justify-content:center;gap:7px;padding:0 10px;border:1px solid #37b49c38;border-radius:10px;background:#37b49c0a;color:var(--sw-ink);font-size:11px;font-weight:600;white-space:nowrap;transition:background .18s,border-color .18s,color .18s}
 .sunworld-community-button:hover{border-color:#37b49c55;background:#37b49c0c;color:#238f7d}
 .dark .sunworld-community-button:hover{color:#8fddca}
 .sunworld-community-button>svg:first-child{color:var(--sw-mint)}
