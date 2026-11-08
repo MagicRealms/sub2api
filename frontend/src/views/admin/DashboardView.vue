@@ -1,10 +1,10 @@
 <template>
   <AppLayout>
-    <div class="sunworld-dashboard space-y-6">
+    <div class="sunworld-dashboard console-data-board console-admin-board space-y-6">
       <SunworldWorkspaceHero
-        eyebrow="SUNWORLD / CONTROL ROOM"
-        title="运营控制台"
-        subtitle="从渠道、用户到请求质量，在同一张工作台上掌握中转站状态。"
+        eyebrow="ADMIN / DATA BOARD"
+        title="运营数据看板"
+        subtitle="从用户、渠道、模型到请求质量，集中查看中转站的实时运行状态。"
         action-label="查看渠道管理"
         action-path="/admin/accounts"
         status-label="系统状态"
@@ -310,6 +310,7 @@
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ModelDistributionChart
               :model-stats="modelStats"
+              :title="t('admin.dashboard.consumptionDistribution')"
               :enable-ranking-view="true"
               :ranking-items="rankingItems"
               :ranking-total-actual-cost="rankingTotalActualCost"
@@ -322,7 +323,11 @@
               :end-date="endDate"
               @ranking-click="goToUserUsage"
             />
-            <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+            <TokenUsageTrend
+              :trend-data="trendData"
+              :loading="chartsLoading"
+              :title="t('admin.dashboard.modelCallAnalysis')"
+            />
           </div>
 
           <!-- User Usage Trend (Full Width) -->

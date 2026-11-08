@@ -163,7 +163,7 @@ export default {
 
   // Navigation
   nav: {
-    dashboard: 'Dashboard',
+    dashboard: 'Data Board',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     batchImage: 'Batch Images',

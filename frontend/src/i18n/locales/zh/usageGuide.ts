@@ -27,7 +27,7 @@ export default {
     prepareTitle: '先准备好这三件事',
     prepareHint: '所有客户端都从这一步开始',
     preparation: {
-      account: { title: '登录并确认额度', text: '登录本站，在仪表盘确认余额或可用订阅额度。余额不足时，可通过侧边栏的“余额充值”或兑换入口补充。', action: '进入控制台' },
+      account: { title: '登录并确认额度', text: '登录本站，在数据看板确认余额或可用订阅额度。余额不足时，可通过侧边栏的“余额充值”或兑换入口补充。', action: '进入控制台' },
       key: { title: '创建自己的 API 密钥', text: '打开“API 密钥”，点击“创建密钥”，取个好记的名称，并选择需要使用的分组。复制生成的完整密钥。', action: '前往 API 密钥' },
       config: { title: '认准地址与模型', text: 'API Key 是刚才复制的那一串字符。Base URL 填本站 API 地址，模型名称按密钥分组支持的 Model ID 填写。', action: '查看密钥接入配置' }
     },

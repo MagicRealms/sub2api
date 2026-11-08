@@ -37,10 +37,12 @@ export default {
       day: '按天',
       hour: '按小时',
       modelDistribution: '模型分布',
+      consumptionDistribution: '消耗分布',
       groupDistribution: '分组使用分布',
       metricTokens: '按 Token',
       metricActualCost: '按实际消费',
       tokenUsageTrend: 'Token 使用趋势',
+      modelCallAnalysis: '模型调用分析',
       userUsageTrend: '用户使用趋势（Top 12）',
       noDataAvailable: '暂无数据',
       model: '模型',
@@ -78,7 +80,7 @@ export default {
       groupPricingDesc: '设置批量折扣和冻结比例',
       systemSettings: '系统设置',
       configureSystem: '配置系统设置',
-      failedToLoad: '加载仪表盘数据失败'
+      failedToLoad: '加载数据看板失败'
     },
 
     backup: {

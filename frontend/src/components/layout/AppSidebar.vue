@@ -24,7 +24,7 @@
         >
           {{ siteName }}
         </router-link>
-        <p class="sidebar-brand-caption">AI ROUTING WORKSPACE</p>
+        <p class="sidebar-brand-caption">DATA CONSOLE</p>
         <!-- Version Badge -->
         <VersionBadge :version="siteVersion" />
       </div>

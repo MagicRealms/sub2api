@@ -34,10 +34,12 @@ export default {
       day: 'Day',
       hour: 'Hour',
       modelDistribution: 'Model Distribution',
+      consumptionDistribution: 'Consumption Mix',
       groupDistribution: 'Group Usage Distribution',
       metricTokens: 'By Tokens',
       metricActualCost: 'By Actual Cost',
       tokenUsageTrend: 'Token Usage Trend',
+      modelCallAnalysis: 'Model Call Analysis',
       userUsageTrend: 'User Usage Trend (Top 12)',
       model: 'Model',
       group: 'Group',
@@ -78,7 +80,7 @@ export default {
       groupPricingDesc: 'Configure batch discount and hold ratio',
       systemSettings: 'System Settings',
       configureSystem: 'Configure system settings',
-      failedToLoad: 'Failed to load dashboard statistics'
+      failedToLoad: 'Failed to load data board statistics'
     },
 
     backup: {
