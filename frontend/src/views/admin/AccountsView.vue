@@ -75,14 +75,8 @@
                   <span class="hidden md:inline">{{ t('admin.accounts.moreActions') }}</span>
                   <Icon name="chevronDown" size="xs" class="ml-1 hidden md:inline" />
                 </button>
-                <Teleport to="body">
-                  <div
-                    v-if="showAccountToolsDropdown"
-                    class="fixed z-[9999] origin-top-right overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-800"
-                    :style="accountToolsDropdownStyle"
-                    @click.stop
-                  >
-                    <div class="overflow-y-auto p-2" :style="{ maxHeight: `${accountToolsDropdownPosition.maxHeight}px` }">
+                <FloatingPanel :open="showAccountToolsDropdown" :anchor="accountToolsTriggerRef" align="end" :min-width="320" :max-height="540" class="w-80 rounded-lg border border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-800" @close="closeAccountToolsDropdown">
+                    <div class="overflow-y-auto p-2">
                       <div class="px-2 py-2">
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                           {{ t('admin.accounts.dataActions') }}
@@ -155,8 +149,8 @@
                         </button>
                       </div>
                     </div>
-                  </div>
-                </Teleport>
+
+    </FloatingPanel>
               </div>
             </template>
           </AccountTableActions>
@@ -443,7 +437,7 @@
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
                 <span class="text-xs">{{ t('common.delete') }}</span>
               </button>
-              <button @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
+              <button data-testid="account-action-trigger" :aria-label="t('admin.accounts.moreActions')" @click="openMenu(row, $event)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /></svg>
                 <span class="text-xs">{{ t('common.more') }}</span>
               </button>
@@ -460,7 +454,7 @@
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
-    <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
+    <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" :anchor="menuAnchor" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
     <ImportDataModal :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
@@ -537,7 +531,6 @@ import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import { proxyExpiryBadgeClass, proxyExpiryLabelKey } from '@/utils/proxyExpiry'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { sanitizeUrl } from '@/utils/url'
-import { getFloatingPanelPosition } from '@/utils/floatingPanel'
 import { formatMultiplier } from '@/utils/formatters'
 import type { Account, AccountListItem, AccountPlatform, AccountSchedulerGroupScore, AccountType, AccountUsageInfo, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel, UpstreamBillingProbeSnapshot } from '@/types'
 
@@ -621,6 +614,7 @@ const showSchedulePanel = ref(false)
 const scheduleAcc = ref<Account | null>(null)
 const scheduleModelOptions = ref<SelectOption[]>([])
 const togglingSchedulable = ref<number | null>(null)
+const menuAnchor = ref<HTMLElement | null>(null)
 const menu = reactive<{show:boolean, acc:Account|null, anchorRect:DOMRect|null}>({ show: false, acc: null, anchorRect: null })
 const exportingData = ref(false)
 const probingUpstreamBilling = reactive(new Set<number>())
@@ -635,19 +629,6 @@ useIntervalFn(() => { upstreamBillingNow.value = Date.now() }, 60_000)
 const showAccountToolsDropdown = ref(false)
 const accountToolsDropdownRef = ref<HTMLElement | null>(null)
 const accountToolsTriggerRef = ref<HTMLElement | null>(null)
-const accountToolsDropdownPosition = reactive({
-  top: null as number | null,
-  bottom: null as number | null,
-  left: 16,
-  width: 320,
-  maxHeight: 0
-})
-const accountToolsDropdownStyle = computed(() => ({
-  top: accountToolsDropdownPosition.top == null ? 'auto' : `${accountToolsDropdownPosition.top}px`,
-  bottom: accountToolsDropdownPosition.bottom == null ? 'auto' : `${accountToolsDropdownPosition.bottom}px`,
-  left: `${accountToolsDropdownPosition.left}px`,
-  width: `${accountToolsDropdownPosition.width}px`
-}))
 const hiddenColumns = reactive<Set<string>>(new Set())
 const DEFAULT_HIDDEN_COLUMNS = ['today_stats', 'proxy', 'notes', 'scheduler_score', 'rate_multiplier']
 const HIDDEN_COLUMNS_KEY = 'account-hidden-columns'
@@ -1539,22 +1520,9 @@ const closeAccountToolsDropdown = () => {
   showAccountToolsDropdown.value = false
 }
 
-const updateAccountToolsDropdownPosition = () => {
-  const trigger = accountToolsTriggerRef.value
-  if (!trigger) return
-
-  const position = getFloatingPanelPosition(
-    trigger.getBoundingClientRect(),
-    document.documentElement.clientWidth || window.innerWidth,
-    window.innerHeight
-  )
-  Object.assign(accountToolsDropdownPosition, position)
-}
-
 const toggleAccountToolsDropdown = () => {
   const nextVisible = !showAccountToolsDropdown.value
   showAutoRefreshDropdown.value = false
-  if (nextVisible) updateAccountToolsDropdownPosition()
   showAccountToolsDropdown.value = nextVisible
 }
 
@@ -1888,6 +1856,7 @@ const handleEdit = async (a: AccountListItem) => {
 const openMenu = (a: Account, e: MouseEvent) => {
   menu.acc = a
   const target = e.currentTarget as HTMLElement
+  menuAnchor.value = target
   menu.anchorRect = target.getBoundingClientRect()
   menu.show = true
 }
@@ -2543,11 +2512,6 @@ const proxyExpiryText = (p: AccountProxy): string => {
 const handleScroll = (event: Event) => {
   if (event.target instanceof Element && event.target.closest('.action-menu-content')) return
   menu.show = false
-  if (showAccountToolsDropdown.value) updateAccountToolsDropdownPosition()
-}
-
-const handleViewportResize = () => {
-  if (showAccountToolsDropdown.value) updateAccountToolsDropdownPosition()
 }
 
 // 点击外部关闭顶部下拉菜单
@@ -2592,7 +2556,6 @@ onMounted(async () => {
     console.error('Failed to load groups:', groupsResult.reason)
   }
   window.addEventListener('scroll', handleScroll, true)
-  window.addEventListener('resize', handleViewportResize)
   document.addEventListener('click', handleClickOutside)
 
   if (autoRefreshEnabled.value) {
@@ -2611,7 +2574,6 @@ onUnmounted(() => {
   }
   pendingUsageBatchIds.clear()
   window.removeEventListener('scroll', handleScroll, true)
-  window.removeEventListener('resize', handleViewportResize)
   document.removeEventListener('click', handleClickOutside)
   if (desktopViewportMediaQuery && desktopViewportListener) {
     if (typeof desktopViewportMediaQuery.removeEventListener === 'function') {

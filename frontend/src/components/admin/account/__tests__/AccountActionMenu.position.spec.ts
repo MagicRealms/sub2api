@@ -60,6 +60,27 @@ describe('AccountActionMenu viewport positioning', () => {
     vi.unstubAllGlobals()
   })
 
+  it('follows its owning dialog and dismisses when navigation makes the trigger inert', async () => {
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    dialog.style.zIndex = '50'
+    const anchor = document.createElement('button')
+    dialog.appendChild(anchor)
+    document.body.appendChild(dialog)
+    try {
+      const wrapper = mount(AccountActionMenu, {
+        props: { show: true, account, anchorRect: new DOMRect(400, 200, 32, 24), anchor },
+        global: { stubs: { Icon: true } }
+      })
+      await flushPromises()
+      expect(getMenu().style.zIndex).toBe('51')
+      anchor.setAttribute('inert', '')
+      window.dispatchEvent(new Event('sunworld:overlay-change'))
+      await flushPromises()
+      expect(wrapper.emitted('close')).toHaveLength(1)
+    } finally { dialog.remove() }
+  })
+
   it('measures a long OAuth menu and opens above the last row', async () => {
     await mountMenu()
 

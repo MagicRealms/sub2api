@@ -738,7 +738,8 @@ const adminNavItems = computed((): NavItem[] => {
 })
 
 function toggleSidebar() {
-  appStore.toggleSidebar()
+  if (isMobile.value) appStore.setMobileOpen(false)
+  else appStore.toggleSidebar()
 }
 
 function toggleTheme() {

@@ -278,13 +278,7 @@
       </template>
     </TablePageLayout>
 
-    <Teleport to="body">
-      <div
-        v-if="openMoreJobId"
-        class="fixed z-[9999] w-44 overflow-hidden rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
-        :style="moreMenuStyle"
-        @click.stop
-      >
+    <FloatingPanel :open="!!openMoreJobId" :anchor="moreMenuAnchor" align="end" :max-height="240" class="w-44 rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10" @close="closeMoreMenu">
         <template v-for="job in batchJobs" :key="job.id">
           <template v-if="job.id === openMoreJobId">
             <button
@@ -309,17 +303,10 @@
             </button>
           </template>
         </template>
-      </div>
-    </Teleport>
 
-    <Teleport to="body">
-      <div
-        v-if="promptPopover.visible"
-        class="batch-prompt-popover fixed z-[9999] rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-800 shadow-xl ring-1 ring-black/5 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-100 dark:ring-white/10"
-        :style="promptPopover.style"
-        @mouseenter="cancelPromptPopoverClose"
-        @mouseleave="schedulePromptPopoverClose"
-      >
+    </FloatingPanel>
+
+    <FloatingPanel :open="promptPopover.visible" :anchor="promptPanelAnchor" :min-width="440" :max-height="320" class="batch-prompt-popover w-[440px] rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-800 shadow-xl ring-1 ring-black/5 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-100 dark:ring-white/10" @close="closePromptPopover" @mouseenter="cancelPromptPopoverClose" @mouseleave="schedulePromptPopoverClose">
         <div class="mb-2 flex items-center justify-between gap-3">
           <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('batchImage.promptPopover.title') }}</span>
           <button
@@ -333,8 +320,8 @@
         <p class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-6 selection:bg-primary-100 selection:text-primary-900 dark:selection:bg-primary-900/60 dark:selection:text-primary-100">
           {{ promptPopover.text }}
         </p>
-      </div>
-    </Teleport>
+
+    </FloatingPanel>
 
     <BaseDialog :show="!!currentJob" :title="t('batchImage.detail.title')" width="extra-wide" @close="closeDetail">
       <div v-if="currentJob" class="space-y-4">
@@ -752,6 +739,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -923,11 +911,11 @@ const previewImageItem = ref<BatchImageItem | null>(null)
 const availableBatchImageModels = ref<Array<{ value: string; label: string }>>([])
 const modelLoadError = ref('')
 const openMoreJobId = ref('')
-const moreMenuStyle = ref<Record<string, string>>({})
+const moreMenuAnchor = ref<HTMLElement | null>(null)
+const promptPanelAnchor = ref<HTMLElement | null>(null)
 const promptPopover = reactive({
   visible: false,
   text: '',
-  style: {} as Record<string, string>,
 })
 let modelRequestSeq = 0
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -1401,16 +1389,8 @@ function toggleMoreMenu(job: BatchImageJobRow, event: MouseEvent) {
     return
   }
   const trigger = event.currentTarget as HTMLElement | null
-  const rect = trigger?.getBoundingClientRect()
-  if (!rect) return
-  const menuWidth = 176
-  const margin = 8
-  const left = Math.max(margin, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - margin))
-  const top = Math.min(rect.bottom + margin, window.innerHeight - 96)
-  moreMenuStyle.value = {
-    left: `${left}px`,
-    top: `${Math.max(margin, top)}px`,
-  }
+  if (!trigger) return
+  moreMenuAnchor.value = trigger
   openMoreJobId.value = job.id
 }
 
@@ -1431,7 +1411,6 @@ function closePromptPopover() {
   cancelPromptPopoverClose()
   promptPopover.visible = false
   promptPopover.text = ''
-  promptPopover.style = {}
   activePromptPopoverTarget = null
 }
 
@@ -1469,23 +1448,8 @@ function showPromptPopover(event: MouseEvent | FocusEvent, text: string) {
 }
 
 function openPromptPopover(target: HTMLElement, value: string) {
-  const rect = target.getBoundingClientRect()
-  if (!rect) return
-  const viewportWidth = window.innerWidth || 1280
-  const viewportHeight = window.innerHeight || 720
-  const width = Math.min(440, Math.max(320, viewportWidth - 32))
-  const left = Math.max(16, Math.min(rect.left, viewportWidth - width - 16))
-  const estimatedHeight = 178
-  const preferredTop = rect.bottom + 8
-  const top = preferredTop + estimatedHeight > viewportHeight
-    ? Math.max(16, rect.top - estimatedHeight - 8)
-    : preferredTop
+  promptPanelAnchor.value = target
   promptPopover.text = value
-  promptPopover.style = {
-    left: `${left}px`,
-    top: `${top}px`,
-    width: `${width}px`,
-  }
   promptPopover.visible = true
 }
 
@@ -2607,10 +2571,6 @@ onMounted(() => {
     void cleanupPreviewCache()
   }, 60 * 60 * 1000)
   document.addEventListener('click', closeMoreMenu)
-  window.addEventListener('resize', closeMoreMenu)
-  window.addEventListener('scroll', closeMoreMenu, true)
-  window.addEventListener('resize', closePromptPopover)
-  window.addEventListener('scroll', closePromptPopover, true)
 })
 
 watch(
@@ -2642,10 +2602,6 @@ onBeforeUnmount(() => {
   }
   clearItemPreviews()
   document.removeEventListener('click', closeMoreMenu)
-  window.removeEventListener('resize', closeMoreMenu)
-  window.removeEventListener('scroll', closeMoreMenu, true)
-  window.removeEventListener('resize', closePromptPopover)
-  window.removeEventListener('scroll', closePromptPopover, true)
 })
 </script>
 

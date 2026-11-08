@@ -50,13 +50,7 @@
   </BaseDialog>
 
   <!-- Group Selector Dropdown -->
-  <Teleport to="body">
-    <div
-      v-if="groupSelectorKeyId !== null && dropdownPosition"
-      ref="dropdownRef"
-      class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] w-64 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 duration-200 dark:bg-dark-800 dark:ring-white/10"
-      :style="{ top: dropdownPosition.top + 'px', left: dropdownPosition.left + 'px' }"
-    >
+  <FloatingPanel :open="groupSelectorKeyId !== null" :anchor="groupSelectorAnchor" :min-width="256" :max-height="280" class="w-64 rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10" @close="closeGroupSelector">
       <div class="max-h-64 overflow-y-auto p-1.5">
         <!-- Unbind option -->
         <button
@@ -101,12 +95,13 @@
           />
         </button>
       </div>
-    </div>
-  </Teleport>
+
+    </FloatingPanel>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
+import { ref, computed, watch, type ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -127,8 +122,7 @@ const loading = ref(false)
 let requestVersion = 0
 const updatingKeyIds = ref(new Set<number>())
 const groupSelectorKeyId = ref<number | null>(null)
-const dropdownPosition = ref<{ top: number; left: number } | null>(null)
-const dropdownRef = ref<HTMLElement | null>(null)
+const groupSelectorAnchor = computed(() => groupButtonRefs.value.get(groupSelectorKeyId.value ?? -1) ?? null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 
@@ -180,30 +174,12 @@ const loadGroups = async () => {
   }
 }
 
-const DROPDOWN_HEIGHT = 272 // max-h-64 = 16rem = 256px + padding
-const DROPDOWN_GAP = 4
-
 const openGroupSelector = (key: ApiKey) => {
-  if (groupSelectorKeyId.value === key.id) {
-    closeGroupSelector()
-  } else {
-    const buttonEl = groupButtonRefs.value.get(key.id)
-    if (buttonEl) {
-      const rect = buttonEl.getBoundingClientRect()
-      const spaceBelow = window.innerHeight - rect.bottom
-      const openUpward = spaceBelow < DROPDOWN_HEIGHT && rect.top > spaceBelow
-      dropdownPosition.value = {
-        top: openUpward ? rect.top - DROPDOWN_HEIGHT - DROPDOWN_GAP : rect.bottom + DROPDOWN_GAP,
-        left: rect.left
-      }
-    }
-    groupSelectorKeyId.value = key.id
-  }
+  groupSelectorKeyId.value = groupSelectorKeyId.value === key.id ? null : key.id
 }
 
 const closeGroupSelector = () => {
   groupSelectorKeyId.value = null
-  dropdownPosition.value = null
 }
 
 const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
@@ -230,36 +206,9 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   }
 }
 
-const handleKeyDown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && groupSelectorKeyId.value !== null) {
-    event.stopPropagation()
-    closeGroupSelector()
-  }
-}
-
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (dropdownRef.value && !dropdownRef.value.contains(target)) {
-    // Check if the click is on one of the group trigger buttons
-    for (const el of groupButtonRefs.value.values()) {
-      if (el.contains(target)) return
-    }
-    closeGroupSelector()
-  }
-}
-
 const handleClose = () => {
   closeGroupSelector()
   emit('close')
 }
 
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-  document.addEventListener('keydown', handleKeyDown, true)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-  document.removeEventListener('keydown', handleKeyDown, true)
-})
 </script>

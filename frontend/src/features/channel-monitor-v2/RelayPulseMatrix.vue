@@ -144,13 +144,7 @@
       </div>
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="floatingTooltip.visible"
-        class="matrix-floating-tooltip"
-        :style="{ left: `${floatingTooltip.x}px`, top: `${floatingTooltip.y}px` }"
-        role="tooltip"
-      >
+    <FloatingPanel :open="floatingTooltip.visible" :anchor="tooltipAnchor" :min-width="184" :max-height="360" class="matrix-floating-tooltip" role="tooltip" @close="hideTooltip">
         <span
           v-for="(line, index) in floatingTooltip.lines"
           :key="`${index}:${line}`"
@@ -159,12 +153,12 @@
         >
           {{ line }}
         </span>
-      </div>
-    </Teleport>
+    </FloatingPanel>
   </section>
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { useI18n } from 'vue-i18n'
 import { computed, reactive, ref, watch } from 'vue'
 import type {
@@ -213,10 +207,9 @@ const props = withDefaults(
 
 type AlignedSlot = { start: string; bucket?: MonitorMatrixBucket }
 
+const tooltipAnchor = ref<HTMLElement | null>(null)
 const floatingTooltip = reactive({
   visible: false,
-  x: 0,
-  y: 0,
   lines: [] as string[],
 })
 
@@ -418,16 +411,7 @@ function hideTooltip() {
 }
 
 function positionTooltip(event: MouseEvent | FocusEvent) {
-  if ('clientX' in event) {
-    floatingTooltip.x = Math.min(window.innerWidth - 12, Math.max(12, event.clientX))
-    floatingTooltip.y = Math.min(window.innerHeight - 12, Math.max(12, event.clientY)) - 12
-    return
-  }
-  const target = event.target as HTMLElement | null
-  const rect = target?.getBoundingClientRect()
-  if (!rect) return
-  floatingTooltip.x = rect.left + rect.width / 2
-  floatingTooltip.y = rect.top - 10
+  tooltipAnchor.value = event.currentTarget as HTMLElement | null
 }
 
 function latencyPrivacy(metric: LatencyMetric) {
@@ -615,10 +599,8 @@ function formatBucketRange(value: string) {
 .matrix-floating-tooltip {
   pointer-events: none;
   position: fixed;
-  z-index: 9999;
   min-width: 11.5rem;
   max-width: min(18rem, calc(100vw - 1.5rem));
-  transform: translate(-50%, -100%);
   border-radius: 0.75rem;
   border: 1px solid rgb(229 231 235);
   background: rgb(255 255 255);

@@ -680,12 +680,7 @@
     </TablePageLayout>
 
     <!-- Action Menu (Teleported) -->
-    <Teleport to="body">
-      <div
-        v-if="activeMenuId !== null && menuPosition"
-        class="action-menu-content fixed z-[9999] w-48 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
-        :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
-      >
+    <FloatingPanel :open="activeMenuId !== null" :anchor="actionMenuAnchor" align="end" :max-height="400" class="action-menu-content w-48 rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10" @close="closeActionMenu">
         <div class="py-1">
           <template v-for="user in users" :key="user.id">
             <template v-if="user.id === activeMenuId">
@@ -761,8 +756,8 @@
             </template>
           </template>
         </div>
-      </div>
-    </Teleport>
+
+    </FloatingPanel>
 
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.users.deleteUser')" :message="t('admin.users.deleteConfirm', { email: deletingUser?.email })" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <ConfirmDialog
@@ -1463,7 +1458,7 @@ const refreshCurrentPageSecondaryData = () => {
 
 // Action Menu State
 const activeMenuId = ref<number | null>(null)
-const menuPosition = ref<{ top: number; left: number } | null>(null)
+const actionMenuAnchor = ref<HTMLElement | null>(null)
 
 const openActionMenu = (user: AdminUser, e: MouseEvent) => {
   if (activeMenuId.value === user.id) {
@@ -1475,52 +1470,14 @@ const openActionMenu = (user: AdminUser, e: MouseEvent) => {
       return
     }
 
-    const rect = target.getBoundingClientRect()
-    const menuWidth = 200
-    const menuHeight = 240
-    const padding = 8
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    let left, top
-
-    if (viewportWidth < 768) {
-      // 居中显示,水平位置
-      left = Math.max(padding, Math.min(
-        rect.left + rect.width / 2 - menuWidth / 2,
-        viewportWidth - menuWidth - padding
-      ))
-
-      // 优先显示在按钮下方
-      top = rect.bottom + 4
-
-      // 如果下方空间不够,显示在上方
-      if (top + menuHeight > viewportHeight - padding) {
-        top = rect.top - menuHeight - 4
-        // 如果上方也不够,就贴在视口顶部
-        if (top < padding) {
-          top = padding
-        }
-      }
-    } else {
-      left = Math.max(padding, Math.min(
-        e.clientX - menuWidth,
-        viewportWidth - menuWidth - padding
-      ))
-      top = e.clientY
-      if (top + menuHeight > viewportHeight - padding) {
-        top = viewportHeight - menuHeight - padding
-      }
-    }
-
-    menuPosition.value = { top, left }
+    actionMenuAnchor.value = target
     activeMenuId.value = user.id
   }
 }
 
 const closeActionMenu = () => {
   activeMenuId.value = null
-  menuPosition.value = null
+  actionMenuAnchor.value = null
 }
 
 // Close menu when clicking outside

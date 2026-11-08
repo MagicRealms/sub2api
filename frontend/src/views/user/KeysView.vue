@@ -1103,18 +1103,7 @@
     </BaseDialog>
 
     <!-- Group Selector Dropdown (Teleported to body to avoid overflow clipping) -->
-    <Teleport to="body">
-      <div
-        v-if="groupSelectorKeyId !== null && dropdownPosition"
-        ref="dropdownRef"
-        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] w-max max-w-[calc(100vw-16px)] overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 duration-200 sm:min-w-[380px] dark:bg-dark-800 dark:ring-white/10"
-        style="pointer-events: auto !important;"
-        :style="{
-          top: dropdownPosition.top !== undefined ? dropdownPosition.top + 'px' : undefined,
-          bottom: dropdownPosition.bottom !== undefined ? dropdownPosition.bottom + 'px' : undefined,
-          left: dropdownPosition.left + 'px'
-        }"
-      >
+    <FloatingPanel :open="groupSelectorKeyId !== null" :anchor="groupSelectorAnchor" :min-width="380" :max-height="640" class="w-[380px] rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10" @close="groupSelectorKeyId = null">
         <!-- Search box -->
         <div class="border-b border-gray-100 p-2 dark:border-dark-700">
           <div class="relative">
@@ -1136,8 +1125,8 @@
         <div class="border-t border-gray-100 p-3 dark:border-dark-700">
           <button type="button" class="btn btn-primary w-full" :disabled="routeSaving || !routeDraft.length" @click="saveGroupRoutes">{{ t('common.save') }}</button>
         </div>
-      </div>
-    </Teleport>
+
+    </FloatingPanel>
   </AppLayout>
 </template>
 
@@ -1359,9 +1348,8 @@ const copiedKeyId = ref<number | null>(null)
 const recommendedEndpointCopied = ref(false)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
-const dropdownRef = ref<HTMLElement | null>(null)
 const columnDropdownRef = ref<HTMLElement | null>(null)
-const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
+const groupSelectorAnchor = computed(() => groupButtonRefs.value.get(groupSelectorKeyId.value ?? -1) ?? null)
 const groupButtonRefs = ref<Map<number, HTMLElement>>(new Map())
 let abortController: AbortController | null = null
 
@@ -1717,32 +1705,7 @@ const openGroupSelector = (key: ApiKey) => {
   routeDraft.value = keyRouteIDs(key)
   if (groupSelectorKeyId.value === key.id) {
     groupSelectorKeyId.value = null
-    dropdownPosition.value = null
   } else {
-    const buttonEl = groupButtonRefs.value.get(key.id)
-    if (buttonEl) {
-      const rect = buttonEl.getBoundingClientRect()
-      const dropdownEstHeight = 400 // estimated max dropdown height
-      const dropdownEstWidth = Math.min(380, window.innerWidth - 16)
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
-      // 夹取 left，避免窄屏下浮层超出视口右缘
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - dropdownEstWidth - 8))
-
-      if (spaceBelow < dropdownEstHeight && spaceAbove > spaceBelow) {
-        // Not enough space below, pop upward
-        dropdownPosition.value = {
-          bottom: window.innerHeight - rect.top + 4,
-          left
-        }
-      } else {
-        // Default: pop downward
-        dropdownPosition.value = {
-          top: rect.bottom + 4,
-          left
-        }
-      }
-    }
     groupSelectorKeyId.value = key.id
     groupSearchQuery.value = ''
   }
@@ -1755,7 +1718,6 @@ const saveGroupRoutes = async () => {
   try {
     await keysAPI.update(key.id, { group_id: routeDraft.value[0], group_ids: [...routeDraft.value] })
     groupSelectorKeyId.value = null
-    dropdownPosition.value = null
     appStore.showSuccess(t('keys.groupChangedSuccess'))
     await loadApiKeys()
   } catch (error) {
@@ -1765,11 +1727,6 @@ const saveGroupRoutes = async () => {
 
 const closeGroupSelector = (event: MouseEvent) => {
   const target = event.target as HTMLElement
-  // Check if click is inside the dropdown or the trigger button
-  if (!target.closest('.group\\/dropdown') && !dropdownRef.value?.contains(target)) {
-    groupSelectorKeyId.value = null
-    dropdownPosition.value = null
-  }
   if (columnDropdownRef.value && !columnDropdownRef.value.contains(target)) {
     showColumnDropdown.value = false
   }
