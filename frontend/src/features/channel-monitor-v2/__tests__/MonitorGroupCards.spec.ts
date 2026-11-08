@@ -32,15 +32,21 @@ describe('MonitorGroupCards observed health', () => {
     expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(28)
     expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(1)
   })
-  it('shows group glyphs with stable colors independent of health or order', async () => {
+  it('uses the group platform brand marks and colors, independent of health or order', async () => {
     const a = card(6), b = card(16)
+    b.platform = 'anthropic'
     const wrapper = render([a, b])
     const colors = wrapper.findAll('.group-icon').map(x => x.classes().join(' '))
     expect(colors[0]).not.toBe(colors[1])
     expect(wrapper.findAll('.group-icon svg path')).toHaveLength(2)
+    const marks = wrapper.findAll('.group-icon svg path').map(x => x.attributes('d'))
+    expect(marks[0]).not.toBe(marks[1])
+    expect(wrapper.findAll('.group-icon')[0]!.attributes('title')).toBe('OpenAI')
+    expect(wrapper.findAll('.group-icon')[1]!.attributes('title')).toBe('Anthropic')
     a.health = state('critical')
     await wrapper.setProps({ cards: [b, a] })
     expect(wrapper.findAll('.group-icon').map(x => x.classes().join(' '))).toEqual([...colors].reverse())
+    expect(wrapper.findAll('.group-icon svg path').map(x => x.attributes('d'))).toEqual([...marks].reverse())
   })
   it('does not fabricate success percentages or a healthy dot for empty groups', () => {
     const data = card(6)

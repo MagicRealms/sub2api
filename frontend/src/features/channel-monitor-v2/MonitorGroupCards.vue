@@ -9,8 +9,8 @@
     <div v-if="entries.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <article v-for="{ card, slots } in entries" :key="card.group_id" class="monitor-group-card min-w-0 rounded-3xl border border-gray-200/80 bg-white p-4 transition-shadow hover:shadow-md dark:border-dark-600/70 dark:bg-dark-800 sm:p-5" :data-group-id="card.group_id">
         <header class="flex items-start gap-3">
-          <span class="group-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" :class="groupIconClass(card.group_id)">
-            <WorkspaceIcon name="group" class="h-[23px] w-[23px]" />
+          <span class="group-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ring-black/5 dark:ring-white/10" :class="platformBadgeLightClass(card.platform)" :title="providerName(card.platform)">
+            <PlatformIcon :platform="card.platform as GroupPlatform" size="lg" class="!h-6 !w-6" />
           </span>
           <div class="min-w-0 flex-1">
             <h2 class="truncate text-sm font-bold text-gray-900 dark:text-gray-100" :title="card.group_name">{{ card.group_name || `#${card.group_id}` }}</h2>
@@ -80,9 +80,11 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { MonitorCoverage, MonitorGroupCard, MonitorHealth } from '@/api/channelMonitorV2'
+import type { GroupPlatform } from '@/types'
 import Icon from '@/components/icons/Icon.vue'
-import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
+import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
+import { platformBadgeLightClass } from '@/utils/platformColors'
 import { formatLatencyPrivacy, formatMonitorMs, formatMonitorPercent, healthModeState, type HealthDisplayMode } from './monitorFormat'
 import { groupCardHistory, type GroupHistorySlot } from './groupCardHistory'
 
@@ -98,15 +100,6 @@ function showTooltip(event: MouseEvent | FocusEvent, slot: GroupHistorySlot) {
 }
 watch(() => [props.cards, props.healthMode, props.coverage], closeTooltip)
 function cellClass(health: MonitorHealth, sampled: boolean) { return `health-${sampled ? healthModeState(health, props.healthMode) : 'unknown'}` }
-const groupColors = [
-  'bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300',
-  'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
-  'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
-  'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300',
-  'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300',
-  'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300',
-]
-function groupIconClass(id?: number) { return groupColors[(Math.abs(id || 0) * 17 + Math.floor(Math.abs(id || 0) / 6)) % groupColors.length] }
 function modelLabel(card: MonitorGroupCard) {
   if (!card.has_traffic || !card.model) return t('channelMonitorV2.cards.noSamples')
   return card.model === '__other__' ? t('channelMonitorV2.otherModels') : card.model
