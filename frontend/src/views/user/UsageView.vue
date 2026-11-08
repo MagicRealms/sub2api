@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div class="console-usage-page sw-page">
-      <UsageWorkspaceHeader :analysis="analysisMode"  />
+      <UsageWorkspaceHeader />
       <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
@@ -24,55 +24,14 @@
           </div>
         </div>
 
-        <div v-if="analysisMode" class="sw-analysis-filters">
-            <label><span>{{ t('usage.apiKeyFilter') }}</span><Select v-model="filters.api_key_id" :options="apiKeyOptions" @change="applyFilters" /></label>
-            <label><span>{{ t('usage.model') }}</span><Select v-model="filters.model" :options="modelOptions" searchable @change="applyFilters" /></label>
-            <label><span>{{ t('admin.usage.group') }}</span><Select v-model="filters.group_id" :options="groupOptions" searchable @change="applyFilters" /></label>
-          </div>
-        <div v-if="analysisMode" class="sw-chart-grid">
-          <ModelDistributionChart compact
-            v-model:metric="modelDistributionMetric"
-            :model-stats="requestedModelStats"
-            :loading="modelStatsLoading"
-            :show-source-toggle="false"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :show-account-cost="false"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-          <GroupDistributionChart compact
-            v-model:metric="groupDistributionMetric"
-            :group-stats="groupStats"
-            :loading="chartsLoading"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :show-account-cost="false"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-        </div>
-
-        <div v-if="analysisMode" class="sw-chart-grid">
-          <EndpointDistributionChart compact
-            v-model:source="endpointDistributionSource"
-            v-model:metric="endpointDistributionMetric"
-            :endpoint-stats="inboundEndpointStats"
-            :upstream-endpoint-stats="upstreamEndpointStats"
-            :endpoint-path-stats="endpointPathStats"
-            :loading="endpointStatsLoading"
-            :show-source-toggle="false"
-            :show-metric-toggle="true"
-            :enable-breakdown="false"
-            :title="t('usage.endpointDistribution')"
-            :start-date="startDate"
-            :end-date="endDate"
-          />
-        </div>
-        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :title="t('usage.performanceTrends')" interactive @point-select="openTrendPoint" />
+        <UsageInsightCards
+          :model-stats="requestedModelStats" :group-stats="groupStats" :endpoint-stats="inboundEndpointStats" :trend-data="trendData"
+          :model-loading="modelStatsLoading" :distribution-loading="chartsLoading" :endpoint-loading="endpointStatsLoading"
+          @open="activeInsight = $event"
+        />
       </div>
 
-      <div v-if="!analysisMode" class="card sw-record-filters p-5">
+      <div class="card sw-record-filters p-5">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div v-if="activeTab === 'errors'" class="flex flex-1 flex-wrap items-end gap-4">
             <div class="w-full sm:w-auto sm:min-w-[220px]">
@@ -177,7 +136,7 @@
         </div>
       </div>
 
-      <div v-if="!analysisMode && errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
+      <div v-if="errorViewEnabled" class="flex gap-2 border-b border-gray-200 dark:border-dark-700">
         <button class="tab" :class="{ 'tab-active': activeTab === 'usage' }" @click="activeTab = 'usage'">
           {{ t('usage.tabs.usage') }}
         </button>
@@ -186,7 +145,7 @@
         </button>
       </div>
 
-      <template v-if="!analysisMode && activeTab === 'usage'">
+      <template v-if="activeTab === 'usage'">
         <div class="console-usage-table">
           <UsageTable
             :data="usageLogs"
@@ -214,7 +173,7 @@
       </template>
 
       <UserErrorRequestsTable
-        v-else-if="!analysisMode && errorViewEnabled"
+        v-else-if="errorViewEnabled"
         :rows="errorRows"
         :total="errorTotal"
         :loading="errorLoading"
@@ -228,6 +187,46 @@
       />
     </div>
   </AppLayout>
+  <BaseDialog :show="activeInsight !== null" :title="insightTitle" width="extra-wide" :close-on-click-outside="true" @close="activeInsight = null">
+    <div class="mb-3 text-xs text-gray-500 dark:text-gray-400">{{ startDate }} — {{ endDate }}</div>
+          <ModelDistributionChart v-if="activeInsight === 'models'" compact
+            :title="t('admin.dashboard.consumptionDistribution')"
+            v-model:metric="modelDistributionMetric"
+            :model-stats="requestedModelStats"
+            :loading="modelStatsLoading"
+            :show-source-toggle="false"
+            :show-metric-toggle="true"
+            :enable-breakdown="false"
+            :show-account-cost="false"
+            :start-date="startDate"
+            :end-date="endDate"
+          />
+          <GroupDistributionChart v-if="activeInsight === 'groups'" compact
+            v-model:metric="groupDistributionMetric"
+            :group-stats="groupStats"
+            :loading="chartsLoading"
+            :show-metric-toggle="true"
+            :enable-breakdown="false"
+            :show-account-cost="false"
+            :start-date="startDate"
+            :end-date="endDate"
+          />
+          <EndpointDistributionChart v-if="activeInsight === 'endpoints'" compact
+            v-model:source="endpointDistributionSource"
+            v-model:metric="endpointDistributionMetric"
+            :endpoint-stats="inboundEndpointStats"
+            :upstream-endpoint-stats="upstreamEndpointStats"
+            :endpoint-path-stats="endpointPathStats"
+            :loading="endpointStatsLoading"
+            :show-source-toggle="false"
+            :show-metric-toggle="true"
+            :enable-breakdown="false"
+            :title="t('usage.endpointDistribution')"
+            :start-date="startDate"
+            :end-date="endDate"
+          />
+    <TokenUsageTrend v-if="activeInsight === 'trends'" :trend-data="trendData" :loading="chartsLoading" :title="t('usage.performanceTrends')" interactive @point-select="openTrendPoint" />
+  </BaseDialog>
   <BaseDialog :show="!!selectedTrendPoint" :title="selectedTrendPoint ? `${t('usage.pointRequests')} · ${selectedTrendPoint.date}` : t('usage.pointRequests')" width="extra-wide" @close="closeTrendPoint">
     <div class="mb-3 flex items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
       <span>{{ t('usage.pointRequests') }}: {{ pointLogTotal.toLocaleString() }}</span>
@@ -258,13 +257,13 @@
 
 <script setup lang="ts">
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
-import { useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
+import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Pagination from '@/components/common/Pagination.vue'
@@ -299,9 +298,9 @@ import type { Column } from '@/components/common/types'
 import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 
 const { t } = useI18n()
-const route = useRoute()
 const advancedFilters = ref(false)
-const analysisMode = computed(() => route?.meta?.usageAnalytics === true)
+const activeInsight = ref<UsageInsight | null>(null)
+const insightTitle = computed(() => t(activeInsight.value === 'models' ? 'admin.dashboard.consumptionDistribution' : activeInsight.value === 'groups' ? 'admin.dashboard.groupDistribution' : activeInsight.value === 'endpoints' ? 'usage.endpointDistribution' : 'usage.performanceTrends'))
 const appStore = useAppStore()
 
 type DistributionMetric = 'tokens' | 'actual_cost'

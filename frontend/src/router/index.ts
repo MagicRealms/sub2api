@@ -253,8 +253,8 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/usage/analytics',
     name: 'UsageAnalytics',
-    component: () => import('@/views/user/UsageView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: false, usageAnalytics: true, title: 'Usage Analytics', titleKey: 'workspace.analytics', descriptionKey: 'workspace.analyticsDescription' }
+    redirect: to => ({ path: '/usage', query: to.query, hash: to.hash }),
+    meta: { requiresAuth: true, requiresAdmin: false }
   },
   {
     path: '/usage',

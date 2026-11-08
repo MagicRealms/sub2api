@@ -172,8 +172,12 @@ function mountUsageView() {
 }
 
 describe('user UsageView', () => {
-  it('renders the interactive trend chart directly on usage records', async () => {
+  it('opens the interactive trend in the unified usage records view', async () => {
     const wrapper = mountUsageView()
+    await flushPromises()
+    expect(wrapper.findAll('[data-insight]')).toHaveLength(4)
+    expect(wrapper.findComponent({ name: 'TokenUsageTrend' }).exists()).toBe(false)
+    await wrapper.get('[data-insight="trends"]').trigger('click')
     await flushPromises()
     const trend = wrapper.findComponent({ name: 'TokenUsageTrend' })
     expect(trend.exists()).toBe(true)
