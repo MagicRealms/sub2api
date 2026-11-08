@@ -7,10 +7,16 @@
           <h1 v-if="!embedded" class="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{{ t('modelPlaza.title') }}</h1>
           <p :class="!embedded ? 'mt-2' : ''" class="max-w-2xl text-sm leading-6 text-white/70">{{ t('modelPlaza.cards.intro') }}</p>
         </div>
-        <dl v-if="response && !loading" class="sunworld-catalog-summary" data-test="plaza-summary">
-          <div><dt>{{ t('modelPlaza.cards.groups') }}</dt><dd>{{ response.groups.length }}</dd></div>
-          <div><dt>{{ t('modelPlaza.cards.uniqueModels') }}</dt><dd>{{ uniqueModelCount }}</dd></div>
-        </dl>
+        <div class="flex flex-wrap items-center gap-4">
+          <dl v-if="response && !loading" class="sunworld-catalog-summary" data-test="plaza-summary">
+            <div><dt>{{ t('modelPlaza.cards.groups') }}</dt><dd>{{ response.groups.length }}</dd></div>
+            <div><dt>{{ t('modelPlaza.cards.uniqueModels') }}</dt><dd>{{ uniqueModelCount }}</dd></div>
+          </dl>
+          <button type="button" class="btn btn-secondary" :disabled="refreshing || loading" :aria-label="t('modelPlaza.cards.refresh')" @click="$emit('refresh')">
+            <Icon name="refresh" size="sm" :class="refreshing ? 'animate-spin' : ''" />
+            <span>{{ t(refreshing ? 'modelPlaza.cards.refreshing' : 'modelPlaza.cards.refresh') }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -31,6 +37,9 @@
       <Icon name="infoCircle" size="xs" class="h-3.5 w-3.5" />
       {{ t('modelPlaza.anonymousHint') }}
     </p>
+    <div v-if="refreshError && response" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200" role="status">
+      {{ t('modelPlaza.refreshFailed') }}
+    </div>
 
     <!-- 加载/错误/空 -->
     <div v-if="loading" class="flex min-h-[240px] items-center justify-center">
@@ -52,12 +61,17 @@
         :group-id="selectedGroupId"
         :rate="selectedRate"
         :search="searchQuery"
+        :mode="selectedMode"
         @update:platform="selectedPlatform = $event"
         @update:group-id="selectedGroupId = $event"
         @update:rate="selectedRate = $event"
         @update:search="searchQuery = $event"
+        @update:mode="selectedMode = $event"
       />
 
+      <p v-if="modelEntries.length" class="text-xs text-gray-500 dark:text-dark-400" data-test="plaza-result-count">
+        {{ t('modelPlaza.cards.showingModels', { count: modelEntries.length }) }}
+      </p>
       <div v-if="modelEntries.length > 0" class="sunworld-model-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <PlazaModelCard v-for="entry in modelEntries" :key="entry.key" :entry="entry" @open="detail = $event" />
       </div>
@@ -92,9 +106,12 @@ const props = defineProps<{
   response: ModelPlazaResponse | null
   loading: boolean
   error?: boolean
+  refreshing?: boolean
+  refreshError?: boolean
   /** 后台内嵌形态(AppLayout 内):隐藏页头。 */
   embedded?: boolean
 }>()
+defineEmits<{ refresh: [] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -103,6 +120,7 @@ const isAuthenticated = computed(() => authStore.isAuthenticated)
 const selectedPlatform = ref<string>('all')
 const selectedGroupId = ref<number | 'all'>('all')
 const selectedRate = ref<number | 'all'>('all')
+const selectedMode = ref<'all' | 'token' | 'image' | 'video' | 'per_request'>('all')
 const searchQuery = ref('')
 const detail = ref<PlazaModelVariant | null>(null)
 const detailGroup = computed(() => {
@@ -162,11 +180,26 @@ const filteredGroups = computed(() => {
   if (selectedRate.value !== 'all') {
     groups = groups.filter((g) => effectiveRate(g) === selectedRate.value)
   }
+  if (selectedMode.value !== 'all') {
+    groups = groups
+      .map((g) => ({
+        ...g,
+        models: g.models.filter((m) => (m.pricing?.billing_mode || 'token') === selectedMode.value),
+      }))
+      .filter((g) => g.models.length > 0)
+  }
   // 模型名搜索:分组内只留命中的模型,整组无命中则隐藏该分组。
   const q = searchQuery.value.trim().toLowerCase()
   if (q) {
     groups = groups
-      .map((g) => ({ ...g, models: g.models.filter((m) => m.name.toLowerCase().includes(q)) }))
+      .map((g) => ({
+        ...g,
+        models: g.models.filter((m) =>
+          m.name.toLowerCase().includes(q) ||
+          m.platform.toLowerCase().includes(q) ||
+          g.name.toLowerCase().includes(q)
+        ),
+      }))
       .filter((g) => g.models.length > 0)
   }
   // 专属倍率会改变生效值,不能只依赖后端按默认倍率的排序。
@@ -192,7 +225,7 @@ const modelEntries = computed(() => {
   for (const entry of entries.values()) {
     entry.variants.sort((a, b) => modelRate(a) - modelRate(b) || a.group.name.localeCompare(b.group.name))
   }
-  const isImage = (entry: PlazaModelEntry) => /image|dall-e/i.test(entry.name)
+  const isImage = (entry: PlazaModelEntry) => entry.variants[0]?.model.pricing?.billing_mode === 'image' || /image|dall-e/i.test(entry.name)
   return [...entries.values()].sort((a, b) => a.platform.localeCompare(b.platform) || Number(isImage(a)) - Number(isImage(b)) || b.name.localeCompare(a.name, undefined, { numeric: true }))
 })
 </script>

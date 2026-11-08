@@ -395,6 +395,10 @@ export default {
     perRequest: '每次请求',
     apiKeyFilter: 'API 密钥',
     allApiKeys: '全部密钥',
+    unitCost: '单位成本',
+    unitCostPerMillion: '$ / 百万 Token',
+    chartPointHint: '点击数据点查看对应请求',
+    pointRequests: '此时间段请求',
     timeRange: '时间范围',
     exportCsv: '导出 CSV',
     exportExcel: '导出 Excel',
@@ -718,6 +722,9 @@ export default {
       variablePricing: '阶梯、时段或思考等级可能影响最终价格，详见价格明细。',
       openGroup: '查看 {name} 的模型与价格',
       usageNotes: '价格与使用说明',
+      refresh: '刷新目录',
+      refreshing: '正在刷新...',
+      showingModels: '当前显示 {count} 个模型',
       allGroups: '全部分组',
       allRates: '全部倍率',
       clearSearch: '清空搜索'
@@ -728,8 +735,15 @@ export default {
       rateLabel: '倍率',
       modelLabel: '模型',
       searchPlaceholder: '搜索模型名称',
+      modeLabel: '计费类型',
+      allTypes: '全部类型',
+      token: 'Token',
+      image: '生图',
+      video: '视频',
+      perRequest: '按次',
       all: '全部'
     },
+    refreshFailed: '目录刷新失败，仍显示上次加载的结果。',
     badges: {
       exclusive: '专属分组',
       subscription: '订阅'

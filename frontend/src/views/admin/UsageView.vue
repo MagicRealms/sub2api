@@ -68,6 +68,8 @@
             :trend-data="trendData"
             :loading="chartsLoading"
             :title="t('admin.dashboard.modelCallAnalysis')"
+            interactive
+            @point-select="openTrendPoint"
           />
         </div>
       </div>
@@ -175,6 +177,32 @@
       <OpsErrorDetailModal v-model:show="showErrorModal" :error-id="selectedErrorId" :error-type="'request'" />
     </div>
   </AppLayout>
+  <BaseDialog :show="!!selectedTrendPoint" :title="selectedTrendPoint ? `${t('usage.pointRequests')} · ${selectedTrendPoint.date}` : t('usage.pointRequests')" width="extra-wide" @close="closeTrendPoint">
+    <div class="mb-3 flex items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
+      <span>{{ t('usage.pointRequests') }}: {{ pointLogTotal.toLocaleString() }}</span>
+      <span>{{ pointRangeLabel }}</span>
+    </div>
+    <div class="overflow-hidden">
+      <UsageTable
+        flat
+        :data="pointLogs"
+        :loading="pointLogsLoading"
+        :columns="visibleColumns"
+        compact
+        :server-side-sort="false"
+        @userClick="handleUserClick"
+        @ipGeoBatchFailed="handleIpGeoBatchFailed"
+      />
+    </div>
+    <Pagination
+      v-if="pointLogTotal > pointPageSize"
+      :page="pointPage"
+      :total="pointLogTotal"
+      :page-size="pointPageSize"
+      @update:page="changePointPage"
+      @update:pageSize="changePointPageSize"
+    />
+  </BaseDialog>
   <UsageExportProgress :show="exportProgress.show" :progress="exportProgress.progress" :current="exportProgress.current" :total="exportProgress.total" :estimated-time="exportProgress.estimatedTime" @cancel="cancelExport" />
   <UsageCleanupDialog
     :show="cleanupDialogVisible"
@@ -202,12 +230,14 @@ import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admi
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
+import { getTrendPointRange } from '@/utils/trendPointRange'
 import UsageWorkspaceHeader from '@/components/workspace/UsageWorkspaceHeader.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
 import UserTokenRanking from '@/components/admin/usage/UserTokenRanking.vue'
 import UsageCleanupDialog from '@/components/admin/usage/UsageCleanupDialog.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import OpsErrorLogTable from '@/views/admin/ops/components/OpsErrorLogTable.vue'
 import OpsErrorDetailModal from '@/views/admin/ops/components/OpsErrorDetailModal.vue'
@@ -227,6 +257,14 @@ const route = useRoute()
 const analysisMode = computed(() => route?.meta?.usageAnalytics === true)
 const usageStats = ref<AdminUsageStatsResponse | null>(null); const usageLogs = ref<AdminUsageLog[]>([]); const loading = ref(false); const exporting = ref(false)
 const trendData = ref<TrendDataPoint[]>([]); const requestedModelStats = ref<ModelStat[]>([]); const upstreamModelStats = ref<ModelStat[]>([]); const mappingModelStats = ref<ModelStat[]>([]); const groupStats = ref<GroupStat[]>([]); const chartsLoading = ref(false); const modelStatsLoading = ref(false); const granularity = ref<'day' | 'hour'>('hour')
+const trendTimezone = ref('UTC')
+const selectedTrendPoint = ref<TrendDataPoint | null>(null)
+const pointLogs = ref<AdminUsageLog[]>([])
+const pointLogTotal = ref(0)
+const pointPage = ref(1)
+const pointPageSize = ref(20)
+const pointLogsLoading = ref(false)
+const pointRangeLabel = ref('')
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
 const modelDistributionSource = ref<ModelDistributionSource>('requested')
 const loadedModelSources = reactive<Record<ModelDistributionSource, boolean>>({
@@ -245,6 +283,8 @@ let abortController: AbortController | null = null; let exportAbortController: A
 let chartReqSeq = 0
 let statsReqSeq = 0
 let modelStatsReqSeq = 0
+let pointReqSeq = 0
+let pointAbortController: AbortController | null = null
 const exportProgress = reactive({ show: false, progress: 0, current: 0, total: 0, estimatedTime: '' })
 const cleanupDialogVisible = ref(false)
 // Balance history modal state
@@ -526,9 +566,79 @@ const loadChartData = async () => {
     })
     if (seq !== chartReqSeq) return
     trendData.value = snapshot.trend || []
+    trendTimezone.value = snapshot.timezone || 'UTC'
     groupStats.value = snapshot.groups || []
   } catch (error) { console.error('Failed to load chart data:', error) } finally { if (seq === chartReqSeq) chartsLoading.value = false }
 }
+
+const loadTrendPointLogs = async () => {
+  if (!selectedTrendPoint.value) return
+  const range = getTrendPointRange(selectedTrendPoint.value.date, granularity.value, trendTimezone.value)
+  if (!range) {
+    appStore.showError(t('usage.failedToLoad'))
+    return
+  }
+  pointAbortController?.abort()
+  const controller = new AbortController()
+  pointAbortController = controller
+  const seq = ++pointReqSeq
+  pointLogsLoading.value = true
+  const timeLabel = (date: Date) => date.toLocaleString(undefined, {
+    timeZone: trendTimezone.value,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+  })
+  pointRangeLabel.value = `${timeLabel(range.start)} - ${timeLabel(range.end)}`
+  try {
+    const response = await adminUsageAPI.list({
+      ...filters.value,
+      start_date: undefined,
+      end_date: undefined,
+      start_time: range.start.toISOString(),
+      end_time: range.end.toISOString(),
+      page: pointPage.value,
+      page_size: pointPageSize.value,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+    }, { signal: controller.signal })
+    if (seq !== pointReqSeq || controller.signal.aborted) return
+    pointLogs.value = response.items
+    pointLogTotal.value = response.total
+  } catch (error: any) {
+    if (error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED' && seq === pointReqSeq) {
+      appStore.showError(t('admin.usage.failedToLoad'))
+    }
+  } finally {
+    if (seq === pointReqSeq) pointLogsLoading.value = false
+  }
+}
+
+const openTrendPoint = (point: TrendDataPoint) => {
+  selectedTrendPoint.value = point
+  pointPage.value = 1
+  pointLogs.value = []
+  pointLogTotal.value = 0
+  void loadTrendPointLogs()
+}
+
+const closeTrendPoint = () => {
+  selectedTrendPoint.value = null
+  pointAbortController?.abort()
+  pointAbortController = null
+  pointLogs.value = []
+  pointLogTotal.value = 0
+}
+
+const changePointPage = (page: number) => {
+  pointPage.value = page
+  void loadTrendPointLogs()
+}
+
+const changePointPageSize = (pageSize: number) => {
+  pointPageSize.value = pageSize
+  pointPage.value = 1
+  void loadTrendPointLogs()
+}
+
 const applyFilters = () => {
   pagination.page = 1
   invalidateModelStatsCache()
@@ -900,7 +1010,7 @@ onMounted(() => {
   loadSavedErrColumns()
   document.addEventListener('click', handleColumnClickOutside)
 })
-onUnmounted(() => { abortController?.abort(); exportAbortController?.abort(); document.removeEventListener('click', handleColumnClickOutside) })
+onUnmounted(() => { abortController?.abort(); exportAbortController?.abort(); pointAbortController?.abort(); document.removeEventListener('click', handleColumnClickOutside) })
 
 watch(modelDistributionSource, (source) => {
   void loadModelStats(source)

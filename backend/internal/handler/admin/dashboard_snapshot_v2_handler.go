@@ -28,6 +28,7 @@ type dashboardSnapshotV2Response struct {
 	StartDate   string `json:"start_date"`
 	EndDate     string `json:"end_date"`
 	Granularity string `json:"granularity"`
+	Timezone    string `json:"timezone"`
 
 	Stats      *dashboardSnapshotV2Stats        `json:"stats,omitempty"`
 	Trend      []usagestats.TrendDataPoint      `json:"trend,omitempty"`
@@ -163,6 +164,7 @@ func (h *DashboardHandler) buildSnapshotV2Response(
 		StartDate:   startTime.Format("2006-01-02"),
 		EndDate:     endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		Granularity: granularity,
+		Timezone:    time.Local.String(),
 	}
 
 	if includeStats {

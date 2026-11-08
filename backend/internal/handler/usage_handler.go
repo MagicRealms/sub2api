@@ -159,47 +159,74 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 	var startPtr, endPtr *time.Time
 	startDateStr := strings.TrimSpace(c.Query("start_date"))
 	endDateStr := strings.TrimSpace(c.Query("end_date"))
-
-	if startDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+	startTimeStr := strings.TrimSpace(c.Query("start_time"))
+	endTimeStr := strings.TrimSpace(c.Query("end_time"))
+	if startTimeStr != "" || endTimeStr != "" {
+		if startDateStr != "" || endDateStr != "" {
+			response.BadRequest(c, "Use either start_time/end_time or start_date/end_date")
 			return nil, false
 		}
-		startTime = t
+		if startTimeStr == "" || endTimeStr == "" {
+			response.BadRequest(c, "Both start_time and end_time are required")
+			return nil, false
+		}
+		parsedStartTime, err := time.Parse(time.RFC3339Nano, startTimeStr)
+		if err != nil {
+			response.BadRequest(c, "Invalid start_time format, use RFC3339")
+			return nil, false
+		}
+		parsedEndTime, err := time.Parse(time.RFC3339Nano, endTimeStr)
+		if err != nil || !parsedEndTime.After(parsedStartTime) {
+			response.BadRequest(c, "Invalid end_time: it must be RFC3339 and later than start_time")
+			return nil, false
+		}
+		startTime = parsedStartTime
+		endTime = parsedEndTime
 		startPtr = &startTime
-	}
-	if endDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
-			return nil, false
-		}
-		endTime = t.AddDate(0, 0, 1)
 		endPtr = &endTime
-	}
+	} else {
 
-	if requireRange {
-		if startPtr == nil {
-			switch c.DefaultQuery("period", "") {
-			case "today":
-				startTime = timezone.StartOfDayInUserLocation(now, userTZ)
-			case "week":
-				startTime = now.AddDate(0, 0, -7)
-			case "month":
-				startTime = now.AddDate(0, -1, 0)
-			default:
-				startTime = timezone.StartOfDayInUserLocation(now.AddDate(0, 0, -7), userTZ)
+		if startDateStr != "" {
+			t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+			if err != nil {
+				response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+				return nil, false
 			}
+			startTime = t
 			startPtr = &startTime
 		}
-		if endPtr == nil {
-			if strings.TrimSpace(c.Query("period")) != "" {
-				endTime = now
-			} else {
-				endTime = timezone.StartOfDayInUserLocation(now.AddDate(0, 0, 1), userTZ)
+		if endDateStr != "" {
+			t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+			if err != nil {
+				response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
+				return nil, false
 			}
+			endTime = t.AddDate(0, 0, 1)
 			endPtr = &endTime
+		}
+
+		if requireRange {
+			if startPtr == nil {
+				switch c.DefaultQuery("period", "") {
+				case "today":
+					startTime = timezone.StartOfDayInUserLocation(now, userTZ)
+				case "week":
+					startTime = now.AddDate(0, 0, -7)
+				case "month":
+					startTime = now.AddDate(0, -1, 0)
+				default:
+					startTime = timezone.StartOfDayInUserLocation(now.AddDate(0, 0, -7), userTZ)
+				}
+				startPtr = &startTime
+			}
+			if endPtr == nil {
+				if strings.TrimSpace(c.Query("period")) != "" {
+					endTime = now
+				} else {
+					endTime = timezone.StartOfDayInUserLocation(now.AddDate(0, 0, 1), userTZ)
+				}
+				endPtr = &endTime
+			}
 		}
 	}
 
@@ -544,6 +571,7 @@ func (h *UsageHandler) DashboardSnapshotV2(c *gin.Context) {
 		"start_date":   parsed.StartTime.Format("2006-01-02"),
 		"end_date":     parsed.EndTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		"granularity":  granularity,
+		"timezone":     time.Local.String(),
 	}
 
 	if includeTrend {

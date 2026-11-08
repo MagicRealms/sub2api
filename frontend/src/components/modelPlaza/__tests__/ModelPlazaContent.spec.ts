@@ -73,6 +73,18 @@ describe('Model Plaza cards and filters', () => {
     expect(wrapper.text()).toContain('modelPlaza.noSearchResult')
   })
 
+  it('filters the full catalog by billing mode', async () => {
+    const wrapper = render([group(1, { models: [
+      model('gpt-6.1-sol'),
+      model('gpt-image-2', { billing_mode: 'image', per_request_price: 0.05 }),
+    ] })])
+
+    await wrapper.find('select[aria-label="modelPlaza.filters.modeLabel"]').setValue('image')
+
+    expect(wrapper.findAll('[data-test="plaza-model-card"]')).toHaveLength(1)
+    expect(wrapper.find('[data-test="plaza-model-card"]').attributes('data-model')).toBe('gpt-image-2')
+  })
+
   it('combines filters, removes unavailable choices and resets rates after refresh', async () => {
     const wrapper = render([group(1), group(2, { rate_multiplier: 0.25 })])
     await wrapper.findAll('select')[1].setValue('0.25')

@@ -390,6 +390,10 @@ export default {
     perRequest: 'per request',
     apiKeyFilter: 'API Key',
     allApiKeys: 'All API Keys',
+    unitCost: 'Unit cost',
+    unitCostPerMillion: '$ / 1M tokens',
+    chartPointHint: 'Select a point to inspect its requests',
+    pointRequests: 'Requests in this interval',
     timeRange: 'Time Range',
     exportCsv: 'Export CSV',
     exportExcel: 'Export Excel',
@@ -713,6 +717,9 @@ export default {
       variablePricing: 'Tiers, time windows or reasoning effort may affect the final price. See details.',
       openGroup: 'View models and pricing for {name}',
       usageNotes: 'Pricing & usage notes',
+      refresh: 'Refresh catalog',
+      refreshing: 'Refreshing...',
+      showingModels: 'Showing {count} models',
       allGroups: 'All groups',
       allRates: 'All rates',
       clearSearch: 'Clear search'
@@ -723,8 +730,15 @@ export default {
       rateLabel: 'Rate',
       modelLabel: 'Model',
       searchPlaceholder: 'Search models',
+      modeLabel: 'Billing type',
+      allTypes: 'All billing types',
+      token: 'Token',
+      image: 'Image',
+      video: 'Video',
+      perRequest: 'Per request',
       all: 'All'
     },
+    refreshFailed: 'The catalog could not be refreshed. Showing the last loaded version.',
     badges: {
       exclusive: 'Exclusive',
       subscription: 'Subscription'

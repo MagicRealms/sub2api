@@ -177,6 +177,35 @@ func TestUserUsageListAdvancedFilters(t *testing.T) {
 	require.NotNil(t, repo.listFilters.EndTime)
 }
 
+func TestUserUsageListExactTimeRange(t *testing.T) {
+	repo := &userUsageRepoCapture{}
+	router := newUserUsageRequestTypeTestRouter(repo)
+	req := httptest.NewRequest(http.MethodGet, "/usage?start_time=2026-11-08T09%3A00%3A00Z&end_time=2026-11-08T10%3A00%3A00Z", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, int64(42), repo.listFilters.UserID)
+	require.Equal(t, time.Date(2026, 11, 8, 9, 0, 0, 0, time.UTC), *repo.listFilters.StartTime)
+	require.Equal(t, time.Date(2026, 11, 8, 10, 0, 0, 0, time.UTC), *repo.listFilters.EndTime)
+}
+
+func TestUserUsageListRejectsInvalidExactTimeRange(t *testing.T) {
+	for _, query := range []string{
+		"start_time=2026-11-08T09%3A00%3A00Z",
+		"start_time=2026-11-08T10%3A00%3A00Z&end_time=2026-11-08T09%3A00%3A00Z",
+		"start_time=2026-11-08T09%3A00%3A00Z&end_time=bad",
+		"start_time=2026-11-08T09%3A00%3A00Z&end_time=2026-11-08T10%3A00%3A00Z&start_date=2026-11-08",
+	} {
+		repo := &userUsageRepoCapture{}
+		router := newUserUsageRequestTypeTestRouter(repo)
+		req := httptest.NewRequest(http.MethodGet, "/usage?"+query, nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusBadRequest, rec.Code, query)
+	}
+}
+
 func TestUserUsageListInvalidBillingMode(t *testing.T) {
 	repo := &userUsageRepoCapture{}
 	router := newUserUsageRequestTypeTestRouter(repo)

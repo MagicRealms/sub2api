@@ -304,6 +304,19 @@ describe('user KeysView column settings', () => {
     isCurrentStep.mockReturnValue(false)
   })
 
+  it('releases the key list before the usage aggregate request finishes', async () => {
+    let finishUsage: ((value: { stats: Record<number, unknown> }) => void) | undefined
+    getDashboardApiKeysUsage.mockReturnValue(new Promise((resolve) => { finishUsage = resolve }))
+
+    const wrapper = await mountView()
+
+    expect(getDashboardApiKeysUsage).toHaveBeenCalledOnce()
+    expect(wrapper.get('button[title="Refresh"]').attributes('disabled')).toBeUndefined()
+
+    finishUsage?.({ stats: {} })
+    await flushPromises()
+  })
+
   it.each([
     { initialStatus: 'quota_exhausted', status: 'active', formStatus: 'active' },
     { initialStatus: 'inactive', status: 'inactive', formStatus: 'inactive' },

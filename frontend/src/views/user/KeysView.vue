@@ -14,12 +14,6 @@
       <template #filters>
         <div class="flex flex-col gap-3">
           <div class="flex flex-wrap items-center gap-3">
-            <SearchInput
-              v-model="filterSearch"
-              :placeholder="t('keys.searchPlaceholder')"
-              class="w-full sm:w-64"
-              @search="onFilterChange"
-            />
             <Select
               :model-value="filterGroupId"
               class="w-40"
@@ -53,7 +47,14 @@
       </template>
 
       <template #actions>
-        <div class="flex justify-end gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <SearchInput
+            v-model="filterSearch"
+            :placeholder="t('keys.searchPlaceholder')"
+            class="w-full sm:w-64"
+            @search="onFilterChange"
+          />
+          <div class="flex flex-wrap justify-end gap-3">
           <button
             @click="loadApiKeys"
             :disabled="loading"
@@ -98,6 +99,7 @@
             <Icon name="plus" size="md" class="mr-2" />
             {{ t('keys.createKey') }}
           </button>
+          </div>
         </div>
       </template>
 
@@ -1593,19 +1595,16 @@ const loadApiKeys = async () => {
     handleSelectionChange(selectedIds.value)
     pagination.value.total = response.total
     pagination.value.pages = response.pages
+    usageStats.value = {}
 
-    // Load usage stats for all API keys in the list
+    // Keep the key list interactive while the slower aggregate request runs.
     if (response.items.length > 0) {
       const keyIds = response.items.map((k) => k.id)
-      try {
-        const usageResponse = await usageAPI.getDashboardApiKeysUsage(keyIds, { signal })
-        if (signal.aborted) return
-        usageStats.value = usageResponse.stats
-      } catch (e) {
-        if (!isAbortError(e)) {
-          console.error('Failed to load usage stats:', e)
-        }
-      }
+      void usageAPI.getDashboardApiKeysUsage(keyIds, { signal }).then((usageResponse) => {
+        if (!signal.aborted) usageStats.value = usageResponse.stats
+      }).catch((error) => {
+        if (!isAbortError(error)) console.error('Failed to load usage stats:', error)
+      })
     }
   } catch (error) {
     if (isAbortError(error)) {
@@ -2089,6 +2088,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  abortController?.abort()
   document.removeEventListener('click', closeGroupSelector)
   if (resetTimer) clearInterval(resetTimer)
 })

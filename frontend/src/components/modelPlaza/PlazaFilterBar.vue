@@ -22,6 +22,13 @@
           <option value="all">{{ t('modelPlaza.cards.allRates') }}</option>
           <option v-for="r in rates" :key="r" :value="r" :disabled="!rateEnabled(r)">{{ r }}×</option>
         </select>
+        <select :value="mode" :aria-label="t('modelPlaza.filters.modeLabel')" class="input min-w-0 rounded-xl py-2 text-sm dark:bg-dark-900 dark:text-gray-100" @change="$emit('update:mode', ($event.target as HTMLSelectElement).value as 'all' | 'token' | 'image' | 'video' | 'per_request')">
+          <option value="all">{{ t('modelPlaza.filters.allTypes') }}</option>
+          <option value="token">{{ t('modelPlaza.filters.token') }}</option>
+          <option value="image">{{ t('modelPlaza.filters.image') }}</option>
+          <option value="video">{{ t('modelPlaza.filters.video') }}</option>
+          <option value="per_request">{{ t('modelPlaza.filters.perRequest') }}</option>
+        </select>
       </div>
     </div>
     <div v-if="platforms.length" class="flex flex-wrap gap-2">
@@ -60,6 +67,7 @@ const props = defineProps<{
   platform: string
   groupId: number | 'all'
   rate: number | 'all'
+  mode: 'all' | 'token' | 'image' | 'video' | 'per_request'
   /** 模型名搜索词(纯前端过滤)。 */
   search: string
 }>()
@@ -68,6 +76,7 @@ defineEmits<{
   'update:platform': [value: string]
   'update:groupId': [value: number | 'all']
   'update:rate': [value: number | 'all']
+  'update:mode': [value: 'all' | 'token' | 'image' | 'video' | 'per_request']
   'update:search': [value: string]
 }>()
 

@@ -21,7 +21,7 @@ vi.mock('vue-i18n', async () => {
 vi.mock('vue-chartjs', () => ({
   Line: {
     props: ['data', 'options'],
-    template: '<div class="chart-data">{{ JSON.stringify(data) }}</div>',
+    template: '<div class="chart-data" @click="options.onClick({}, [{ index: 0 }])">{{ JSON.stringify(data) }}</div>',
   },
 }))
 
@@ -36,6 +36,31 @@ describe('TokenUsageTrend', () => {
     await wrapper.findAll('.sw-segmented button')[2].trigger('click')
     expect(JSON.parse(wrapper.get('.chart-data').text()).datasets[0].data).toEqual([2.5])
     expect(wrapper.get('.sw-chart-total').text()).toBe('$2.50')
+  })
+
+  it('shows cache hit rate and weighted unit cost as selectable time series', async () => {
+    const wrapper = mount(TokenUsageTrend, { props: { trendData: [
+      { date: '2026-11-08 10:00', requests: 2, input_tokens: 500, output_tokens: 100, cache_read_tokens: 1500, cache_creation_tokens: 0, total_tokens: 2100, cost: 5, actual_cost: 2.5 },
+      { date: '2026-11-08 11:00', requests: 1, input_tokens: 500, output_tokens: 100, cache_read_tokens: 0, cache_creation_tokens: 0, total_tokens: 600, cost: 1, actual_cost: 1.5 },
+    ] } })
+
+    await wrapper.findAll('.sw-segmented button')[3].trigger('click')
+    let chart = JSON.parse(wrapper.get('.chart-data').text())
+    expect(chart.datasets[0].data).toEqual([75, 0])
+    expect(wrapper.get('.sw-chart-total').text()).toBe('60.0%')
+
+    await wrapper.findAll('.sw-segmented button')[4].trigger('click')
+    chart = JSON.parse(wrapper.get('.chart-data').text())
+    expect(chart.datasets[0].data[0]).toBeCloseTo((2.5 / 2100) * 1_000_000)
+    expect(wrapper.get('.sw-chart-total').text()).toBe('$1481.48')
+  })
+
+  it('emits the selected trend point when interactive chart data is clicked', async () => {
+    const point = { date: '2026-11-08 10:00', requests: 2, input_tokens: 500, output_tokens: 100, cache_read_tokens: 1500, cache_creation_tokens: 0, total_tokens: 2100, cost: 5, actual_cost: 2.5 }
+    const wrapper = mount(TokenUsageTrend, { props: { trendData: [point], interactive: true } })
+    await wrapper.get('.chart-data').trigger('click')
+
+    expect(wrapper.emitted('pointSelect')?.[0]).toEqual([point])
   })
   it('calculates cache hit rate against all prompt tokens', () => {
     const wrapper = mount(TokenUsageTrend, {

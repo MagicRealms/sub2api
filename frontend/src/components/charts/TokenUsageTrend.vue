@@ -6,9 +6,9 @@
         <button v-for="item in chartMetrics" :key="item.value" type="button" :class="{ 'is-active': metric === item.value }" :aria-pressed="metric === item.value" @click="metric = item.value">{{ item.label }}</button>
       </div>
     </div>
-    <div class="mb-3 flex items-baseline gap-2"><strong class="sw-chart-total">{{ summaryValue }}</strong><span class="sw-chart-sub">{{ t('usage.inSelectedRange') }}</span></div>
+    <div class="mb-3 flex flex-wrap items-baseline gap-2"><strong class="sw-chart-total">{{ summaryValue }}</strong><span class="sw-chart-sub">{{ metric === 'unit_cost' ? t('usage.unitCostPerMillion') : metric === 'cache_hit_rate' ? t('usage.cacheHitRate') : t('usage.inSelectedRange') }}</span><span v-if="interactive" class="ml-auto text-xs text-gray-400">{{ t('usage.chartPointHint') }}</span></div>
     <div v-if="loading" class="flex h-48 items-center justify-center"><LoadingSpinner /></div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-48"><Line :data="chartData" :options="lineOptions" /></div>
+    <div v-else-if="trendData.length > 0 && chartData" :class="['h-48', { 'cursor-crosshair': interactive }]"><Line :data="chartData" :options="lineOptions" /></div>
     <div v-else class="flex h-48 items-center justify-center text-xs text-gray-400">{{ t('admin.dashboard.noDataAvailable') }}</div>
   </div>
 </template>
@@ -51,19 +51,33 @@ const props = defineProps<{
   trendData: TrendDataPoint[]
   loading?: boolean
   title?: string
+  interactive?: boolean
 }>()
+const emit = defineEmits<{ pointSelect: [point: TrendDataPoint] }>()
 
 const isDarkMode = ref(document.documentElement.classList.contains('dark'))
 useMutationObserver(document.documentElement, () => { isDarkMode.value = document.documentElement.classList.contains('dark') }, { attributes: true, attributeFilter: ['class'] })
-const metric = ref<'tokens' | 'requests' | 'cost'>('tokens')
+const metric = ref<'tokens' | 'requests' | 'cost' | 'cache_hit_rate' | 'unit_cost'>('tokens')
 const chartMetrics = computed(() => [
   { value: 'tokens' as const, label: 'Token' },
   { value: 'requests' as const, label: t('admin.dashboard.requests') },
   { value: 'cost' as const, label: t('usage.cost') },
+  { value: 'cache_hit_rate' as const, label: t('usage.cacheHitRate') },
+  { value: 'unit_cost' as const, label: t('usage.unitCost') },
 ])
 const summaryValue = computed(() => {
   if (metric.value === 'requests') return props.trendData.reduce((sum, d) => sum + Number(d.requests || 0), 0).toLocaleString()
   if (metric.value === 'cost') return `$${props.trendData.reduce((sum, d) => sum + Number(d.actual_cost || 0), 0).toFixed(2)}`
+  if (metric.value === 'cache_hit_rate') {
+    const cacheRead = props.trendData.reduce((sum, d) => sum + Number(d.cache_read_tokens || 0), 0)
+    const promptTokens = props.trendData.reduce((sum, d) => sum + Number(d.input_tokens || 0) + Number(d.cache_read_tokens || 0) + Number(d.cache_creation_tokens || 0), 0)
+    return `${promptTokens > 0 ? ((cacheRead / promptTokens) * 100).toFixed(1) : '0.0'}%`
+  }
+  if (metric.value === 'unit_cost') {
+    const tokens = props.trendData.reduce((sum, d) => sum + Number(d.total_tokens || 0), 0)
+    const cost = props.trendData.reduce((sum, d) => sum + Number(d.actual_cost || 0), 0)
+    return `$${(tokens > 0 ? (cost / tokens) * 1_000_000 : 0).toFixed(2)}`
+  }
   return formatTokenMillions(props.trendData.reduce((sum, d) => sum + d.input_tokens + d.output_tokens + d.cache_creation_tokens + d.cache_read_tokens, 0))
 })
 
@@ -79,9 +93,22 @@ const chartColors = computed(() => ({
 
 const chartData = computed(() => {
   if (!props.trendData?.length) return null
-  if (metric.value !== 'tokens') return {
-    labels: props.trendData.map(d => d.date),
-    datasets: [{ label: metric.value === 'cost' ? t('usage.cost') : t('admin.dashboard.requests'), data: props.trendData.map(d => metric.value === 'cost' ? Number(d.actual_cost || 0) : Number(d.requests || 0)), borderColor: chartColors.value.input, backgroundColor: `${chartColors.value.input}16`, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .4, fill: true }]
+  if (metric.value !== 'tokens') {
+    const isRate = metric.value === 'cache_hit_rate'
+    const isUnitCost = metric.value === 'unit_cost'
+    const values = props.trendData.map((d) => {
+      const tokens = Number(d.total_tokens || 0)
+      const promptTokens = Number(d.input_tokens || 0) + Number(d.cache_read_tokens || 0) + Number(d.cache_creation_tokens || 0)
+      if (isRate) return promptTokens > 0 ? (Number(d.cache_read_tokens || 0) / promptTokens) * 100 : 0
+      if (isUnitCost) return tokens > 0 ? (Number(d.actual_cost || 0) / tokens) * 1_000_000 : 0
+      return metric.value === 'cost' ? Number(d.actual_cost || 0) : Number(d.requests || 0)
+    })
+    const label = isRate ? t('usage.cacheHitRate') : isUnitCost ? `${t('usage.unitCost')} (${t('usage.unitCostPerMillion')})` : metric.value === 'cost' ? t('usage.cost') : t('admin.dashboard.requests')
+    const color = isRate ? chartColors.value.cacheHitRate : chartColors.value.input
+    return {
+      labels: props.trendData.map(d => d.date),
+      datasets: [{ label, data: values, borderColor: color, backgroundColor: `${color}16`, borderWidth: 2, pointRadius: props.interactive ? 3 : 0, pointHoverRadius: 5, pointHitRadius: props.interactive ? 10 : 0, tension: .4, fill: true, ...(isRate ? { yAxisID: 'yPercent' } : {}) }]
+    }
   }
   return {
     labels: props.trendData.map((d) => d.date),
@@ -91,8 +118,9 @@ const chartData = computed(() => {
         data: props.trendData.map((d) => d.input_tokens),
         borderColor: chartColors.value.input,
         backgroundColor: `${chartColors.value.input}18`,
-        pointRadius: 0,
+        pointRadius: props.interactive ? 2 : 0,
         pointHoverRadius: 4,
+        pointHitRadius: props.interactive ? 10 : 0,
         fill: true,
         tension: 0.4
       },
@@ -101,8 +129,9 @@ const chartData = computed(() => {
         data: props.trendData.map((d) => d.output_tokens),
         borderColor: chartColors.value.output,
         backgroundColor: `${chartColors.value.output}16`,
-        pointRadius: 0,
+        pointRadius: props.interactive ? 2 : 0,
         pointHoverRadius: 4,
+        pointHitRadius: props.interactive ? 10 : 0,
         fill: true,
         tension: 0.4
       },
@@ -111,7 +140,8 @@ const chartData = computed(() => {
         data: props.trendData.map((d) => d.cache_creation_tokens),
         borderColor: chartColors.value.cacheCreation,
         backgroundColor: `${chartColors.value.cacheCreation}14`,
-        pointRadius: 0,
+        pointRadius: props.interactive ? 2 : 0,
+        pointHitRadius: props.interactive ? 10 : 0,
         fill: true,
         tension: 0.4
       },
@@ -120,7 +150,8 @@ const chartData = computed(() => {
         data: props.trendData.map((d) => d.cache_read_tokens),
         borderColor: chartColors.value.cacheRead,
         backgroundColor: `${chartColors.value.cacheRead}14`,
-        pointRadius: 0,
+        pointRadius: props.interactive ? 2 : 0,
+        pointHitRadius: props.interactive ? 10 : 0,
         fill: true,
         tension: 0.4
       },
@@ -132,7 +163,8 @@ const chartData = computed(() => {
         }),
         borderColor: chartColors.value.cacheHitRate,
         backgroundColor: `${chartColors.value.cacheHitRate}14`,
-        pointRadius: 0,
+        pointRadius: props.interactive ? 2 : 0,
+        pointHitRadius: props.interactive ? 10 : 0,
         borderDash: [5, 5],
         fill: false,
         tension: 0.4,
@@ -148,8 +180,13 @@ const lineOptions = computed(() => ({
   animation: { duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600 },
   elements: { line: { borderWidth: 2 } },
   interaction: {
-    intersect: false,
-    mode: 'index' as const
+    intersect: props.interactive ?? false,
+    mode: (props.interactive ? 'nearest' : 'index') as 'nearest' | 'index'
+  },
+  onClick: (_event: unknown, elements: { index: number }[]) => {
+    const index = elements[0]?.index
+    const point = index === undefined ? undefined : props.trendData[index]
+    if (props.interactive && point) emit('pointSelect', point)
   },
   plugins: {
     legend: {
@@ -172,7 +209,7 @@ const lineOptions = computed(() => ({
           if (context.dataset.yAxisID === 'yPercent') {
             return `${context.dataset.label}: ${context.raw.toFixed(1)}%`
           }
-          return `${context.dataset.label}: ${metric.value === 'cost' ? '$' + Number(context.raw).toFixed(4) : metric.value === 'requests' ? Number(context.raw).toLocaleString() : formatTokens(context.raw)}`
+          return `${context.dataset.label}: ${metric.value === 'cost' ? '$' + Number(context.raw).toFixed(4) : metric.value === 'requests' ? Number(context.raw).toLocaleString() : metric.value === 'cache_hit_rate' ? `${Number(context.raw).toFixed(1)}%` : metric.value === 'unit_cost' ? '$' + Number(context.raw).toFixed(4) : formatTokens(context.raw)}`
         },
         footer: (tooltipItems: any) => {
           const dataIndex = tooltipItems[0]?.dataIndex
@@ -208,11 +245,11 @@ const lineOptions = computed(() => ({
         font: {
           size: 10
         },
-        callback: (value: string | number) => metric.value === 'cost' ? '$' + Number(value).toFixed(2) : metric.value === 'requests' ? Number(value).toLocaleString() : formatTokens(Number(value))
+        callback: (value: string | number) => metric.value === 'cost' || metric.value === 'unit_cost' ? '$' + Number(value).toFixed(2) : metric.value === 'requests' ? Number(value).toLocaleString() : metric.value === 'cache_hit_rate' ? `${value}%` : formatTokens(Number(value))
       }
     },
     yPercent: {
-      display: metric.value === 'tokens',
+      display: metric.value === 'tokens' || metric.value === 'cache_hit_rate',
       position: 'right' as const,
       min: 0,
       max: 100,

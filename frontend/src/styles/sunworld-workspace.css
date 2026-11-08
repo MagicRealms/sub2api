@@ -6,15 +6,24 @@ body{background:var(--sw-bg)!important;color:var(--sw-ink)}
 .sunworld-ambient-grid{display:none}
 .sunworld-ambient-sun{top:-25%;right:10%;width:85vw;height:85vh;background:radial-gradient(ellipse at 75% 25%,#f8dfb938,transparent 48%),radial-gradient(ellipse at 25% 35%,#c2dcf363,transparent 55%);filter:blur(45px)}
 .dark .sunworld-ambient-sun{background:radial-gradient(ellipse at 75% 25%,#7567c21a,transparent 48%),radial-gradient(ellipse at 25% 35%,#3c79ba25,transparent 55%)}
-.sunworld-main{max-width:1800px;margin:0 auto;padding-top:1.5rem}
+.sunworld-main{position:relative;z-index:0;max-width:1800px;margin:0 auto;padding-top:1.5rem}
 .sw-content{min-width:0}
-.sunworld-header{height:74px;border:0!important;border-bottom:1px solid var(--sw-line)!important;background:var(--sw-bg)!important;box-shadow:0 3px 16px #25365008!important;backdrop-filter:none!important}
-.sunworld-header>div{height:74px}
+.sunworld-header{height:64px;border:0!important;border-bottom:1px solid var(--sw-line)!important;background:var(--sw-solid)!important;box-shadow:0 2px 14px #2536500b!important;backdrop-filter:none!important}
+.sunworld-header>div{height:64px}
+.sunworld-header-icon-button{border:1px solid transparent;color:var(--sw-muted)!important}
+.sunworld-header-icon-button:hover{border-color:var(--sw-line);background:#37b49c0c;color:#238f7d!important}
+.dark .sunworld-header-icon-button:hover{color:#8fddca!important}
 .sw-breadcrumb{display:flex;align-items:center;gap:.65rem;color:var(--sw-muted);font-size:12px}
 .sw-breadcrumb svg{width:18px;height:18px;color:var(--sw-mint)}
 .sw-breadcrumb strong{font-size:13px;font-weight:600;color:var(--sw-ink)}
 .sunworld-live-pill{border:1px solid var(--sw-line)!important;background:var(--sw-surface)!important;color:var(--sw-ink)!important;box-shadow:var(--sw-shadow);letter-spacing:0}
 .sunworld-live-dot{width:5px;height:5px;background:var(--sw-mint);box-shadow:0 0 0 3px #37b49c16}
+.sunworld-community-button{display:inline-flex;height:34px;align-items:center;justify-content:center;gap:7px;padding:0 10px;border:1px solid #37b49c38;border-radius:10px;background:#37b49c0a;color:var(--sw-ink);font-size:11px;font-weight:600;white-space:nowrap;transition:background .18s,border-color .18s,color .18s}
+.sunworld-community-button:hover{border-color:#37b49c55;background:#37b49c0c;color:#238f7d}
+.dark .sunworld-community-button:hover{color:#8fddca}
+.sunworld-community-button>svg:first-child{color:var(--sw-mint)}
+.sunworld-community-button .community-arrow{color:var(--sw-muted)}
+@media(max-width:560px){.sunworld-community-button{width:34px;padding:0}.sunworld-community-button>span,.sunworld-community-button .community-arrow{display:none}}
 .console-sun-mark{display:none!important}
 .sidebar{background:var(--sw-surface)!important;border:1px solid var(--sw-line)!important;box-shadow:var(--sw-shadow)!important;backdrop-filter:blur(20px)}
 .sidebar-header{height:90px!important;padding:22px 18px!important;gap:10px!important}

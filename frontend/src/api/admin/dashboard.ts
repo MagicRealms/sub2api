@@ -147,6 +147,7 @@ export interface DashboardSnapshotV2Response {
   start_date: string
   end_date: string
   granularity: string
+  timezone?: string
   stats?: DashboardSnapshotV2Stats
   trend?: TrendDataPoint[]
   models?: ModelStat[]

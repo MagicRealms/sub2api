@@ -113,6 +113,7 @@ export interface UsageDashboardSnapshotV2Response {
   start_date: string
   end_date: string
   granularity: string
+  timezone?: string
   trend?: TrendDataPoint[]
   models?: ModelStat[]
   groups?: GroupStat[]

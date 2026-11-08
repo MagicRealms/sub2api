@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -159,27 +160,13 @@ func (h *UsageHandler) List(c *gin.Context) {
 		upstreamModelMismatch = &value
 	}
 
-	// Parse date range
-	var startTime, endTime *time.Time
-	userTZ := c.Query("timezone") // Get user's timezone from request
-	if startDateStr := c.Query("start_date"); startDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
-			return
-		}
-		startTime = &t
-	}
-
-	if endDateStr := c.Query("end_date"); endDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
-			return
-		}
-		// Use half-open range [start, end), move to next calendar day start (DST-safe).
-		t = t.AddDate(0, 0, 1)
-		endTime = &t
+	startTime, endTime, rangeErr := parseUsageListTimeRange(
+		c.Query("start_date"), c.Query("end_date"),
+		c.Query("start_time"), c.Query("end_time"), c.Query("timezone"),
+	)
+	if rangeErr != nil {
+		response.BadRequest(c, rangeErr.Error())
+		return
 	}
 
 	params := pagination.PaginationParams{
@@ -214,6 +201,45 @@ func (h *UsageHandler) List(c *gin.Context) {
 	}
 
 	response.Paginated(c, adminUsageLogResponses(c, records), result.Total, page, pageSize)
+}
+
+func parseUsageListTimeRange(startDateStr, endDateStr, startTimeStr, endTimeStr, userTZ string) (*time.Time, *time.Time, error) {
+	if strings.TrimSpace(startTimeStr) != "" || strings.TrimSpace(endTimeStr) != "" {
+		if strings.TrimSpace(startDateStr) != "" || strings.TrimSpace(endDateStr) != "" {
+			return nil, nil, fmt.Errorf("use either start_time/end_time or start_date/end_date")
+		}
+		if strings.TrimSpace(startTimeStr) == "" || strings.TrimSpace(endTimeStr) == "" {
+			return nil, nil, fmt.Errorf("both start_time and end_time are required")
+		}
+		start, err := time.Parse(time.RFC3339Nano, startTimeStr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid start_time format, use RFC3339")
+		}
+		end, err := time.Parse(time.RFC3339Nano, endTimeStr)
+		if err != nil || !end.After(start) {
+			return nil, nil, fmt.Errorf("invalid end_time: it must be RFC3339 and later than start_time")
+		}
+		return &start, &end, nil
+	}
+
+	var startTime, endTime *time.Time
+	if startDateStr != "" {
+		parsed, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid start_date format, use YYYY-MM-DD")
+		}
+		startTime = &parsed
+	}
+	if endDateStr != "" {
+		parsed, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid end_date format, use YYYY-MM-DD")
+		}
+		// Use half-open range [start, end), move to next calendar day start (DST-safe).
+		parsed = parsed.AddDate(0, 0, 1)
+		endTime = &parsed
+	}
+	return startTime, endTime, nil
 }
 
 // Stats handles getting usage statistics with filters
