@@ -20,7 +20,7 @@
         <a
           v-if="contactLink"
           :href="contactLink"
-          target="_blank"
+          :target="contactLink.startsWith('http') ? '_blank' : '_self'"
           rel="noopener noreferrer"
           class="sunworld-community-button"
           :title="contactLabel"
@@ -242,7 +242,8 @@ const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const contactLink = computed(() => {
-  return parseCommunityContact(contactInfo.value).url
+  const contact = parseCommunityContact(contactInfo.value)
+  return contact.url || (contact.number ? `mqqapi://card/show_pslcard?src_type=internal&version=1&card_type=group&uin=${contact.number}` : '')
 })
 const contactLabel = computed(() => {
   const group = parseCommunityContact(contactInfo.value).number

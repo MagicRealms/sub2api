@@ -72,6 +72,9 @@
       <p v-if="modelEntries.length" class="text-xs text-gray-500 dark:text-dark-400" data-test="plaza-result-count">
         {{ t('modelPlaza.cards.showingModels', { count: modelEntries.length }) }}
       </p>
+      <div class="sw-model-kinds" role="group" :aria-label="t('modelPlaza.filters.capability')">
+        <button v-for="kind in modelKinds" :key="kind.value" type="button" :class="{ 'is-active': selectedKind === kind.value }" :aria-pressed="selectedKind === kind.value" :data-kind="kind.value" @click="selectedKind = kind.value">{{ kind.label }}<span>{{ kind.count }}</span></button>
+      </div>
       <div v-if="modelEntries.length > 0" class="sunworld-model-grid grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <PlazaModelCard v-for="entry in modelEntries" :key="entry.key" :entry="entry" @open="detail = $event" />
       </div>
@@ -98,7 +101,7 @@ import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlazaFilterBar from './PlazaFilterBar.vue'
 import PlazaModelCard from './PlazaModelCard.vue'
 import PlazaGroupSection from './PlazaGroupSection.vue'
-import { modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
+import { modelKind, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
 import type { ModelPlazaGroup, ModelPlazaResponse } from '@/api/modelPlaza'
 import { useAuthStore } from '@/stores/auth'
 
@@ -121,6 +124,11 @@ const selectedPlatform = ref<string>('all')
 const selectedGroupId = ref<number | 'all'>('all')
 const selectedRate = ref<number | 'all'>('all')
 const selectedMode = ref<'all' | 'token' | 'image' | 'video' | 'per_request'>('all')
+const selectedKind = ref<'all' | 'chat' | 'image' | 'audio' | 'video'>('all')
+const modelKinds = computed(() => (['all', 'chat', 'image', 'audio', 'video'] as const).map(value => ({
+  value, label: t(`modelPlaza.kinds.${value}`),
+  count: new Set(filteredGroups.value.flatMap(g => g.models.filter(m => value === 'all' || modelKind(m) === value).map(m => `${m.platform}:${m.name}`))).size,
+})))
 const searchQuery = ref('')
 const detail = ref<PlazaModelVariant | null>(null)
 const detailGroup = computed(() => {
@@ -145,7 +153,7 @@ function effectiveRate(g: ModelPlazaGroup): number {
 }
 
 const platforms = computed(() =>
-  [...new Set((props.response?.groups ?? []).map((g) => g.platform).filter(Boolean))].sort()
+  [...new Set((props.response?.groups ?? []).flatMap(g => g.models.map(m => m.platform)).filter(Boolean))].sort()
 )
 
 const groupOptions = computed(() =>
@@ -153,6 +161,7 @@ const groupOptions = computed(() =>
     id: g.id,
     name: g.name,
     platform: g.platform,
+    platforms: [...new Set(g.models.map(m => m.platform))],
     rate: effectiveRate(g)
   }))
 )
@@ -168,11 +177,15 @@ watch(rates, (list) => {
     selectedRate.value = 'all'
   }
 })
+watch(() => props.response, () => {
+  if (selectedGroupId.value !== 'all' && !props.response?.groups.some(g => g.id === selectedGroupId.value)) selectedGroupId.value = 'all'
+  if (selectedPlatform.value !== 'all' && !platforms.value.includes(selectedPlatform.value)) selectedPlatform.value = 'all'
+})
 
 const filteredGroups = computed(() => {
   let groups = props.response?.groups ?? []
   if (selectedPlatform.value !== 'all') {
-    groups = groups.filter((g) => g.platform === selectedPlatform.value)
+    groups = groups.map(g => ({ ...g, models: g.models.filter(m => m.platform === selectedPlatform.value) })).filter(g => g.models.length > 0)
   }
   if (selectedGroupId.value !== 'all') {
     groups = groups.filter((g) => g.id === selectedGroupId.value)
@@ -213,6 +226,7 @@ const modelEntries = computed(() => {
   const entries = new Map<string, PlazaModelEntry>()
   for (const group of filteredGroups.value) {
     for (const model of group.models) {
+      if (selectedKind.value !== 'all' && modelKind(model) !== selectedKind.value) continue
       const key = `${model.platform}:${model.name}`
       let entry = entries.get(key)
       if (!entry) {

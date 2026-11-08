@@ -14,6 +14,14 @@ export interface PlazaModelEntry {
   variants: PlazaModelVariant[]
 }
 
+/** Model capability is independent of billing: image models may bill by token. */
+export function modelKind(model: Pick<PlazaModel, 'name' | 'pricing'>): 'chat' | 'image' | 'audio' | 'video' {
+  if (model.pricing?.billing_mode === BILLING_MODE_VIDEO || /(?:^|[-_/])(video|sora|veo|kling|wan)(?:[-_/.]|$)/i.test(model.name)) return 'video'
+  if (model.pricing?.billing_mode === BILLING_MODE_IMAGE || /image|dall-e|imagine|imagen|flux/i.test(model.name)) return 'image'
+  if (/audio|realtime|whisper|(?:^|[-_/])(tts|stt)(?:[-_/.]|$)/i.test(model.name)) return 'audio'
+  return 'chat'
+}
+
 export function modelRate({ group, model }: PlazaModelVariant): number {
   if (model.pricing?.billing_mode === BILLING_MODE_IMAGE && group.image_rate_independent) {
     return group.image_rate_multiplier ?? 1

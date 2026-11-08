@@ -18,6 +18,8 @@
       </button>
     </div>
 
+    <div class="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-gray-500 dark:text-dark-400"><span class="sw-model-kind-badge">{{ t(`modelPlaza.kinds.${modelKind(variant.model)}`) }}</span><span>{{ entry.variants.length }} {{ t('modelPlaza.cards.availableGroups') }}</span></div>
+
     <div class="mt-5 border-t border-[#e9f1ee] pt-4 dark:border-dark-700">
       <label :for="selectId" class="mb-2 flex items-center justify-between gap-2 text-[11px] text-gray-500 dark:text-dark-400">
         <span>{{ t('modelPlaza.cards.availableGroups') }}</span>
@@ -63,7 +65,7 @@ import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN } from '@/constants/channel'
 import { formatScaled } from '@/utils/pricing'
 import { platformAccentColor, platformLabel } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
-import { baseTokenPrices, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
+import { baseTokenPrices, modelKind, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
 
 const props = defineProps<{ entry: PlazaModelEntry }>()
 const emit = defineEmits<{ open: [variant: PlazaModelVariant] }>()

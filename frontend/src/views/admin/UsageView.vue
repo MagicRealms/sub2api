@@ -64,14 +64,14 @@
             :end-date="endDate"
             :filters="breakdownFilters"
           />
+        </div>
           <TokenUsageTrend
             :trend-data="trendData"
             :loading="chartsLoading"
-            :title="t('admin.dashboard.modelCallAnalysis')"
+            :title="t('usage.performanceTrends')"
             interactive
             @point-select="openTrendPoint"
           />
-        </div>
       </div>
       <!-- 明细区：tab 栏 + 筛选 + 内容收进同一张卡片，消除割裂感 -->
       <div v-if="!analysisMode" class="card sw-log-card">

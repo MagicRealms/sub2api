@@ -1,10 +1,10 @@
 <template>
-  <div class="relative">
+  <div class="relative min-w-0">
     <!-- Admin: Full version badge with dropdown -->
     <template v-if="isAdmin">
       <button
         @click="toggleDropdown"
-        class="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
+        class="flex max-w-full items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
         :class="[
           hasUpdate
             ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'
@@ -12,7 +12,7 @@
         ]"
         :title="versionWarning ? t('version.checkFailed') : hasUpdate ? t(isReleaseBuild ? 'version.updateAvailable' : 'version.upstreamUpdateAvailable') : t('version.upToDate')"
       >
-        <span v-if="currentVersion" class="font-medium">v{{ currentVersion }}</span>
+        <span v-if="currentVersion" class="truncate font-medium" :title="`v${currentVersion}`">v{{ currentVersion }}</span>
         <span
           v-else
           class="h-3 w-12 animate-pulse rounded bg-gray-200 font-medium dark:bg-dark-600"

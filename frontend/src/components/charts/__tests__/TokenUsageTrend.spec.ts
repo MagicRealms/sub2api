@@ -26,6 +26,15 @@ vi.mock('vue-chartjs', () => ({
 }))
 
 describe('TokenUsageTrend', () => {
+  it('exposes weighted cache rate and unit cost by default and lets summaries switch the chart', async () => {
+    const wrapper = mount(TokenUsageTrend, { props: { interactive: true, trendData: [
+      { date:'2026-11-08', requests:1, input_tokens:500, output_tokens:100, cache_read_tokens:1500, cache_creation_tokens:0, total_tokens:2100, cost:5, actual_cost:2.5 },
+    ] } })
+    expect(wrapper.get('.sw-trend-overview').text()).toContain('75.0%')
+    expect(wrapper.get('.sw-trend-overview').text()).toContain('$1190.48')
+    await wrapper.findAll('.sw-trend-overview button')[0].trigger('click')
+    expect(JSON.parse(wrapper.get('.chart-data').text()).datasets[0].data).toEqual([75])
+  })
   it('switches between request counts and actual charges using the same data', async () => {
     const wrapper = mount(TokenUsageTrend, { props: { trendData: [
       { date: '2026-11-08', requests: 12, input_tokens: 100, output_tokens: 20, cache_read_tokens: 40, cache_creation_tokens: 0, total_tokens: 160, cost: 5, actual_cost: 2.5 }

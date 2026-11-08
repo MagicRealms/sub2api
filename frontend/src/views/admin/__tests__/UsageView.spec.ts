@@ -180,6 +180,12 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
 })
 
 describe('admin UsageView route filters', () => {
+  it('renders the interactive trend chart on the records route', async () => {
+    const wrapper = mountRouteFilteredUsageView()
+    await flushPromises()
+    expect(wrapper.find('token-usage-trend-stub').exists()).toBe(true)
+    wrapper.unmount()
+  })
   beforeEach(() => {
   routeMeta.usageAnalytics = false
     vi.useFakeTimers()

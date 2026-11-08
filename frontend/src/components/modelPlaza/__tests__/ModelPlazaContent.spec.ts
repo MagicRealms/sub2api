@@ -43,6 +43,26 @@ function render(groups: ModelPlazaGroup[], description = '') {
 }
 
 describe('Model Plaza cards and filters', () => {
+  it('filters concrete models inside composite groups and resets a removed group', async () => {
+    const wrapper = render([group(1, { platform: 'composite', models: [model('gpt-6.1-sol'), { ...model('claude-opus-5-5'), platform: 'anthropic' }] })])
+    const anthropic = wrapper.findAll('button').find(b => b.text() === 'Claude') ?? wrapper.findAll('button').find(b => b.text() === 'Anthropic')
+    expect(anthropic).toBeDefined()
+    await anthropic!.trigger('click')
+    expect(wrapper.findAll('[data-test="plaza-model-card"]')).toHaveLength(1)
+    expect(wrapper.find('[data-test="plaza-model-card"]').attributes('data-model')).toBe('claude-opus-5-5')
+    await wrapper.find('select[aria-label="modelPlaza.filters.groupLabel"]').setValue('1')
+    await wrapper.setProps({ response: { groups: [group(2)], description: '' } })
+    expect(wrapper.findAll('[data-test="plaza-model-card"]')).toHaveLength(2)
+  })
+
+  it('finds image capability even when the model is billed by token', async () => {
+    const wrapper = render([group(1, { models: [model('gpt-6.1-sol'), model('gpt-image-2.6'), model('gpt-4o-realtime-preview')] })])
+    await wrapper.get('[data-kind="image"]').trigger('click')
+    expect(wrapper.findAll('[data-test="plaza-model-card"]')).toHaveLength(1)
+    expect(wrapper.get('[data-test="plaza-model-card"]').attributes('data-model')).toBe('gpt-image-2.6')
+    await wrapper.get('[data-kind="audio"]').trigger('click')
+    expect(wrapper.get('[data-test="plaza-model-card"]').attributes('data-model')).toBe('gpt-4o-realtime-preview')
+  })
   it('shows each model once, switches groups and opens only that model with selected prices', async () => {
     const wrapper = render([group(1), group(2, { rate_multiplier: 0.25, models: [model('gpt-6.1-sol', { input_price: 0.000004 })] })])
     const cards = wrapper.findAll('[data-test="plaza-model-card"]')

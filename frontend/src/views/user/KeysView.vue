@@ -11,23 +11,8 @@
         </div>
       </section>
     <TablePageLayout>
-      <template #filters>
-        <div class="flex flex-col gap-3">
-          <div class="flex flex-wrap items-center gap-3">
-            <Select
-              :model-value="filterGroupId"
-              class="w-40"
-              :options="groupFilterOptions"
-              @update:model-value="onGroupFilterChange"
-            />
-            <Select
-              :model-value="filterStatus"
-              class="w-40"
-              :options="statusFilterOptions"
-              @update:model-value="onStatusFilterChange"
-            />
-          </div>
-          <div v-if="selectedIds.length" class="flex flex-wrap items-center gap-3 text-sm">
+      <template #filters v-if="selectedIds.length">
+          <div class="flex flex-wrap items-center gap-3 text-sm">
             <span class="text-gray-600 dark:text-gray-300">
               {{ t('keys.bulkEdit.selectedCount', { count: selectedIds.length }) }}
             </span>
@@ -43,18 +28,19 @@
               {{ t('keys.bulkEdit.clearSelection') }}
             </button>
           </div>
-        </div>
       </template>
 
       <template #actions>
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="sw-key-toolbar" data-testid="key-toolbar">
           <SearchInput
             v-model="filterSearch"
             :placeholder="t('keys.searchPlaceholder')"
-            class="w-full sm:w-64"
+            class="sw-key-search"
             @search="onFilterChange"
           />
-          <div class="flex flex-wrap justify-end gap-3">
+          <Select :model-value="filterGroupId" class="sw-key-filter" :options="groupFilterOptions" @update:model-value="onGroupFilterChange" />
+          <Select :model-value="filterStatus" class="sw-key-filter" :options="statusFilterOptions" @update:model-value="onStatusFilterChange" />
+          <div class="sw-key-toolbar-actions">
           <button
             @click="loadApiKeys"
             :disabled="loading"
@@ -1666,6 +1652,7 @@ const handlePageSizeChange = (pageSize: number) => {
 }
 
 const handleSort = (key: string, order: 'asc' | 'desc') => {
+  if (sortState.value.sort_by === key && sortState.value.sort_order === order) return
   selectedIds.value = []
   sortState.value.sort_by = key
   sortState.value.sort_order = order
@@ -2079,7 +2066,7 @@ function formatResetTime(resetAt: string | null): string {
 
 onMounted(() => {
   loadSavedColumns()
-  loadApiKeys()
+  if (!abortController) void loadApiKeys()
   loadGroups()
   loadUserGroupRates()
   loadPublicSettings()

@@ -68,8 +68,8 @@
             :start-date="startDate"
             :end-date="endDate"
           />
-          <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" interactive @point-select="openTrendPoint" />
         </div>
+        <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" :title="t('usage.performanceTrends')" interactive @point-select="openTrendPoint" />
       </div>
 
       <div v-if="!analysisMode" class="card sw-record-filters p-5">

@@ -391,6 +391,8 @@ export default {
     apiKeyFilter: 'API Key',
     allApiKeys: 'All API Keys',
     unitCost: 'Unit cost',
+    performanceTrends: 'Cache, Cost and Usage Trends',
+    cacheHitRateBasis: 'Cached input / total input tokens',
     unitCostPerMillion: '$ / 1M tokens',
     chartPointHint: 'Select a point to inspect its requests',
     pointRequests: 'Requests in this interval',
@@ -687,6 +689,7 @@ export default {
 
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
+    kinds: { all: 'All models', chat: 'Chat & reasoning', image: 'Image generation', audio: 'Audio & realtime', video: 'Video generation' },
     title: 'Model Plaza',
     description: 'Explore models and compare prices across groups',
     loading: 'Loading...',
@@ -731,6 +734,7 @@ export default {
       modelLabel: 'Model',
       searchPlaceholder: 'Search models',
       modeLabel: 'Billing type',
+      capability: 'Model capability',
       allTypes: 'All billing types',
       token: 'Token',
       image: 'Image',

@@ -61,7 +61,7 @@ const props = defineProps<{
   /** 数据中出现的平台(去重排序后)。 */
   platforms: string[]
   /** 全量分组(含平台与生效倍率),三个维度的置灰联动由此推导。 */
-  groups: Array<{ id: number; name: string; platform: string; rate: number }>
+  groups: Array<{ id: number; name: string; platform: string; platforms?: string[]; rate: number }>
   /** 全量生效倍率去重升序。 */
   rates: number[]
   platform: string
@@ -89,15 +89,15 @@ const { t } = useI18n()
 function platformEnabled(p: string): boolean {
   return props.groups.some(
     (g) =>
-      g.platform === p &&
+      (g.platforms ?? [g.platform]).includes(p) &&
       (props.groupId === 'all' || g.id === props.groupId) &&
       (props.rate === 'all' || g.rate === props.rate)
   )
 }
 
-function groupEnabled(g: { platform: string; rate: number }): boolean {
+function groupEnabled(g: { platform: string; platforms?: string[]; rate: number }): boolean {
   return (
-    (props.platform === 'all' || g.platform === props.platform) &&
+    (props.platform === 'all' || (g.platforms ?? [g.platform]).includes(props.platform)) &&
     (props.rate === 'all' || g.rate === props.rate)
   )
 }
@@ -106,7 +106,7 @@ function rateEnabled(r: number): boolean {
   return props.groups.some(
     (g) =>
       g.rate === r &&
-      (props.platform === 'all' || g.platform === props.platform) &&
+      (props.platform === 'all' || (g.platforms ?? [g.platform]).includes(props.platform)) &&
       (props.groupId === 'all' || g.id === props.groupId)
   )
 }

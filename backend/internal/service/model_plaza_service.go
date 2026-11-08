@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 // PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
@@ -34,8 +36,8 @@ type PlazaModel struct {
 // PlazaGroup 模型广场中以分组为顶层的条目。
 //
 // 与 AvailableGroupRef 相比多了 Description 与 Models；Models 来自该分组关联渠道的
-// 支持模型（普通分组按分组平台隔离，Composite 分组展开关联渠道已配置的
-// 具体平台），与「可用渠道」页口径一致。
+// 支持模型及当前账号映射（普通分组按分组平台隔离，Composite 分组展开
+// 具体平台），并遵守分组模型白名单。
 type PlazaGroup struct {
 	ID                 int64
 	Name               string
@@ -63,7 +65,7 @@ type PlazaGroup struct {
 
 // ModelPlazaService 聚合模型广场数据。
 //
-// 模型枚举来自渠道配置；token 模型的展示单价与阶梯由 BillingService 的阶梯表
+// 模型枚举结合渠道配置与当前启用账号的模型映射；token 模型的展示单价与阶梯由 BillingService 的阶梯表
 // 查询给出（与扣费走同一条解析链与计费函数），图片/按次模型沿用渠道/分组档位价。
 type ModelPlazaService struct {
 	channelRepo    ChannelRepository
@@ -71,6 +73,7 @@ type ModelPlazaService struct {
 	pricingService *PricingService
 	billingService *BillingService
 	resolver       *ModelPricingResolver
+	accountRepo    AccountRepository
 }
 
 // NewModelPlazaService 创建模型广场服务。
@@ -80,6 +83,7 @@ func NewModelPlazaService(
 	pricingService *PricingService,
 	billingService *BillingService,
 	resolver *ModelPricingResolver,
+	accountRepo AccountRepository,
 ) *ModelPlazaService {
 	return &ModelPlazaService{
 		channelRepo:    channelRepo,
@@ -87,13 +91,13 @@ func NewModelPlazaService(
 		pricingService: pricingService,
 		billingService: billingService,
 		resolver:       resolver,
+		accountRepo:    accountRepo,
 	}
 }
 
 // ListGroups 返回模型广场数据：每个活跃分组附带其可用模型与定价。
 //
-// 模型枚举口径与 ListAvailable 一致（Active 渠道、SupportedModels ∪ 全局定价回落、
-// 平台隔离），仅把顶层从渠道换成分组：
+// 模型枚举来自 Active 渠道及启用账号，按平台与分组权限隔离：
 //   - 渠道按 lower(name) 排序后遍历，保证同名模型去重结果确定；
 //   - 同分组同名模型「先见者胜」，仅当已存条目无定价而新条目有定价时升级替换；
 //   - token 模型的单价与阶梯按实收口径合成（见 ResolveContextPricingSchedule），
@@ -202,6 +206,73 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 		}
 	}
 
+	// Channels are optional pricing/routing configuration. The current account
+	// mappings must also contribute models, otherwise newly added platforms and
+	// groups disappear from the catalog until a separate channel is created.
+	if s.accountRepo != nil {
+		accounts, err := s.accountRepo.ListModelAvailabilityCandidates(ctx, nil, domain.ConcretePlatformIDs(), true)
+		if err != nil {
+			return nil, fmt.Errorf("list catalog accounts: %w", err)
+		}
+		byPool := make(map[int64][]Account)
+		for _, account := range accounts {
+			for _, gid := range account.GroupIDs {
+				if _, ok := byGroup[gid]; ok {
+					byPool[gid] = append(byPool[gid], account)
+				}
+			}
+		}
+		for gid, pool := range byPool {
+			pg, g := byGroup[gid], groupEnt[gid]
+			candidates := make(map[modelKey]PlazaModel)
+			for _, model := range pg.Models {
+				candidates[modelKey{model.Platform, model.Name}] = model
+			}
+			for i := range pool {
+				account := &pool[i]
+				if pg.Platform != PlatformComposite && account.Platform != pg.Platform && !mixedListingAccountAllowed(pg.Platform, account) {
+					continue
+				}
+				for name := range account.GetModelMapping() {
+					name = strings.TrimSpace(name)
+					if name == "" || strings.Contains(name, "*") {
+						continue
+					}
+					platform := account.Platform
+					if pg.Platform != PlatformComposite && platform != pg.Platform {
+						if !mixedListingModelAllowed(pg.Platform, name) {
+							continue
+						}
+						platform = pg.Platform
+					}
+					key := modelKey{platform, name}
+					if _, exists := candidates[key]; !exists {
+						candidates[key] = PlazaModel{Name: name, Platform: platform}
+					}
+				}
+			}
+			pg.Models = nil
+			for key, model := range candidates {
+				if !g.ModelAllowlist.Allows(key.name) {
+					continue
+				}
+				if strings.HasPrefix(key.name, codexAutoModelPrefix) && !plazaExplicitModelAllowed(g, key.name) {
+					continue
+				}
+				for i := range pool {
+					account := &pool[i]
+					if account.Platform != key.platform && !(mixedListingAccountAllowed(key.platform, account) && mixedListingModelAllowed(key.platform, key.name)) {
+						continue
+					}
+					if account.IsModelSupported(key.name) {
+						pg.Models = append(pg.Models, model)
+						break
+					}
+				}
+			}
+		}
+	}
+
 	officialMemo := make(map[string]*PlazaOfficialPricing)
 	out := make([]PlazaGroup, 0, len(order))
 	for _, gid := range order {
@@ -232,6 +303,18 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	return out, nil
 }
 
+func plazaExplicitModelAllowed(group *Group, name string) bool {
+	if !group.ModelAllowlistEnabled() {
+		return false
+	}
+	for _, configured := range group.ModelAllowlist.Models {
+		if configured == name {
+			return true
+		}
+	}
+	return false
+}
+
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
 // 图片/按次模型（或阶梯表不可用时）沿用渠道定价与分组图片档位价。
@@ -240,7 +323,7 @@ func (s *ModelPlazaService) fillDisplayPricing(ctx context.Context, m *PlazaMode
 		m.Pricing = groupPricing
 		// 分组模型级固定价就是实收价，不能再被分组图片兜底档位覆盖。
 		// 否则模型广场会显示 image_price_1k/2k/4k，而实际按 model_pricing 扣费。
-		if groupPricing.BillingMode == BillingModeImage || groupPricing.BillingMode == BillingModePerRequest {
+		if groupPricing.BillingMode != "" && groupPricing.BillingMode != BillingModeToken {
 			return
 		}
 	}

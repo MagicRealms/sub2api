@@ -396,6 +396,8 @@ export default {
     apiKeyFilter: 'API 密钥',
     allApiKeys: '全部密钥',
     unitCost: '单位成本',
+    performanceTrends: '缓存、成本与用量趋势',
+    cacheHitRateBasis: '缓存读取 Token / 总输入 Token',
     unitCostPerMillion: '$ / 百万 Token',
     chartPointHint: '点击数据点查看对应请求',
     pointRequests: '此时间段请求',
@@ -692,6 +694,7 @@ export default {
 
   // Model Plaza (public group/model pricing showcase)
   modelPlaza: {
+    kinds: { all: '全部模型', chat: '对话与推理', image: '图像生成', audio: '音频与实时', video: '视频生成' },
     title: '模型广场',
     description: '浏览可用模型，切换分组比较价格',
     loading: '加载中...',
@@ -718,7 +721,7 @@ export default {
       perToken: '按量计费',
       basePrice: '基础价格 · 已含倍率',
       cachedInput: '缓存读取',
-      switchHint: '切换分组即可比较价格；调用时请使用对应分组的 API Key。',
+      switchHint: '切换分组比较价格；多分组 Key 按你设置的顺序路由。',
       variablePricing: '阶梯、时段或思考等级可能影响最终价格，详见价格明细。',
       openGroup: '查看 {name} 的模型与价格',
       usageNotes: '价格与使用说明',
@@ -736,10 +739,11 @@ export default {
       modelLabel: '模型',
       searchPlaceholder: '搜索模型名称',
       modeLabel: '计费类型',
+      capability: '模型能力',
       allTypes: '全部类型',
       token: 'Token',
-      image: '生图',
-      video: '视频',
+      image: '按图片计费',
+      video: '视频计费',
       perRequest: '按次',
       all: '全部'
     },

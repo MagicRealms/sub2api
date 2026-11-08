@@ -165,13 +165,21 @@ function mountUsageView() {
         ModelDistributionChart: chartStub,
         GroupDistributionChart: chartStub,
         EndpointDistributionChart: chartStub,
-        TokenUsageTrend: chartStub,
+        TokenUsageTrend: { name: 'TokenUsageTrend', props: { interactive: Boolean }, template: '<div data-test="trend-chart" />' },
       },
     },
   })
 }
 
 describe('user UsageView', () => {
+  it('renders the interactive trend chart directly on usage records', async () => {
+    const wrapper = mountUsageView()
+    await flushPromises()
+    const trend = wrapper.findComponent({ name: 'TokenUsageTrend' })
+    expect(trend.exists()).toBe(true)
+    expect(trend.props('interactive')).toBe(true)
+    wrapper.unmount()
+  })
   beforeEach(() => {
     query.mockReset()
     getStats.mockReset()

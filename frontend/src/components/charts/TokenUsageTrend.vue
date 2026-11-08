@@ -1,10 +1,15 @@
 <template>
-  <div class="sunworld-chart-card sw-chart-panel">
+  <div class="sunworld-chart-card sw-chart-panel" data-testid="usage-trends">
     <div class="sw-section-head flex flex-wrap">
       <h3><WorkspaceIcon name="analysis" />{{ title || t('admin.dashboard.tokenUsageTrend') }}</h3>
       <div class="sw-segmented" role="group" :aria-label="title || t('admin.dashboard.tokenUsageTrend')">
         <button v-for="item in chartMetrics" :key="item.value" type="button" :class="{ 'is-active': metric === item.value }" :aria-pressed="metric === item.value" @click="metric = item.value">{{ item.label }}</button>
       </div>
+    </div>
+    <div v-if="interactive" class="sw-trend-overview">
+      <button v-for="item in overviewMetrics" :key="item.metric" type="button" :class="{ 'is-active': metric === item.metric }" @click="metric = item.metric">
+        <span>{{ item.label }}</span><strong>{{ loading ? '—' : item.value }}</strong><small>{{ item.note }}</small>
+      </button>
     </div>
     <div class="mb-3 flex flex-wrap items-baseline gap-2"><strong class="sw-chart-total">{{ summaryValue }}</strong><span class="sw-chart-sub">{{ metric === 'unit_cost' ? t('usage.unitCostPerMillion') : metric === 'cache_hit_rate' ? t('usage.cacheHitRate') : t('usage.inSelectedRange') }}</span><span v-if="interactive" class="ml-auto text-xs text-gray-400">{{ t('usage.chartPointHint') }}</span></div>
     <div v-if="loading" class="flex h-48 items-center justify-center"><LoadingSpinner /></div>
@@ -64,6 +69,17 @@ const chartMetrics = computed(() => [
   { value: 'cost' as const, label: t('usage.cost') },
   { value: 'cache_hit_rate' as const, label: t('usage.cacheHitRate') },
   { value: 'unit_cost' as const, label: t('usage.unitCost') },
+])
+const totals = computed(() => props.trendData.reduce((sum, d) => ({
+  tokens: sum.tokens + Number(d.total_tokens ?? (d.input_tokens + d.output_tokens + d.cache_creation_tokens + d.cache_read_tokens)),
+  prompt: sum.prompt + Number(d.input_tokens || 0) + Number(d.cache_read_tokens || 0) + Number(d.cache_creation_tokens || 0),
+  cache: sum.cache + Number(d.cache_read_tokens || 0),
+  cost: sum.cost + Number(d.actual_cost || 0),
+}), { tokens: 0, prompt: 0, cache: 0, cost: 0 }))
+const overviewMetrics = computed(() => [
+  { metric: 'cache_hit_rate' as const, label: t('usage.cacheHitRate'), value: `${(totals.value.prompt > 0 ? totals.value.cache / totals.value.prompt * 100 : 0).toFixed(1)}%`, note: t('usage.cacheHitRateBasis') },
+  { metric: 'unit_cost' as const, label: t('usage.unitCost'), value: `$${(totals.value.tokens > 0 ? totals.value.cost / totals.value.tokens * 1_000_000 : 0).toFixed(2)}`, note: t('usage.unitCostPerMillion') },
+  { metric: 'tokens' as const, label: t('admin.dashboard.totalTokens'), value: formatTokenMillions(totals.value.tokens), note: t('usage.inSelectedRange') },
 ])
 const summaryValue = computed(() => {
   if (metric.value === 'requests') return props.trendData.reduce((sum, d) => sum + Number(d.requests || 0), 0).toLocaleString()
@@ -180,8 +196,8 @@ const lineOptions = computed(() => ({
   animation: { duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 600 },
   elements: { line: { borderWidth: 2 } },
   interaction: {
-    intersect: props.interactive ?? false,
-    mode: (props.interactive ? 'nearest' : 'index') as 'nearest' | 'index'
+    intersect: false,
+    mode: 'index' as const
   },
   onClick: (_event: unknown, elements: { index: number }[]) => {
     const index = elements[0]?.index

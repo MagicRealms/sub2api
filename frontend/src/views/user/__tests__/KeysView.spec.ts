@@ -272,6 +272,15 @@ const getButtonByText = (wrapper: VueWrapper, text: string) => {
 }
 
 describe('user KeysView column settings', () => {
+  it('keeps search, both filters and create actions together without reloading an identical sort', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.get('[data-testid="key-toolbar"]').findAll('.sw-key-filter')).toHaveLength(2)
+    const requests = listKeys.mock.calls.length
+    wrapper.findComponent({ name:'DataTable' }).vm.$emit('sort','created_at','desc')
+    await flushPromises()
+    expect(listKeys).toHaveBeenCalledTimes(requests)
+    wrapper.unmount()
+  })
   beforeEach(() => {
     authState.user.role = 'user'
     resetUsage.mockReset()
