@@ -348,25 +348,24 @@
               <span
                 v-if="getUserGroups(row).exclusive.length > 0"
                 class="group/ex relative inline-flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs"
-                @click.stop="toggleExpandedGroup(row.id)"
+                @click.stop="toggleExpandedGroup(row.id, $event)"
               >
                 <Icon name="shield" size="xs" class="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
                 <span class="font-medium text-purple-600 dark:text-purple-400">{{ getUserGroups(row).exclusive.length }}</span>
                 <span class="text-gray-500 dark:text-dark-400">{{ t('admin.users.exclusiveLabel') }}</span>
                 <!-- Hover tooltip（操作菜单未打开时显示） -->
-                <div
-                  v-if="expandedGroupUserId !== row.id"
-                  class="pointer-events-none absolute left-0 top-full z-50 mt-1.5 rounded bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover/ex:opacity-100 dark:bg-dark-600"
-                >
-                  <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
+                <HelpTooltip :disabled="expandedGroupUserId === row.id" :touch-trigger="false" width-class="w-64" class="!ml-0">
                   <div class="flex flex-col gap-0.5 whitespace-nowrap">
                     <span v-for="g in getUserGroups(row).exclusive" :key="g.id">{{ g.name }}</span>
                   </div>
-                </div>
+                </HelpTooltip>
                 <!-- 点击展开分组操作菜单 -->
-                <div
-                  v-if="expandedGroupUserId === row.id"
-                  class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-xs shadow-xl dark:border-dark-600 dark:bg-dark-700"
+                <FloatingPanel
+                  :open="expandedGroupUserId === row.id"
+                  :anchor="expandedGroupAnchor"
+                  :min-width="160"
+                  @close="expandedGroupUserId = null"
+                  class="rounded-lg border border-gray-200 bg-white py-1 text-xs shadow-xl dark:border-dark-600 dark:bg-dark-700"
                 >
                   <div class="border-b border-gray-100 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:border-dark-600 dark:text-dark-400">
                     {{ t('admin.users.clickToReplace') }}
@@ -380,23 +379,23 @@
                     <Icon name="swap" size="xs" class="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
                     <span class="flex-1">{{ g.name }}</span>
                   </div>
-                </div>
+                </FloatingPanel>
               </span>
               <!-- 公开分组行 -->
               <span
                 v-if="getUserGroups(row).publicGroups.length > 0"
                 class="group/pub relative inline-flex cursor-default items-center gap-1 whitespace-nowrap text-xs"
               >
-                <Icon name="globe" size="xs" class="h-3.5 w-3.5 text-gray-400 dark:text-dark-500" />
-                <span class="font-medium text-gray-600 dark:text-dark-300">{{ getUserGroups(row).publicGroups.length }}</span>
-                <span class="text-gray-400 dark:text-dark-500">{{ t('admin.users.publicLabel') }}</span>
-                <!-- Tooltip: 向下弹出 -->
-                <div class="pointer-events-none absolute left-0 top-full z-50 mt-1.5 rounded bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover/pub:opacity-100 dark:bg-dark-600">
-                  <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
-                  <div class="flex flex-col gap-0.5 whitespace-nowrap">
+                <HelpTooltip class="!ml-0 gap-1" width-class="w-72" :focusable="false" :touch-trigger="false">
+                  <template #trigger>
+                    <Icon name="globe" size="xs" class="h-3.5 w-3.5 text-gray-400 dark:text-dark-500" />
+                    <span class="font-medium text-gray-600 dark:text-dark-300">{{ getUserGroups(row).publicGroups.length }}</span>
+                    <span class="text-gray-400 dark:text-dark-500">{{ t('admin.users.publicLabel') }}</span>
+                  </template>
+                  <div class="flex flex-col gap-0.5 whitespace-normal break-words">
                     <span v-for="g in getUserGroups(row).publicGroups" :key="g.id">{{ g.name }}</span>
                   </div>
-                </div>
+                </HelpTooltip>
               </span>
               <!-- 都没有 -->
               <span
@@ -435,17 +434,17 @@
           <template #cell-balance="{ value, row }">
             <div class="flex items-center gap-2">
               <div class="group relative">
-                <button
-                  class="font-medium text-gray-900 underline decoration-dashed decoration-gray-300 underline-offset-4 transition-colors hover:text-primary-600 dark:text-white dark:decoration-dark-500 dark:hover:text-primary-400"
-                  @click="handleBalanceHistory(row)"
-                >
-                  ${{ value.toFixed(2) }}
-                </button>
-                <!-- Instant tooltip -->
-                <div class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover:opacity-100 dark:bg-dark-600">
+                <HelpTooltip class="!ml-0 gap-1" width-class="w-72" :focusable="false" :touch-trigger="false">
+                  <template #trigger>
+                    <button
+                      class="font-medium text-gray-900 underline decoration-dashed decoration-gray-300 underline-offset-4 transition-colors hover:text-primary-600 dark:text-white dark:decoration-dark-500 dark:hover:text-primary-400"
+                      @click="handleBalanceHistory(row)"
+                    >
+                      ${{ value.toFixed(2) }}
+                    </button>
+                  </template>
                   {{ t('admin.users.balanceHistoryTip') }}
-                  <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-dark-600"></div>
-                </div>
+                </HelpTooltip>
               </div>
               <button
                 @click.stop="handleDeposit(row)"
@@ -511,9 +510,8 @@
                   </svg>
                 </button>
                 <!-- 弹出菜单：今日 / 近30天，点击进行三态循环切换。 -->
-                <div
-                  v-if="openUsageSortMenu === usageKey"
-                  class="absolute right-0 top-full z-50 mt-1 min-w-[120px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                <FloatingPanel :open="!!(openUsageSortMenu === usageKey)" :min-width="120" align="end" :max-height="360" @close="openUsageSortMenu = null"
+                  class="min-w-[120px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
                 >
                   <button
                     v-for="metric in (['today', 'total'] as const)"
@@ -544,7 +542,7 @@
                   <div class="mt-1 border-t border-gray-100 px-3 py-1 text-[10px] normal-case tracking-normal text-gray-400 dark:border-dark-700 dark:text-dark-500">
                     {{ t('admin.users.sortCurrentPageOnly') }}
                   </div>
-                </div>
+                </FloatingPanel>
               </div>
             </div>
           </template>
@@ -801,6 +799,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -1554,7 +1553,9 @@ const allowedGroupsUser = ref<AdminUser | null>(null)
 
 // Expanded group dropdown state (click to show exclusive groups list)
 const expandedGroupUserId = ref<number | null>(null)
-const toggleExpandedGroup = (userId: number) => {
+const expandedGroupAnchor = ref<HTMLElement | null>(null)
+const toggleExpandedGroup = (userId: number, event: MouseEvent) => {
+  expandedGroupAnchor.value = event.currentTarget as HTMLElement
   expandedGroupUserId.value = expandedGroupUserId.value === userId ? null : userId
 }
 

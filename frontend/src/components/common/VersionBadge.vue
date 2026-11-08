@@ -3,6 +3,7 @@
     <!-- Admin: Full version badge with dropdown -->
     <template v-if="isAdmin">
       <button
+        ref="versionTrigger"
         @click="toggleDropdown"
         class="flex max-w-full items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
         :class="[
@@ -27,11 +28,8 @@
       </button>
 
       <!-- Dropdown -->
-      <transition name="dropdown">
-        <div
-          v-if="dropdownOpen"
-          ref="dropdownRef"
-          class="absolute left-0 z-50 mt-2 overflow-hidden whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
+      <FloatingPanel :open="dropdownOpen" :anchor="versionTrigger" align="start" @close="closeDropdown"
+          class="overflow-hidden whitespace-normal rounded-xl border border-gray-200 bg-white shadow-lg transition-all duration-200 dark:border-dark-700 dark:bg-dark-800"
           :class="rollbackPanelOpen && isReleaseBuild ? 'w-80' : 'w-64'"
         >
           <!-- Header with refresh button -->
@@ -642,8 +640,7 @@
               </div>
             </template>
           </div>
-        </div>
-      </transition>
+        </FloatingPanel>
     </template>
 
     <!-- Non-admin: Site slogan, independent of server version/loading state. -->
@@ -654,6 +651,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
@@ -683,7 +681,7 @@ const appStore = useAppStore()
 const isAdmin = computed(() => authStore.isAdmin)
 
 const dropdownOpen = ref(false)
-const dropdownRef = ref<HTMLElement | null>(null)
+const versionTrigger = ref<HTMLElement | null>(null)
 
 // Use store's cached version state
 const loading = computed(() => appStore.versionLoading)
@@ -919,13 +917,6 @@ async function checkServiceAndReload() {
   window.location.reload()
 }
 
-function handleClickOutside(event: MouseEvent) {
-  const target = event.target as Node
-  const button = (event.target as Element).closest('button')
-  if (dropdownRef.value && !dropdownRef.value.contains(target) && !button?.contains(target)) {
-    closeDropdown()
-  }
-}
 
 onMounted(() => {
   if (isAdmin.value) {
@@ -935,12 +926,10 @@ onMounted(() => {
       if (isAdmin.value) appStore.fetchVersion(false)
     }, 60 * 1000) // The store limits successful checks to once per 20 minutes.
   }
-  document.addEventListener('click', handleClickOutside)
 })
 
 onBeforeUnmount(() => {
   if (versionCheckInterval) clearInterval(versionCheckInterval)
-  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 

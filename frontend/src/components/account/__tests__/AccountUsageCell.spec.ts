@@ -1917,7 +1917,8 @@ describe('AccountUsageCell', () => {
       global: {
         stubs: {
           UsageProgressBar: true,
-          AccountQuotaInfo: true
+          AccountQuotaInfo: true,
+          Teleport: true
         }
       }
     })

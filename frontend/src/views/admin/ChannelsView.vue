@@ -541,9 +541,8 @@
                       @focus="onRuleAccountSearchFocus(section.platform, ruleIndex)"
                     />
                     <!-- Search results dropdown -->
-                    <div
-                      v-if="showRuleAccountDropdown[`${section.platform}-${ruleIndex}`] && (ruleAccountSearchResults[`${section.platform}-${ruleIndex}`]?.length ?? 0) > 0"
-                      class="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                    <FloatingPanel :open="!!(showRuleAccountDropdown[`${section.platform}-${ruleIndex}`] && (ruleAccountSearchResults[`${section.platform}-${ruleIndex}`]?.length ?? 0) > 0)" :match-width="true" :max-height="192" @close="showRuleAccountDropdown[`${section.platform}-${ruleIndex}`] = false"
+                      class="max-h-48 w-full overflow-auto rounded-lg border bg-white shadow-lg dark:border-dark-600 dark:bg-dark-800"
                     >
                       <button
                         v-for="account in ruleAccountSearchResults[`${section.platform}-${ruleIndex}`]"
@@ -557,7 +556,7 @@
                         <span :class="platformTextClass(account.platform)">{{ account.name }}</span>
                         <span class="ml-2 text-xs text-gray-400">#{{ account.id }}</span>
                       </button>
-                    </div>
+                    </FloatingPanel>
                   </div>
                   <p class="mt-1 text-xs text-gray-400">
                     {{ t('admin.channels.form.ruleAccountsHint') }}
@@ -628,6 +627,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

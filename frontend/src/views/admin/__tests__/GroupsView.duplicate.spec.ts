@@ -153,9 +153,10 @@ const BaseDialogStub = defineComponent({
 })
 
 function mountView() {
-  return mount(GroupsView, {
+  return mount(GroupsView, { attachTo: document.body,
     global: {
       stubs: {
+        Teleport: true,
         AppLayout: AppLayoutStub,
         TablePageLayout: TablePageLayoutStub,
         DataTable: DataTableStub,

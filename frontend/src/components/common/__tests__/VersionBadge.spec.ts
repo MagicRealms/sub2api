@@ -39,7 +39,7 @@ afterEach(() => {
 })
 
 function renderBadge(version?: string) {
-  const wrapper = mount(VersionBadge, { props: { version }, global: { stubs: { Icon: true } } })
+  const wrapper = mount(VersionBadge, { props: { version }, global: { stubs: { Icon: true, Teleport: true } } })
   unmount = () => wrapper.unmount()
   return wrapper
 }

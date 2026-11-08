@@ -25,21 +25,7 @@
     </div>
 
     <!-- Popover 显示完整列表 -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition duration-150 ease-out"
-        enter-from-class="opacity-0 scale-95"
-        enter-to-class="opacity-100 scale-100"
-        leave-active-class="transition duration-100 ease-in"
-        leave-from-class="opacity-100 scale-100"
-        leave-to-class="opacity-0 scale-95"
-      >
-        <div
-          v-if="showPopover"
-          ref="popoverRef"
-          class="fixed z-50 min-w-48 max-w-96 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-dark-600 dark:bg-dark-800"
-          :style="popoverStyle"
-        >
+    <FloatingPanel :open="showPopover" :anchor="moreButtonRef" :min-width="192" @close="showPopover = false" class="w-96 rounded-lg border border-gray-200 bg-white p-3 shadow-lg dark:border-dark-600 dark:bg-dark-800">
           <div class="mb-2 flex items-center justify-between">
             <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.groupCountTotal', { count: groups.length }) }}
@@ -66,22 +52,17 @@
               class="min-w-0 max-w-full"
             />
           </div>
-        </div>
-      </Transition>
-    </Teleport>
+        </FloatingPanel>
 
     <!-- 点击外部关闭 popover -->
-    <div
-      v-if="showPopover"
-      class="fixed inset-0 z-40"
-      @click="showPopover = false"
-    />
+
   </div>
   <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import type { Group } from '@/types'
@@ -98,7 +79,6 @@ const props = withDefaults(defineProps<Props>(), {
 const { t } = useI18n()
 
 const moreButtonRef = ref<HTMLElement | null>(null)
-const popoverRef = ref<HTMLElement | null>(null)
 const showPopover = ref(false)
 
 // 显示的分组（最多显示 maxDisplay 个）
@@ -118,44 +98,4 @@ const hiddenCount = computed(() => {
   return props.groups.length - (props.maxDisplay - 1)
 })
 
-// Popover 位置样式
-const popoverStyle = computed(() => {
-  if (!moreButtonRef.value) return {}
-  const rect = moreButtonRef.value.getBoundingClientRect()
-  const viewportHeight = window.innerHeight
-  const viewportWidth = window.innerWidth
-
-  let top = rect.bottom + 8
-  let left = rect.left
-
-  // 如果下方空间不足，显示在上方
-  if (top + 280 > viewportHeight) {
-    top = Math.max(8, rect.top - 280)
-  }
-
-  // 如果右侧空间不足，向左偏移
-  if (left + 384 > viewportWidth) {
-    left = Math.max(8, viewportWidth - 392)
-  }
-
-  return {
-    top: `${top}px`,
-    left: `${left}px`
-  }
-})
-
-// 关闭 popover 的键盘事件
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
-    showPopover.value = false
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
-})
 </script>

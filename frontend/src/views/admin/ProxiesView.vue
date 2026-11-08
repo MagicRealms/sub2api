@@ -146,9 +146,8 @@
                   <Icon name="copy" size="sm" />
                 </button>
                 <!-- 右键展开格式选择菜单 -->
-                <div
-                  v-if="copyMenuProxyId === row.id"
-                  class="absolute left-0 top-full z-50 mt-1 w-auto min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-500 dark:bg-dark-700"
+                <FloatingPanel :open="!!(copyMenuProxyId === row.id)" :min-width="180" :max-height="360" @close="copyMenuProxyId = null"
+                  class="w-auto min-w-[180px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-500 dark:bg-dark-700"
                 >
                   <button
                     v-for="fmt in getCopyFormats(row)"
@@ -158,7 +157,7 @@
                   >
                     <span class="truncate font-mono text-gray-600 dark:text-gray-300">{{ fmt.label }}</span>
                   </button>
-                </div>
+                </FloatingPanel>
               </div>
             </div>
           </template>
@@ -964,6 +963,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

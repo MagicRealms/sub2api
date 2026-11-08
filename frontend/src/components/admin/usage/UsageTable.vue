@@ -210,6 +210,12 @@
             <div
               class="group relative"
               @mouseenter="showTokenTooltip($event, row)"
+              @focusin="showTokenTooltip($event, row)"
+              @focusout="hideTokenTooltip"
+              @click.stop="showTokenTooltip($event, row)"
+              @keydown.enter.prevent="showTokenTooltip($event, row)"
+              @keydown.space.prevent="showTokenTooltip($event, row)"
+              role="button" tabindex="0" :aria-label="t('usage.tokenDetails')"
               @mouseleave="hideTokenTooltip"
             >
               <div class="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 transition-colors group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900/50">
@@ -233,6 +239,12 @@
               <div
                 class="group relative"
                 @mouseenter="showTooltip($event, row)"
+              @focusin="showTooltip($event, row)"
+              @focusout="hideTooltip"
+              @click.stop="showTooltip($event, row)"
+              @keydown.enter.prevent="showTooltip($event, row)"
+              @keydown.space.prevent="showTooltip($event, row)"
+              role="button" tabindex="0" :aria-label="t('usage.totalCost')"
                 @mouseleave="hideTooltip"
               >
                 <div class="flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-100 transition-colors group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900/50">
@@ -327,16 +339,9 @@
   </div>
 
   <!-- Token Tooltip Portal -->
-  <Teleport to="body">
-    <div
-      v-if="tokenTooltipVisible"
-      class="fixed z-[9999] pointer-events-none -translate-y-1/2"
-      :style="{
-        left: tokenTooltipPosition.x + 'px',
-        top: tokenTooltipPosition.y + 'px'
-      }"
-    >
-      <div class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
+  <FloatingPanel :open="tokenTooltipVisible" :anchor="tokenTooltipAnchor" :max-height="560" @close="hideTokenTooltip" @mouseleave="hideTokenTooltip" role="tooltip" class="fixed w-80" data-testid="request-token-details">
+
+      <div class="whitespace-normal break-words rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
         <div class="space-y-1.5">
           <div>
             <div class="text-xs font-semibold text-gray-300 mb-1">{{ t('usage.tokenDetails') }}</div>
@@ -405,22 +410,15 @@
             <span class="font-semibold text-blue-400">{{ ((tokenTooltipData?.input_tokens || 0) + (tokenTooltipData?.output_tokens || 0) + (tokenTooltipData?.cache_creation_tokens || 0) + (tokenTooltipData?.cache_read_tokens || 0)).toLocaleString() }}</span>
           </div>
         </div>
-        <div class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"></div>
+
       </div>
-    </div>
-  </Teleport>
+
+</FloatingPanel>
 
   <!-- Cost Tooltip Portal -->
-  <Teleport to="body">
-    <div
-      v-if="tooltipVisible"
-      class="fixed z-[9999] pointer-events-none -translate-y-1/2"
-      :style="{
-        left: tooltipPosition.x + 'px',
-        top: tooltipPosition.y + 'px'
-      }"
-    >
-      <div class="whitespace-nowrap rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
+  <FloatingPanel :open="tooltipVisible" :anchor="tooltipAnchor" :max-height="560" @close="hideTooltip" @mouseleave="hideTooltip" role="tooltip" class="fixed w-80" data-testid="request-cost-details">
+
+      <div class="whitespace-normal break-words rounded-lg border border-gray-700 bg-gray-900 px-3 py-2.5 text-xs text-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
         <div class="space-y-1.5">
           <!-- Cost Breakdown -->
           <div class="mb-2 border-b border-gray-700 pb-1.5">
@@ -542,13 +540,14 @@
             </div>
           </template>
         </div>
-        <div class="absolute right-full top-1/2 h-0 w-0 -translate-y-1/2 border-b-[6px] border-r-[6px] border-t-[6px] border-b-transparent border-r-gray-900 border-t-transparent dark:border-r-gray-800"></div>
+
       </div>
-    </div>
-  </Teleport>
+
+</FloatingPanel>
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -726,12 +725,12 @@ const copyUpstreamRequestId = (upstreamRequestId: string) =>
 
 // Tooltip state - cost
 const tooltipVisible = ref(false)
-const tooltipPosition = ref({ x: 0, y: 0 })
+const tooltipAnchor = ref<HTMLElement | null>(null)
 const tooltipData = ref<AdminUsageLog | null>(null)
 
 // Tooltip state - token
 const tokenTooltipVisible = ref(false)
-const tokenTooltipPosition = ref({ x: 0, y: 0 })
+const tokenTooltipAnchor = ref<HTMLElement | null>(null)
 const tokenTooltipData = ref<AdminUsageLog | null>(null)
 
 const getRequestTypeLabel = (row: AdminUsageLog): string => {
@@ -771,31 +770,34 @@ const formatDuration = (ms: number | null | undefined): string => {
 }
 
 // Cost tooltip functions
-const showTooltip = (event: MouseEvent, row: AdminUsageLog) => {
+const showTooltip = (event: Event, row: AdminUsageLog) => {
   const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
   tooltipData.value = row
-  tooltipPosition.value.x = rect.right + 8
-  tooltipPosition.value.y = rect.top + rect.height / 2
+  tooltipAnchor.value = target
   tooltipVisible.value = true
 }
 
-const hideTooltip = () => {
+const isTooltipTransfer = (event: MouseEvent | FocusEvent | undefined, anchor: HTMLElement | null, testId: string) => {
+  const target = event?.relatedTarget
+  return target instanceof Node && (anchor?.contains(target) || document.querySelector(`[data-testid="${testId}"]`)?.contains(target))
+}
+
+const hideTooltip = (event?: MouseEvent | FocusEvent) => {
+  if (isTooltipTransfer(event, tooltipAnchor.value, 'request-cost-details')) return
   tooltipVisible.value = false
   tooltipData.value = null
 }
 
 // Token tooltip functions
-const showTokenTooltip = (event: MouseEvent, row: AdminUsageLog) => {
+const showTokenTooltip = (event: Event, row: AdminUsageLog) => {
   const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
   tokenTooltipData.value = row
-  tokenTooltipPosition.value.x = rect.right + 8
-  tokenTooltipPosition.value.y = rect.top + rect.height / 2
+  tokenTooltipAnchor.value = target
   tokenTooltipVisible.value = true
 }
 
-const hideTokenTooltip = () => {
+const hideTokenTooltip = (event?: MouseEvent | FocusEvent) => {
+  if (isTooltipTransfer(event, tokenTooltipAnchor.value, 'request-token-details')) return
   tokenTooltipVisible.value = false
   tokenTooltipData.value = null
 }

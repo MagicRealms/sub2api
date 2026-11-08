@@ -35,9 +35,8 @@
               </button>
 
               <!-- User Dropdown -->
-              <div
-                v-if="showFilterUserDropdown && (filterUserResults.length > 0 || filterUserKeyword)"
-                class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
+              <FloatingPanel :open="!!(showFilterUserDropdown && (filterUserResults.length > 0 || filterUserKeyword))" :match-width="true" :max-height="240" @close="showFilterUserDropdown = false"
+                class="max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
               >
                 <div
                   v-if="filterUserLoading"
@@ -61,7 +60,7 @@
                   <span class="font-medium text-gray-900 dark:text-white">{{ user.email }}</span>
                   <span class="ml-2 text-gray-500 dark:text-gray-400">#{{ user.id }}</span>
                 </button>
-              </div>
+              </FloatingPanel>
             </div>
 
             <!-- Filters -->
@@ -527,9 +526,8 @@
               <Icon name="x" size="sm" :stroke-width="2" />
             </button>
             <!-- User Dropdown -->
-            <div
-              v-if="showUserDropdown && (userSearchResults.length > 0 || userSearchKeyword)"
-              class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
+            <FloatingPanel :open="!!(showUserDropdown && (userSearchResults.length > 0 || userSearchKeyword))" :match-width="true" :max-height="240" @close="showUserDropdown = false"
+              class="max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-700 dark:bg-dark-800"
             >
               <div
                 v-if="userSearchLoading"
@@ -554,7 +552,7 @@
                 <span class="font-medium text-gray-900 dark:text-white">{{ user.email }}</span>
                 <span class="ml-2 text-gray-500 dark:text-gray-400">#{{ user.id }}</span>
               </button>
-            </div>
+            </FloatingPanel>
           </div>
           <div v-if="batchAssignEnabled && assignUsers.length > 0" class="mt-2 space-y-2" data-test="assign-users">
             <p class="text-sm text-gray-600 dark:text-gray-400">

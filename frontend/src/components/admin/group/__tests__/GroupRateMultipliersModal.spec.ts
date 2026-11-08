@@ -20,7 +20,7 @@ beforeEach(() => {
 async function selectUser() {
   const wrapper = mount(GroupRateMultipliersModal, {
     props: { show: false, group: { id: 1, name: 'Group', platform: 'openai' } as AdminGroup },
-    global: { stubs: {
+    global: { stubs: { Teleport: true,
       BaseDialog: { props: ['show'], template: '<div v-if="show"><slot /></div>' },
       Icon: true, PlatformIcon: true, Pagination: true
     } }

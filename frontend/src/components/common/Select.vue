@@ -122,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import { floatingAnchorVisible, floatingLayer, floatingViewport } from '@/utils/floating'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
@@ -192,7 +193,6 @@ const dropdownRef = ref<HTMLElement | null>(null)
 const optionsListRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<'bottom' | 'top'>('bottom')
 const triggerRect = ref<DOMRect | null>(null)
-const dropdownViewportPadding = 8
 const dropdownMinimumWidth = 200
 
 // i18n placeholders
@@ -216,20 +216,24 @@ const dropdownStyle = computed(() => {
   if (!triggerRect.value) return {}
 
   const rect = triggerRect.value
-  const viewportRight = Math.max(dropdownViewportPadding, window.innerWidth - dropdownViewportPadding)
+  const viewport = floatingViewport(containerRef.value!)
+  const viewportRight = viewport.right
+  const preferredMinWidth = Math.min(Math.max(dropdownMinimumWidth, rect.width), viewport.width)
   const left = Math.min(
-    Math.max(dropdownViewportPadding, rect.left),
-    viewportRight
+    Math.max(viewport.left, rect.left),
+    viewportRight - preferredMinWidth
   )
   const availableWidth = Math.max(0, viewportRight - left)
-  const preferredMinWidth = Math.max(dropdownMinimumWidth, rect.width)
   const minWidth = Math.min(preferredMinWidth, availableWidth)
   const style: Record<string, string> = {
     position: 'fixed',
     left: `${left}px`,
     minWidth: `${minWidth}px`,
     maxWidth: `${availableWidth}px`,
-    zIndex: '100000020'
+    zIndex: String(floatingLayer(containerRef.value!)),
+    maxHeight: `${Math.max(0, dropdownPosition.value === 'top' ? rect.top - viewport.top - 4 : viewport.bottom - rect.bottom - 4)}px`,
+    overflowY: 'auto',
+    overscrollBehavior: 'contain'
   }
 
   if (dropdownPosition.value === 'top') {
@@ -348,6 +352,10 @@ const handleOptionMouseEnter = (option: any, index: number) => {
 // Update trigger rect periodically while open to follow scroll/resize
 const updateTriggerRect = () => {
   if (containerRef.value) {
+    if (isOpen.value && !floatingAnchorVisible(containerRef.value)) {
+      isOpen.value = false
+      return
+    }
     triggerRect.value = containerRef.value.getBoundingClientRect()
   }
 }
@@ -359,10 +367,11 @@ const calculateDropdownPosition = () => {
   nextTick(() => {
     if (!dropdownRef.value || !triggerRect.value) return
     const dropdownHeight = dropdownRef.value.offsetHeight || 240
-    const spaceBelow = window.innerHeight - triggerRect.value.bottom
-    const spaceAbove = triggerRect.value.top
+    const viewport = floatingViewport(containerRef.value!)
+    const spaceBelow = viewport.bottom - triggerRect.value.bottom - 4
+    const spaceAbove = triggerRect.value.top - viewport.top - 4
 
-    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
       dropdownPosition.value = 'top'
     } else {
       dropdownPosition.value = 'bottom'
@@ -399,8 +408,11 @@ watch(isOpen, (open) => {
       nextTick(() => dropdownRef.value?.focus())
     }
     // Add scroll listener to update position
-    window.addEventListener('scroll', updateTriggerRect, { capture: true, passive: true })
+    window.addEventListener('scroll', calculateDropdownPosition, { capture: true, passive: true })
     window.addEventListener('resize', calculateDropdownPosition)
+    window.addEventListener('sunworld:overlay-change', calculateDropdownPosition)
+    window.visualViewport?.addEventListener('resize', calculateDropdownPosition)
+    window.visualViewport?.addEventListener('scroll', calculateDropdownPosition)
   } else {
     searchQuery.value = ''
     focusedIndex.value = -1
@@ -409,8 +421,11 @@ watch(isOpen, (open) => {
       clearTimeout(remoteSearchTimer)
       remoteSearchTimer = null
     }
-    window.removeEventListener('scroll', updateTriggerRect, { capture: true })
+    window.removeEventListener('scroll', calculateDropdownPosition, { capture: true })
     window.removeEventListener('resize', calculateDropdownPosition)
+    window.removeEventListener('sunworld:overlay-change', calculateDropdownPosition)
+    window.visualViewport?.removeEventListener('resize', calculateDropdownPosition)
+    window.visualViewport?.removeEventListener('scroll', calculateDropdownPosition)
   }
 })
 
@@ -508,8 +523,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
-  window.removeEventListener('scroll', updateTriggerRect, { capture: true })
+  window.removeEventListener('scroll', calculateDropdownPosition, { capture: true })
   window.removeEventListener('resize', calculateDropdownPosition)
+  window.removeEventListener('sunworld:overlay-change', calculateDropdownPosition)
+  window.visualViewport?.removeEventListener('resize', calculateDropdownPosition)
+  window.visualViewport?.removeEventListener('scroll', calculateDropdownPosition)
   if (remoteSearchTimer) {
     clearTimeout(remoteSearchTimer)
     remoteSearchTimer = null

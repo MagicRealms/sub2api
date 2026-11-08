@@ -24,10 +24,8 @@
     </button>
 
     <!-- Hover/Click Tooltip -->
-    <transition name="dropdown">
-      <div
-        v-if="tooltipOpen"
-        class="absolute right-0 z-50 mt-2 w-[340px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-800"
+    <FloatingPanel :open="tooltipOpen" :anchor="containerRef" align="end" @close="tooltipOpen = false"
+        class="w-[340px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-dark-700 dark:bg-dark-800"
       >
         <div class="border-b border-gray-100 p-3 dark:border-dark-700">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
@@ -172,13 +170,13 @@
             {{ t('subscriptionProgress.viewAll') }}
           </router-link>
         </div>
-      </div>
-    </transition>
+      </FloatingPanel>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import { useSubscriptionStore } from '@/stores'
@@ -291,14 +289,8 @@ function closeTooltip() {
   tooltipOpen.value = false
 }
 
-function handleClickOutside(event: MouseEvent) {
-  if (containerRef.value && !containerRef.value.contains(event.target as Node)) {
-    closeTooltip()
-  }
-}
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
   // Trigger initial fetch if not already loaded
   // The actual data loading is handled by App.vue globally
   if (!subscriptionFeatureEnabled.value) return
@@ -307,9 +299,6 @@ onMounted(() => {
   })
 })
 
-onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
 </script>
 
 <style scoped>

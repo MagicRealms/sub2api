@@ -13,6 +13,7 @@
     <div
       class="sw-content relative min-h-screen transition-all duration-300"
       :class="[sidebarCollapsed ? 'lg:ml-[104px]' : 'lg:ml-60']"
+      :inert="mobileNavOpen"
     >
       <!-- Header -->
       <AppHeader />
@@ -28,6 +29,7 @@
 <script setup lang="ts">
 import '@/styles/onboarding.css'
 import { computed, onMounted } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { useAppStore } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
@@ -38,6 +40,8 @@ import AppHeader from './AppHeader.vue'
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
+const isMobile = useMediaQuery('(max-width: 1023px)')
+const mobileNavOpen = computed(() => isMobile.value && appStore.mobileOpen)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 const { replayTour } = useOnboardingTour({

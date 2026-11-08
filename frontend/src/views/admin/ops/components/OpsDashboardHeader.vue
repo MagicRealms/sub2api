@@ -999,10 +999,56 @@ function handleToolbarRefresh() {
           <div
             class="group relative flex cursor-pointer flex-col items-center justify-center rounded-xl py-2 transition-all hover:bg-white/60 dark:hover:bg-dark-800/60 md:border-r md:border-gray-200 md:pr-6 dark:md:border-dark-700"
           >
-            <!-- Diagnosis Popover (hover) -->
-            <div
-              class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 md:left-full md:top-0 md:ml-2 md:mt-0 md:translate-x-0"
-            >
+            <HelpTooltip class="!ml-0 !flex w-full flex-col items-center" width-class="w-72" panel-class="!p-0 !bg-transparent !ring-0">
+              <template #trigger>
+                <div class="relative flex items-center justify-center">
+                              <svg :width="circleSize" :height="circleSize" class="-rotate-90 transform">
+                                <circle
+                                  :cx="circleSize / 2"
+                                  :cy="circleSize / 2"
+                                  :r="radius"
+                                  :stroke-width="strokeWidth"
+                                  fill="transparent"
+                                  class="text-gray-200 dark:text-dark-700"
+                                  stroke="currentColor"
+                                />
+                                <circle
+                                  :cx="circleSize / 2"
+                                  :cy="circleSize / 2"
+                                  :r="radius"
+                                  :stroke-width="strokeWidth"
+                                  fill="transparent"
+                                  :stroke="healthScoreColor"
+                                  stroke-linecap="round"
+                                  :stroke-dasharray="circumference"
+                                  :stroke-dashoffset="dashOffset"
+                                  class="transition-all duration-1000 ease-out"
+                                />
+                              </svg>
+
+                              <div class="absolute flex flex-col items-center">
+                                <span :class="[props.fullscreen ? 'text-5xl' : 'text-3xl', 'font-black', healthScoreClass]">
+                                  {{ isSystemIdle ? t('admin.ops.idleStatus') : (overview.health_score ?? '--') }}
+                                </span>
+                                <span :class="[props.fullscreen ? 'text-xs' : 'text-[10px]', 'font-bold uppercase tracking-wider text-gray-400']">{{ t('admin.ops.health') }}</span>
+                              </div>
+                            </div>
+                <div class="mt-4 text-center" v-if="!props.fullscreen">
+                              <div class="flex items-center justify-center gap-1 text-xs font-medium text-gray-500">
+                                {{ t('admin.ops.healthCondition') }}
+                                <HelpTooltip :content="t('admin.ops.healthHelp')" />
+                              </div>
+                              <div class="mt-1 text-xs font-bold" :class="healthScoreClass">
+                                {{
+                                  isSystemIdle
+                                    ? t('admin.ops.idleStatus')
+                                    : typeof overview.health_score === 'number' && overview.health_score >= 90
+                                      ? t('admin.ops.healthyStatus')
+                                      : t('admin.ops.riskyStatus')
+                                }}
+                              </div>
+                            </div>
+              </template>
               <div class="rounded-xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10">
                 <h4 class="mb-3 border-b border-gray-100 pb-2 text-sm font-bold text-gray-900 dark:border-dark-700 dark:text-white flex items-center gap-2">
                   <Icon name="brain" size="sm" class="text-blue-500" />
@@ -1049,56 +1095,7 @@ function handleToolbarRefresh() {
                   {{ t('admin.ops.diagnosis.footer') }}
                 </div>
               </div>
-            </div>
-
-            <div class="relative flex items-center justify-center">
-              <svg :width="circleSize" :height="circleSize" class="-rotate-90 transform">
-                <circle
-                  :cx="circleSize / 2"
-                  :cy="circleSize / 2"
-                  :r="radius"
-                  :stroke-width="strokeWidth"
-                  fill="transparent"
-                  class="text-gray-200 dark:text-dark-700"
-                  stroke="currentColor"
-                />
-                <circle
-                  :cx="circleSize / 2"
-                  :cy="circleSize / 2"
-                  :r="radius"
-                  :stroke-width="strokeWidth"
-                  fill="transparent"
-                  :stroke="healthScoreColor"
-                  stroke-linecap="round"
-                  :stroke-dasharray="circumference"
-                  :stroke-dashoffset="dashOffset"
-                  class="transition-all duration-1000 ease-out"
-                />
-              </svg>
-
-              <div class="absolute flex flex-col items-center">
-                <span :class="[props.fullscreen ? 'text-5xl' : 'text-3xl', 'font-black', healthScoreClass]">
-                  {{ isSystemIdle ? t('admin.ops.idleStatus') : (overview.health_score ?? '--') }}
-                </span>
-                <span :class="[props.fullscreen ? 'text-xs' : 'text-[10px]', 'font-bold uppercase tracking-wider text-gray-400']">{{ t('admin.ops.health') }}</span>
-              </div>
-            </div>
-
-            <div class="mt-4 text-center" v-if="!props.fullscreen">
-              <div class="flex items-center justify-center gap-1 text-xs font-medium text-gray-500">
-                {{ t('admin.ops.healthCondition') }}
-                <HelpTooltip :content="t('admin.ops.healthHelp')" />
-              </div>
-              <div class="mt-1 text-xs font-bold" :class="healthScoreClass">
-                {{
-                  isSystemIdle
-                    ? t('admin.ops.idleStatus')
-                    : typeof overview.health_score === 'number' && overview.health_score >= 90
-                      ? t('admin.ops.healthyStatus')
-                      : t('admin.ops.riskyStatus')
-                }}
-              </div>
-            </div>
+            </HelpTooltip>
           </div>
 
           <!-- 2) Realtime Traffic -->

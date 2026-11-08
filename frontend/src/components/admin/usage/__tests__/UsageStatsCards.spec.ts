@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 
 import UsageStatsCards from '../UsageStatsCards.vue'
 
@@ -29,6 +29,8 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
+enableAutoUnmount(afterEach)
+
 const stats = {
   total_requests: 1,
   total_input_tokens: 100,
@@ -44,8 +46,9 @@ const stats = {
 }
 
 describe('UsageStatsCards', () => {
-  it('shows cache token breakdown values', () => {
+  it('shows cache token breakdown outside the clipped card', async () => {
     const wrapper = mount(UsageStatsCards, {
+      attachTo: document.body,
       props: {
         stats,
       },
@@ -56,8 +59,13 @@ describe('UsageStatsCards', () => {
       },
     })
 
-    const text = wrapper.text()
-    expect(text).toContain('Cache: 34')
+    expect(wrapper.text()).toContain('Cache: 34')
+    await wrapper.get('[data-testid="cache-token-details"]').trigger('mouseenter')
+    const tooltip = document.body.querySelector<HTMLElement>('[role="tooltip"]')!
+    expect(tooltip.parentElement).toBe(document.body)
+    expect(wrapper.element.contains(tooltip)).toBe(false)
+    expect(tooltip.style.display).not.toBe('none')
+    const text = tooltip.textContent || ''
     expect(text).toContain('Cache Token Breakdown')
     expect(text).toContain('Cache Creation')
     expect(text).toContain('12')
@@ -67,6 +75,7 @@ describe('UsageStatsCards', () => {
 
   it('keeps the cache tooltip out of the layout while it is hidden', () => {
     const wrapper = mount(UsageStatsCards, {
+      attachTo: document.body,
       props: {
         stats,
       },
@@ -77,13 +86,9 @@ describe('UsageStatsCards', () => {
       },
     })
 
-    const tooltip = wrapper.findAll('span').find((el) => el.classes().includes('group-hover:block'))
-
-    expect(tooltip).toBeDefined()
-    // `opacity-0` hides the tooltip visually but keeps it in the layout, so its
-    // fixed width still widens the document and causes horizontal scrolling on
-    // narrow screens. `hidden` (display: none) takes it out of the flow.
-    expect(tooltip?.classes()).toContain('hidden')
-    expect(tooltip?.classes()).not.toContain('opacity-0')
+    const tooltip = document.body.querySelector<HTMLElement>('[role="tooltip"]')!
+    expect(tooltip.style.display).toBe('none')
+    expect(tooltip.parentElement).toBe(document.body)
+    expect(wrapper.element.contains(tooltip)).toBe(false)
   })
 })

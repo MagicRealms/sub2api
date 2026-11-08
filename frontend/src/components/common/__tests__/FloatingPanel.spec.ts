@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import FloatingPanel from '../FloatingPanel.vue'
+import { defineComponent } from 'vue'
 
 enableAutoUnmount(afterEach)
 let anchor: HTMLButtonElement
@@ -36,6 +37,24 @@ async function open(props = {}) {
 }
 
 describe('FloatingPanel containment and layers', () => {
+  it('anchors an inline search menu to its container while portaling the panel', async () => {
+    const Host = defineComponent({
+      components: { FloatingPanel },
+      props: { open: Boolean },
+      template: '<div><input /><FloatingPanel :open="open" :match-width="true"><button>result</button></FloatingPanel></div>'
+    })
+    const wrapper = mount(Host, { props: { open: false }, attachTo: document.body })
+    vi.spyOn(wrapper.element, 'getBoundingClientRect').mockReturnValue(rect(20, 100, 140, 40))
+    await wrapper.setProps({ open: true })
+    await flushPromises()
+    const panel = document.querySelector<HTMLElement>('[data-floating-panel]')!
+    expect(panel.parentElement).toBe(document.body)
+    expect(wrapper.element.contains(panel)).toBe(false)
+    expect(panel.style.width).toBe('140px')
+    expect(panel.style.left).toBe('20px')
+    expect(panel.style.top).toBe('148px')
+  })
+
   it('escapes clipping ancestors and flips above a trigger near the viewport bottom', async () => {
     const card = document.createElement('div')
     card.dataset.testFixture = 'card'
@@ -68,7 +87,7 @@ describe('FloatingPanel containment and layers', () => {
     document.body.appendChild(dialog)
     dialog.appendChild(anchor)
     const { panel } = await open()
-    expect(panel.style.zIndex).toBe('130')
+    expect(panel.style.zIndex).toBe('121')
   })
 
   it('ignores interaction inside the portal and dismisses on an outside pointer', async () => {

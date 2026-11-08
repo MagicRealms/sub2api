@@ -12,8 +12,8 @@ const appStoreMocks = vi.hoisted(() => ({
 vi.mock('@/utils/ipGeoLookup', () => ipGeoMocks)
 vi.mock('@/stores/app', () => ({ useAppStore: () => appStoreMocks }))
 
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 
 import en from '@/i18n/locales/en/admin/resources'
@@ -145,10 +145,12 @@ const baseImageRow = {
   image_size_breakdown: null,
 }
 
+enableAutoUnmount(afterEach)
+
 describe('admin UsageTable tooltip', () => {
   it('shows output TPS in the latency cell using total duration', () => {
     const row = { ...baseImageRow, image_count: 0, billing_mode: 'token', output_tokens: 1000, duration_ms: 20_000, first_token_ms: 10_000 }
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [row, { ...row, request_id: 'no-duration', duration_ms: null }, { ...row, request_id: 'image', image_count: 1 }],
         loading: false,
@@ -180,7 +182,7 @@ describe('admin UsageTable tooltip', () => {
     ['zh', '长上下文', '已应用长上下文计费。输入和输出费率取决于定价档位，并非统一倍率。'],
   ] as const)('marks only applied long-context billing with localized text in %s', (language, label, tooltip) => {
     locale = language
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [
           {
@@ -231,7 +233,7 @@ describe('admin UsageTable tooltip', () => {
         </div>
       `,
     }
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [
           {
@@ -275,7 +277,7 @@ describe('admin UsageTable tooltip', () => {
     [0.5, '0.50x'],
     [undefined, '1.00x'],
   ])('shows the stored user rate %s in cost details', async (rate, expected) => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: { data: [{ ...baseImageRow, rate_multiplier: rate }], loading: false, columns: [] },
       global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
     })
@@ -302,7 +304,7 @@ describe('admin UsageTable tooltip', () => {
       output_tokens: 101,
     }
 
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [row],
         loading: false,
@@ -352,7 +354,7 @@ describe('admin UsageTable tooltip', () => {
       account_stats_cost: 0.00000012,
       account_rate_multiplier: 1.5,
     }
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: { data: [row], loading: false, columns: [] },
       global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
     })
@@ -368,7 +370,7 @@ describe('admin UsageTable tooltip', () => {
   })
 
   it('uses eight decimal places for missing cost values', async () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{ ...baseImageRow, billing_mode: 'per_request', image_count: 0, total_cost: undefined, actual_cost: undefined }],
         loading: false,
@@ -400,7 +402,7 @@ describe('admin UsageTable tooltip', () => {
       output_tokens: 0,
     }
 
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [row],
         loading: false,
@@ -422,7 +424,7 @@ describe('admin UsageTable tooltip', () => {
   })
 
   it('shows requested and forwarded reasoning effort separately when they differ', () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{
           request_id: 'req-admin-effort-1',
@@ -450,7 +452,7 @@ describe('admin UsageTable tooltip', () => {
   })
 
   it('shows a single reasoning effort when requested matches forwarded', () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{
           request_id: 'req-admin-effort-2',
@@ -476,7 +478,7 @@ describe('admin UsageTable tooltip', () => {
   })
 
   it('hides mapped reasoning effort for user rows that only have the requested value', () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{
           request_id: 'req-user-effort-1',
@@ -513,7 +515,7 @@ describe('admin UsageTable tooltip', () => {
 			expectedBadge: 'Different model',
 		},
 	])('shows a compact upstream response audit marker for $name', ({ responseModel, expectedBadge }) => {
-		const wrapper = mount(UsageTable, {
+		const wrapper = mount(UsageTable, { attachTo: document.body,
 			props: {
 				data: [{
 					request_id: `req-${responseModel}`,
@@ -544,7 +546,7 @@ describe('admin UsageTable tooltip', () => {
 	})
 
 	it('always shows a matching upstream response with a green model-correct badge', () => {
-		const wrapper = mount(UsageTable, {
+		const wrapper = mount(UsageTable, { attachTo: document.body,
 			props: {
 				data: [{
 					request_id: 'req-matching-upstream-model',
@@ -622,7 +624,7 @@ describe('admin UsageTable tooltip', () => {
       expected: ['legacy unstandardized: 512x512', 'Legacy record', 'unknown'],
     },
   ])('shows image usage metadata for $name', async ({ row, expected }) => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [row],
         loading: false,
@@ -655,7 +657,7 @@ describe('admin UsageTable tooltip', () => {
   })
 
   it('displays historical image rows with missing billing_mode as image usage without a 2K fallback', async () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [
           {
@@ -704,7 +706,7 @@ describe('admin UsageTable request ID column', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
 
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{ ...baseImageRow, request_id: 'req-admin-visible-id' }],
         loading: false,
@@ -731,7 +733,7 @@ describe('admin UsageTable request ID column', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     vi.stubGlobal('navigator', { clipboard: { writeText } })
 
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{ ...baseImageRow, request_id: '', upstream_request_id: '20260903082826779695' }],
         loading: false,
@@ -777,7 +779,7 @@ describe('admin UsageTable IP geolocation batch toolbar', () => {
   })
 
   it('does not render the batch toolbar when the ip_address column is not visible', () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{ request_id: 'r1', ip_address: '8.8.8.8' }],
         loading: false,
@@ -789,7 +791,7 @@ describe('admin UsageTable IP geolocation batch toolbar', () => {
   })
 
   it('renders the batch toolbar with a pending count when the ip_address column is visible', () => {
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [
           { request_id: 'r1', ip_address: '8.8.8.8' },
@@ -809,7 +811,7 @@ describe('admin UsageTable IP geolocation batch toolbar', () => {
 
   it('fetches deduplicated IPs from the current page when the batch button is clicked', async () => {
     ipGeoMocks.fetchBatch.mockResolvedValue(true)
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [
           { request_id: 'r1', ip_address: '8.8.8.8' },
@@ -828,7 +830,7 @@ describe('admin UsageTable IP geolocation batch toolbar', () => {
 
   it('emits ipGeoBatchFailed when the batch request reports a network-level failure', async () => {
     ipGeoMocks.fetchBatch.mockResolvedValue(false)
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{ request_id: 'r1', ip_address: '8.8.8.8' }],
         loading: false,
@@ -842,7 +844,7 @@ describe('admin UsageTable IP geolocation batch toolbar', () => {
 
   it('renders IpGeoCell content for ip_address cells', () => {
     ipGeoMocks.getEntry.mockReturnValue({ status: 'success', label: 'CN · Guangdong · Shenzhen', detail: {} })
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [{ request_id: 'r1', ip_address: '121.35.47.43' }],
         loading: false,
@@ -888,7 +890,7 @@ describe('admin UsageTable deleted-user badge', () => {
       output_tokens: 1,
     }
 
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [row],
         loading: false,
@@ -923,7 +925,7 @@ describe('admin UsageTable deleted-user badge', () => {
       output_tokens: 1,
     }
 
-    const wrapper = mount(UsageTable, {
+    const wrapper = mount(UsageTable, { attachTo: document.body,
       props: {
         data: [row],
         loading: false,

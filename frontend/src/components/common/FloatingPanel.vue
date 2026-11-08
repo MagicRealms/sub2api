@@ -1,4 +1,5 @@
 <template>
+  <span v-if="anchor === undefined" ref="anchorMarker" hidden aria-hidden="true"></span>
   <Teleport to="body">
     <div
       v-if="open"
@@ -15,12 +16,13 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch, type CSSProperties } from 'vue'
+import { floatingAnchorVisible, floatingLayer, floatingViewport, topFloatingSurface } from '@/utils/floating'
 
 defineOptions({ inheritAttrs: false })
 const props = withDefaults(defineProps<{
   open: boolean
-  anchor: HTMLElement | null
+  anchor?: HTMLElement | null
   align?: 'start' | 'end'
   minWidth?: number
   matchWidth?: boolean
@@ -28,65 +30,48 @@ const props = withDefaults(defineProps<{
 }>(), { align: 'start', minWidth: 0, matchWidth: false, maxHeight: 480 })
 const emit = defineEmits<{ close: [] }>()
 const panelRef = ref<HTMLElement | null>(null)
+// Inline search/action menus can anchor to their existing relative container.
+// The hidden marker stays in that container while the panel is portaled to body.
+const anchorMarker = ref<HTMLElement | null>(null)
+const resolvedAnchor = computed(() => props.anchor === undefined ? anchorMarker.value?.parentElement ?? null : props.anchor)
 const panelStyle = ref<CSSProperties>({ position: 'fixed', visibility: 'hidden' })
 let frame = 0
 let generation = 0
 let observer: ResizeObserver | undefined
 
 function updatePosition() {
-  const anchor = props.anchor
+  const anchor = resolvedAnchor.value
   const panel = panelRef.value
   if (!props.open || !anchor || !panel) return
   const rect = anchor.getBoundingClientRect()
   const padding = 8
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
-  const inDialog = anchor.closest('[role="dialog"], .modal-overlay')
-  const header = !inDialog ? document.querySelector<HTMLElement>('.sunworld-header') : null
-  const visibleTop = header && !header.contains(anchor) ? header.getBoundingClientRect().bottom : 0
+  const viewport = floatingViewport(anchor)
   // A menu must disappear with its trigger, rather than floating over another page region.
-  if (rect.width > 0 && (rect.bottom <= visibleTop || rect.top >= viewportHeight || rect.right <= 0 || rect.left >= viewportWidth)) {
+  if (!floatingAnchorVisible(anchor)) {
     emit('close')
     return
   }
-  for (let parent = anchor.parentElement; rect.width > 0 && parent && parent !== document.body; parent = parent.parentElement) {
-    const overflow = getComputedStyle(parent)
-    const bounds = parent.getBoundingClientRect()
-    if ((/(auto|scroll|hidden|clip)/.test(overflow.overflowY) && (rect.bottom <= bounds.top || rect.top >= bounds.bottom)) ||
-        (/(auto|scroll|hidden|clip)/.test(overflow.overflowX) && (rect.right <= bounds.left || rect.left >= bounds.right))) {
-      emit('close')
-      return
-    }
-  }
-  const availableWidth = Math.max(0, viewportWidth - padding * 2)
-  let layer = 40
-  // Page menus stay below dialogs; menus inside a dialog follow that dialog's layer.
-  if (anchor.closest('[role="dialog"], .modal-overlay, .driver-active-element')) {
-    for (let parent: HTMLElement | null = anchor; parent && parent !== document.body; parent = parent.parentElement) {
-      const zIndex = Number.parseInt(getComputedStyle(parent).zIndex, 10)
-      if (Number.isFinite(zIndex)) layer = Math.max(layer, zIndex + 10)
-    }
-  }
+  const availableWidth = viewport.width
   const base: CSSProperties = {
-    position: 'fixed', margin: '0', zIndex: layer,
+    position: 'fixed', margin: '0', zIndex: floatingLayer(anchor),
     minWidth: `${Math.min(Math.max(props.minWidth, props.matchWidth ? rect.width : 0), availableWidth)}px`,
-    maxWidth: `${availableWidth}px`, maxHeight: `${Math.min(props.maxHeight, Math.max(0, viewportHeight - padding * 2))}px`,
+    maxWidth: `${availableWidth}px`, maxHeight: `${Math.min(props.maxHeight, viewport.height)}px`,
     overflowY: 'auto', overscrollBehavior: 'contain'
   }
   if (props.matchWidth) base.width = `${Math.min(Math.max(props.minWidth, rect.width), availableWidth)}px`
   // Apply bounds before measurement so narrow viewports and long content are measured correctly.
   Object.assign(panel.style, base)
   const size = panel.getBoundingClientRect()
-  const below = Math.max(0, viewportHeight - rect.bottom - padding * 2)
-  const above = Math.max(0, rect.top - padding * 2)
+  const below = Math.max(0, viewport.bottom - rect.bottom - padding)
+  const above = Math.max(0, rect.top - viewport.top - padding)
   const placeAbove = below < size.height && above > below
   const room = placeAbove ? above : below
   const height = Math.min(size.height, props.maxHeight, room)
   const preferredLeft = props.align === 'end' ? rect.right - size.width : rect.left
   panelStyle.value = {
     ...base,
-    left: `${Math.max(padding, Math.min(preferredLeft, viewportWidth - size.width - padding))}px`,
-    top: `${Math.max(padding, Math.min(placeAbove ? rect.top - height - padding : rect.bottom + padding, viewportHeight - height - padding))}px`,
+    left: `${Math.max(viewport.left, Math.min(preferredLeft, viewport.right - size.width))}px`,
+    top: `${Math.max(viewport.top, Math.min(placeAbove ? rect.top - height - padding : rect.bottom + padding, viewport.bottom - height))}px`,
     maxHeight: `${Math.min(props.maxHeight, room)}px`, visibility: 'visible'
   }
 }
@@ -99,16 +84,16 @@ function schedulePosition(event?: Event) {
 
 function handleOutside(event: Event) {
   const target = event.target
-  if (target instanceof Node && !props.anchor?.contains(target) && !panelRef.value?.contains(target)) emit('close')
+  if (target instanceof Node && !resolvedAnchor.value?.contains(target) && !panelRef.value?.contains(target)) emit('close')
 }
 
 function handleEscape(event: KeyboardEvent) {
   const active = document.activeElement
-  if (event.key !== 'Escape' || !active || (!props.anchor?.contains(active) && !panelRef.value?.contains(active))) return
+  if (event.defaultPrevented || event.key !== 'Escape' || !active || !panelRef.value || !topFloatingSurface(panelRef.value) || (!resolvedAnchor.value?.contains(active) && !panelRef.value.contains(active))) return
   event.preventDefault()
   event.stopPropagation()
   emit('close')
-  const anchor = props.anchor
+  const anchor = resolvedAnchor.value
   const focusTarget = anchor?.matches('button, input, [tabindex]') ? anchor : anchor?.querySelector<HTMLElement>('button, input, [tabindex]')
   focusTarget?.focus({ preventScroll: true })
 }
@@ -120,12 +105,14 @@ function cleanup() {
   observer = undefined
   window.removeEventListener('scroll', schedulePosition, true)
   window.removeEventListener('resize', schedulePosition)
+  window.removeEventListener('sunworld:overlay-change', schedulePosition)
   window.visualViewport?.removeEventListener('resize', schedulePosition)
+  window.visualViewport?.removeEventListener('scroll', schedulePosition)
   document.removeEventListener('pointerdown', handleOutside, true)
   window.removeEventListener('keydown', handleEscape, true)
 }
 
-watch(() => [props.open, props.anchor] as const, async ([open]) => {
+watch(() => [props.open, resolvedAnchor.value] as const, async ([open]) => {
   const current = ++generation
   cleanup()
   if (!open) return
@@ -135,12 +122,14 @@ watch(() => [props.open, props.anchor] as const, async ([open]) => {
   updatePosition()
   window.addEventListener('scroll', schedulePosition, { capture: true, passive: true })
   window.addEventListener('resize', schedulePosition, { passive: true })
+  window.addEventListener('sunworld:overlay-change', schedulePosition)
   window.visualViewport?.addEventListener('resize', schedulePosition, { passive: true })
+  window.visualViewport?.addEventListener('scroll', schedulePosition, { passive: true })
   document.addEventListener('pointerdown', handleOutside, true)
   window.addEventListener('keydown', handleEscape, true)
   if (typeof ResizeObserver !== 'undefined') {
     observer = new ResizeObserver(() => schedulePosition())
-    if (props.anchor) observer.observe(props.anchor)
+    if (resolvedAnchor.value) observer.observe(resolvedAnchor.value)
     if (panelRef.value) observer.observe(panelRef.value)
   }
 }, { flush: 'post', immediate: true })

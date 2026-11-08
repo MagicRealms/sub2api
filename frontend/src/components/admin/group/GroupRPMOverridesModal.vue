@@ -31,9 +31,8 @@
               @input="handleSearchUsers"
               @focus="showDropdown = true"
             />
-            <div
-              v-if="showDropdown && searchResults.length > 0"
-              class="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-500 dark:bg-dark-700"
+            <FloatingPanel :open="!!(showDropdown && searchResults.length > 0)" :match-width="true" :max-height="192" @close="showDropdown = false"
+              class="max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-dark-500 dark:bg-dark-700"
             >
               <button
                 v-for="user in searchResults"
@@ -46,7 +45,7 @@
                 <span class="text-gray-900 dark:text-white">{{ user.username || user.email }}</span>
                 <span v-if="user.username" class="text-xs text-gray-400">{{ user.email }}</span>
               </button>
-            </div>
+            </FloatingPanel>
           </div>
           <div class="w-24">
             <input
@@ -206,6 +205,7 @@
 </template>
 
 <script setup lang="ts">
+import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'

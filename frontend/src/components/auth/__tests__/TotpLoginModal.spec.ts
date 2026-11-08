@@ -24,7 +24,7 @@ describe('TotpLoginModal', () => {
   })
 
   it('sends verification errors to toast and does not render inline red text', async () => {
-    const wrapper = mount(TotpLoginModal, {
+    const wrapper = mount(TotpLoginModal, { global: { stubs: { Teleport: true } },
       props: {
         tempToken: 'temp-token',
         userEmailMasked: 'u***@example.com',

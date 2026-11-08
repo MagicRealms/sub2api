@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 
 const copyToClipboard = vi.fn().mockResolvedValue(true)
 
@@ -26,13 +26,15 @@ vi.mock('@/composables/useClipboard', () => ({
 
 import EndpointPopover from '../EndpointPopover.vue'
 
+enableAutoUnmount(afterEach)
+
 describe('EndpointPopover', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('将说明提示渲染到 URL 上方而不是旧的 title 图标上', () => {
-    const wrapper = mount(EndpointPopover, {
+  it('将说明提示渲染到页面浮层并保留复制交互', async () => {
+    const wrapper = mount(EndpointPopover, { attachTo: document.body,
       props: {
         apiBaseUrl: 'https://default.example.com/v1',
         customEndpoints: [
@@ -45,25 +47,29 @@ describe('EndpointPopover', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('自定义说明')
-    expect(wrapper.text()).toContain('点击可复制此端点')
+    await wrapper.findAll('[aria-expanded]').at(-1)!.trigger('mouseenter')
+    const tooltip = [...document.body.querySelectorAll<HTMLElement>('[role="tooltip"]')].find(el => el.style.display !== 'none')!
+    expect(tooltip.parentElement).toBe(document.body)
+    expect(tooltip.textContent).toContain('自定义说明')
+    expect(tooltip.textContent).toContain('点击可复制此端点')
     expect(wrapper.find('[role="button"]').attributes('title')).toBeUndefined()
     expect(wrapper.find('[title="自定义说明"]').exists()).toBe(false)
   })
 
   it('点击 URL 后会复制并切换为已复制提示', async () => {
-    const wrapper = mount(EndpointPopover, {
+    const wrapper = mount(EndpointPopover, { attachTo: document.body,
       props: {
         apiBaseUrl: 'https://default.example.com/v1',
         customEndpoints: [],
       },
     })
 
+    await wrapper.get('[aria-expanded]').trigger('mouseenter')
     await wrapper.find('[role="button"]').trigger('click')
     await flushPromises()
 
     expect(copyToClipboard).toHaveBeenCalledWith('https://default.example.com/v1', '已复制')
-    expect(wrapper.text()).toContain('已复制到剪贴板')
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toContain('已复制到剪贴板')
     expect(wrapper.find('button[aria-label="已复制到剪贴板"]').exists()).toBe(true)
   })
 })

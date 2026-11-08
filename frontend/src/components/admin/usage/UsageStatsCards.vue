@@ -20,8 +20,9 @@
           <span>/</span>
           <span>{{ t('usage.out') }}: {{ formatTokens(stats?.total_output_tokens || 0) }}</span>
           <span>/</span>
-          <span class="group relative inline-flex cursor-help items-center gap-0.5" tabindex="0">
-            <span>{{ cacheLabel() }}: {{ formatTokens(stats?.total_cache_tokens || 0) }}</span>
+          <HelpTooltip variant="surface" width-class="w-64" :aria-label="cacheDetailLabel()" data-testid="cache-token-details">
+            <template #trigger>
+              <span>{{ cacheLabel() }}: {{ formatTokens(stats?.total_cache_tokens || 0) }}</span>
             <svg
               class="h-3.5 w-3.5 text-gray-400"
               fill="none"
@@ -35,9 +36,8 @@
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span
-              class="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-56 -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-3 text-left text-xs text-gray-700 shadow-lg group-hover:block group-focus:block dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200"
-            >
+            </template>
+            <span>
               <span class="mb-2 block font-medium text-gray-900 dark:text-white">
                 {{ cacheDetailLabel() }}
               </span>
@@ -54,7 +54,7 @@
                 </span>
               </span>
             </span>
-          </span>
+          </HelpTooltip>
         </p>
       </div>
     </div>
@@ -95,6 +95,7 @@ import type { AdminUsageStatsResponse } from '@/api/admin/usage'
 import type { UsageStatsResponse } from '@/types'
 import { formatTokenMillions } from '@/utils/workspace'
 import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 
 const props = withDefaults(defineProps<{
   stats: (AdminUsageStatsResponse | UsageStatsResponse) | null

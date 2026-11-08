@@ -1,6 +1,12 @@
 <template>
   <aside
+    ref="sidebarRef"
+    id="workspace-sidebar"
     class="sidebar"
+    :role="isMobile && mobileOpen ? 'dialog' : undefined"
+    :aria-modal="isMobile && mobileOpen ? true : undefined"
+    :aria-label="t('common.toggleMenu')"
+    :inert="isMobile && !mobileOpen"
     :class="[
       sidebarCollapsed ? 'w-[72px]' : 'w-64',
       { '-translate-x-full lg:translate-x-0': !mobileOpen, 'sw-sidebar-collapsed': sidebarCollapsed }
@@ -27,6 +33,9 @@
         <!-- Version Badge -->
         <VersionBadge :version="siteVersion" />
       </div>
+      <button type="button" class="btn-ghost btn-icon ml-auto shrink-0 lg:hidden" :aria-label="t('common.close')" @click="closeMobile">
+        <Icon name="x" size="md" />
+      </button>
     </div>
 
     <div v-if="!sidebarCollapsed" class="sidebar-status mx-3 mb-3 rounded-2xl p-3">
@@ -189,7 +198,8 @@
   <transition name="fade">
     <div
       v-if="mobileOpen"
-      class="fixed inset-0 z-30 bg-black/50 lg:hidden"
+      class="sw-sidebar-backdrop fixed inset-0 bg-black/50 lg:hidden"
+      aria-hidden="true"
       @click="closeMobile"
     ></div>
   </transition>
@@ -197,6 +207,7 @@
 
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
@@ -255,8 +266,12 @@ const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
 const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
 
-const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
+const sidebarCollapsed = computed(() => !isMobile.value && appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
+const isMobile = useMediaQuery('(max-width: 1023px)')
+const sidebarRef = ref<HTMLElement | null>(null)
+let previousMobileFocus: HTMLElement | null = null
+let mobileGeneration = 0
 const isAdmin = computed(() => authStore.isAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
@@ -736,6 +751,42 @@ function closeMobile() {
   appStore.setMobileOpen(false)
 }
 
+function onMobileKeydown(event: KeyboardEvent) {
+  if (!mobileOpen.value || !isMobile.value || event.defaultPrevented) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeMobile()
+  } else if (event.key === 'Tab') {
+    const items = Array.from(sidebarRef.value?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), [tabindex="0"]') ?? []).filter(el => el.getClientRects().length > 0)
+    const first = items[0]
+    const last = items.at(-1)
+    if (event.shiftKey && (document.activeElement === first || !sidebarRef.value?.contains(document.activeElement))) {
+      event.preventDefault()
+      last?.focus()
+    } else if (!event.shiftKey && (document.activeElement === last || !sidebarRef.value?.contains(document.activeElement))) {
+      event.preventDefault()
+      first?.focus()
+    }
+  }
+}
+
+watch([mobileOpen, isMobile], async ([open, mobile]) => {
+  const generation = ++mobileGeneration
+  const active = open && mobile
+  document.body.classList.toggle('mobile-nav-open', active)
+  document.removeEventListener('keydown', onMobileKeydown)
+  if (active) {
+    previousMobileFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    document.addEventListener('keydown', onMobileKeydown)
+  } else if (open && !mobile) appStore.setMobileOpen(false)
+  await nextTick()
+  if (generation !== mobileGeneration) return
+  window.dispatchEvent(new Event('sunworld:overlay-change'))
+  if (active) sidebarRef.value?.querySelector<HTMLElement>('button, a[href]')?.focus({ preventScroll: true })
+  else if (mobile && previousMobileFocus?.isConnected) previousMobileFocus.focus({ preventScroll: true })
+  if (!active) previousMobileFocus = null
+}, { flush: 'post', immediate: true })
+
 function handleMenuItemClick(itemPath: string) {
   if (mobileOpen.value) {
     setTimeout(() => {
@@ -833,6 +884,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  mobileGeneration++
+  document.removeEventListener('keydown', onMobileKeydown)
+  document.body.classList.remove('mobile-nav-open')
   if (sidebarNavRef.value) {
     appStore.sidebarScrollTop = sidebarNavRef.value.scrollTop
   }
