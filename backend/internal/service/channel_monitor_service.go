@@ -728,9 +728,15 @@ func attachQuotaSnapshot(results []*CheckResult, snapshot *domain.MonitorQuotaSn
 	}
 }
 
-// persistCheckResults 写入本次检测的历史记录并更新 last_checked_at。
-// 任一写库失败都只记日志，不影响调用方拿到 results（与 MVP 期望一致：宁可漏记历史也要先返回结果）。
+// persistCheckResults uses a bounded independent context so a timed-out probe
+// or disconnected caller cannot discard the completed check's history.
+// Persistence is best effort; failed history must not advance last_checked_at.
 func (s *ChannelMonitorService) persistCheckResults(ctx context.Context, m *ChannelMonitor, results []*CheckResult) {
+	if len(results) == 0 {
+		return
+	}
+	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
 	rows := make([]*ChannelMonitorHistoryRow, 0, len(results))
 	for _, r := range results {
 		rows = append(rows, &ChannelMonitorHistoryRow{
@@ -744,11 +750,12 @@ func (s *ChannelMonitorService) persistCheckResults(ctx context.Context, m *Chan
 			Quota:         r.Quota,
 		})
 	}
-	if err := s.repo.InsertHistoryBatch(ctx, rows); err != nil {
+	if err := s.repo.InsertHistoryBatch(persistCtx, rows); err != nil {
 		slog.Error("channel_monitor: insert history failed",
 			"monitor_id", m.ID, "name", m.Name, "error", err)
+		return
 	}
-	if err := s.repo.MarkChecked(ctx, m.ID, time.Now()); err != nil {
+	if err := s.repo.MarkChecked(persistCtx, m.ID, time.Now()); err != nil {
 		slog.Error("channel_monitor: mark checked failed",
 			"monitor_id", m.ID, "error", err)
 	}
