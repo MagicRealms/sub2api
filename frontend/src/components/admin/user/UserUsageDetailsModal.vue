@@ -11,7 +11,8 @@
         <p>{{ t('admin.users.usageDetails.loadFailed') }}</p><button class="btn btn-secondary mt-3" @click="loadDetails">{{ t('admin.users.usageDetails.retry') }}</button>
       </div>
       <template v-else-if="details">
-        <section>
+        <div class="sw-user-usage-overview">
+        <section class="min-w-0">
           <div class="sw-section-head"><h3><WorkspaceIcon name="analysis" />{{ t('admin.users.usageDetails.sevenDays') }}</h3><button class="sw-section-link" @click="loadDetails">{{ t('admin.users.usageDetails.refresh') }}</button></div>
           <div class="sw-day-strip" role="group" :aria-label="t('admin.users.usageDetails.selectDay')">
             <button v-for="day in daysNewestFirst" :key="day.date" :data-test="`usage-day-${day.date}`" :title="`${day.date} · ${number(day.requests)}`" :aria-label="day.date" :aria-pressed="selectedDate === day.date" class="sw-day" :class="{ 'is-selected': selectedDate === day.date }" @click="selectedDate = day.date; page = 1">
@@ -22,6 +23,19 @@
           </div>
           <p class="sw-section-meta mt-2">{{ details.timezone }} · {{ selectedDate }}</p>
         </section>
+        <section class="sw-user-model-consumption" data-test="usage-model-consumption" :aria-label="t('admin.dashboard.consumptionDistribution')">
+          <div class="sw-section-head"><h3><WorkspaceIcon name="models" />{{ t('admin.dashboard.consumptionDistribution') }}</h3><small class="sw-section-meta">{{ t('admin.users.usageDetails.costShare') }}</small></div>
+          <div v-if="modelsLoading" role="status" class="sw-model-empty">{{ t('common.loading') }}</div>
+          <div v-else-if="modelsError" data-test="usage-model-error" class="sw-model-empty"><span>{{ t('admin.users.usageDetails.distributionFailed') }}</span><button class="sw-section-link" @click="loadModels(true)">{{ t('admin.users.usageDetails.retry') }}</button></div>
+          <div v-else-if="modelDistribution.length" class="sw-user-model-list">
+            <div v-for="(row, index) in modelDistribution" :key="row.key" data-test="usage-model-row" class="sw-user-model-row" :title="`${row.name} · ${distributionMoney(row.cost)} · ${row.percent.toFixed(1)}%`">
+              <div class="sw-user-model-label"><span class="sw-user-model-name"><i :style="{ backgroundColor: workspacePalette[index % workspacePalette.length] }" />{{ row.name }}</span><span class="sw-user-model-cost">{{ distributionMoney(row.cost) }}<small>{{ row.percent.toFixed(1) }}%</small></span></div>
+              <div class="sw-user-model-track" aria-hidden="true"><i :style="{ width: `${row.percent}%`, backgroundColor: workspacePalette[index % workspacePalette.length] }" /></div>
+            </div>
+          </div>
+          <p v-else class="sw-model-empty">{{ t('common.noData') }}</p>
+        </section>
+        </div>
         <section class="sw-usage-summary" data-test="usage-summary" :aria-label="t('admin.users.usageDetails.todayUsage')">
           <MetricCard :label="t('admin.users.usageDetails.requests')" icon="pulse" tone="sky">
             <template #value><span data-test="day-requests">{{ number(selectedUsage.requests) }}</span></template>
@@ -69,11 +83,11 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
 import type { UserAPIKeyUsage, UserUsageDetails, UserUsageMetrics } from '@/api/admin/users'
-import type { AdminUser } from '@/types'
+import type { AdminUser, ModelStat } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import MetricCard from '@/components/workspace/MetricCard.vue'
 import WorkspaceIcon from '@/components/workspace/WorkspaceIcon.vue'
-import { formatTokenMillions as formatTokensM } from '@/utils/workspace'
+import { formatTokenMillions as formatTokensM, workspacePalette } from '@/utils/workspace'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { formatDateTime } from '@/utils/format'
 
@@ -87,6 +101,13 @@ const selectedDate = ref('')
 const search = ref('')
 const page = ref(1)
 const pageSize = 8
+const modelStats = ref<ModelStat[]>([])
+const modelsLoading = ref(false)
+const modelsError = ref(false)
+const detailsGeneration = ref(0)
+const modelCache = new Map<string, ModelStat[]>()
+let modelController: AbortController | null = null
+let modelRequestVersion = 0
 let controller: AbortController | null = null
 let requestVersion = 0
 const zero: UserUsageMetrics = { requests: 0, input_tokens: 0, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 0, total_tokens: 0, actual_cost: 0 }
@@ -104,6 +125,21 @@ const pageCount = computed(() => Math.max(1, Math.ceil(filteredKeys.value.length
 const pagedKeys = computed(() => filteredKeys.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const number = (value: number) => new Intl.NumberFormat(locale.value).format(value)
 const money = (value: number) => new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+const distributionMoney = (value: number) => new Intl.NumberFormat(locale.value, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6 }).format(value)
+const modelDistribution = computed(() => {
+  const sorted = modelStats.value
+    .filter(row => Number.isFinite(row.actual_cost) && row.actual_cost > 0)
+    .slice().sort((a, b) => b.actual_cost - a.actual_cost || a.model.localeCompare(b.model))
+  const total = sorted.reduce((sum, row) => sum + row.actual_cost, 0)
+  if (!total) return []
+  const visible = sorted.length > 4 ? sorted.slice(0, 3) : sorted
+  const rows = visible.map(row => ({ key: row.model, name: row.model, cost: row.actual_cost, percent: row.actual_cost / total * 100 }))
+  if (sorted.length > 4) {
+    const cost = sorted.slice(3).reduce((sum, row) => sum + row.actual_cost, 0)
+    rows.push({ key: '\u0000other', name: t('admin.users.usageDetails.otherModels', { count: sorted.length - 3 }), cost, percent: cost / total * 100 })
+  }
+  return rows
+})
 const dateTime = (value?: string | null) => value ? formatDateTime(value) : '—'
 const keyDay = (key: UserAPIKeyUsage): UserUsageMetrics => key.daily.find(day => day.date === selectedDate.value) ?? zero
 const keyStatus = (key: UserAPIKeyUsage) => {
@@ -119,6 +155,9 @@ const tokenBreakdown = (usage: UserUsageMetrics) => t('admin.users.usageDetails.
 
 async function loadDetails() {
   controller?.abort()
+  modelCache.clear()
+  modelController?.abort()
+  ++modelRequestVersion
   const version = ++requestVersion
   if (!props.show || !props.user) {
     details.value = null
@@ -137,6 +176,7 @@ async function loadDetails() {
     if (version !== requestVersion) return
     details.value = result
     if (!result.daily.some(day => day.date === selectedDate.value)) selectedDate.value = result.end_date
+    ++detailsGeneration.value
     page.value = Math.min(page.value, pageCount.value)
   } catch {
     if (version !== requestVersion) return
@@ -147,6 +187,38 @@ async function loadDetails() {
   }
 }
 
+async function loadModels(force = false) {
+  modelController?.abort()
+  const version = ++modelRequestVersion
+  modelStats.value = []
+  modelsError.value = false
+  modelsLoading.value = false
+  const usage = details.value
+  const userID = props.user?.id
+  if (!props.show || !usage || usage.user.id !== userID || !selectedDate.value) return
+  const cacheKey = `${userID}:${usage.timezone}:${selectedDate.value}`
+  const cached = modelCache.get(cacheKey)
+  if (!force && cached) { modelStats.value = cached; return }
+  modelController = new AbortController()
+  const signal = modelController.signal
+  modelsLoading.value = true
+  try {
+    const result = await adminAPI.dashboard.getModelStats({
+      user_id: userID, start_date: selectedDate.value, end_date: selectedDate.value,
+      timezone: usage.timezone, model_source: 'requested'
+    }, { signal })
+    if (signal.aborted || version !== modelRequestVersion) return
+    modelCache.set(cacheKey, result.models)
+    modelStats.value = result.models
+  } catch {
+    if (!signal.aborted && version === modelRequestVersion) modelsError.value = true
+  } finally {
+    if (version === modelRequestVersion) modelsLoading.value = false
+  }
+}
+
+watch(() => [props.show, props.user?.id, selectedDate.value, detailsGeneration.value] as const, () => { void loadModels() })
+
 watch(() => [props.show, props.user?.id] as const, () => {
   details.value = null
   selectedDate.value = ''
@@ -154,5 +226,31 @@ watch(() => [props.show, props.user?.id] as const, () => {
   page.value = 1
   void loadDetails()
 }, { immediate: true })
-onBeforeUnmount(() => { ++requestVersion; controller?.abort() })
+onBeforeUnmount(() => { ++requestVersion; controller?.abort(); ++modelRequestVersion; modelController?.abort() })
 </script>
+
+<style scoped>
+.sw-user-usage-overview { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; }
+.sw-user-model-consumption { min-width: 0; border-left: 1px solid var(--sw-line); padding-left: 20px; }
+.sw-user-model-consumption .sw-section-head { gap: 8px; margin-bottom: 12px; }
+.sw-user-model-consumption .sw-section-head h3 { font-size: 12px; }
+.sw-user-model-consumption .sw-section-meta { margin: 0; white-space: nowrap; font-size: 9px; }
+.sw-user-model-list { display: flex; flex-direction: column; gap: 7px; }
+.sw-user-model-label { display: flex; align-items: center; gap: 8px; font-size: 10px; line-height: 15px; }
+.sw-user-model-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-user-model-name i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; }
+.sw-user-model-cost { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.sw-user-model-cost small { display: inline-block; min-width: 38px; margin-left: 7px; text-align: right; font-size: 9px; color: var(--sw-muted); }
+.sw-user-model-track { height: 3px; margin-top: 3px; overflow: hidden; border-radius: 3px; background: var(--sw-line); }
+.sw-user-model-track i { display: block; height: 100%; border-radius: inherit; }
+.sw-model-empty { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 90px; font-size: 11px; color: var(--sw-muted); }
+@media (max-width: 639px) {
+  .sw-user-usage-overview { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sw-user-model-consumption { border-left: 0; border-top: 1px solid var(--sw-line); padding: 12px 0 0; }
+  .sw-user-model-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 14px; }
+  .sw-user-model-label { flex-wrap: wrap; gap: 0; }
+  .sw-user-model-name { flex-basis: 100%; }
+  .sw-user-model-cost { font-size: 9px; }
+  .sw-model-empty { min-height: 24px; }
+}
+</style>

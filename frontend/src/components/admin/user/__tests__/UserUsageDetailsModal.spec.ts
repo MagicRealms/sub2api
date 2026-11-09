@@ -4,13 +4,13 @@ import UserUsageDetailsModal from '../UserUsageDetailsModal.vue'
 import type { AdminUser } from '@/types'
 import type { UserAPIKeyUsage, UserUsageDetails, UserUsageMetrics } from '@/api/admin/users'
 
-const { getDetails } = vi.hoisted(() => ({ getDetails: vi.fn() }))
-vi.mock('@/api/admin', () => ({ adminAPI: { users: { getUserUsageDetails: getDetails } } }))
+const { getDetails, getModels } = vi.hoisted(() => ({ getDetails: vi.fn(), getModels: vi.fn() }))
+vi.mock('@/api/admin', () => ({ adminAPI: { users: { getUserUsageDetails: getDetails }, dashboard: { getModelStats: getModels } } }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ locale: { value: 'en' }, t: (key: string) => key }) }))
 vi.mock('@/utils/format', () => ({ formatDateTime: (value: string) => value }))
 
 enableAutoUnmount(afterEach)
-beforeEach(() => getDetails.mockReset())
+beforeEach(() => { getDetails.mockReset(); getModels.mockReset().mockResolvedValue({ models: [] }) })
 const user = (id: number) => ({ id, email: `user${id}@example.com`, username: `user${id}`, balance: 12, concurrency: 2, status: 'active', notes: '', created_at: '2026-09-01' }) as AdminUser
 const metrics = (values: Partial<UserUsageMetrics> = {}): UserUsageMetrics => ({
   requests: 0, input_tokens: 0, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 0, total_tokens: 0, actual_cost: 0, ...values
@@ -34,10 +34,10 @@ const open = (show = true) => mount(UserUsageDetailsModal, {
     LoadingSpinner: { template: '<span data-test="loading">loading</span>' }
   } }
 })
-function deferred() {
-  let resolve!: (value: UserUsageDetails) => void
+function deferred<T = UserUsageDetails>() {
+  let resolve!: (value: T) => void
   let reject!: (error: Error) => void
-  const promise = new Promise<UserUsageDetails>((res, rej) => { resolve = res; reject = rej })
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
   return { promise, resolve, reject }
 }
 
@@ -137,10 +137,84 @@ describe('user usage details', () => {
     getDetails.mockResolvedValue(response())
     const wrapper = open(false)
     expect(getDetails).not.toHaveBeenCalled()
+    expect(getModels).not.toHaveBeenCalled()
     await wrapper.setProps({ show: true }); await flushPromises()
     await wrapper.get('[data-test="usage-day-2026-10-10"]').trigger('click')
     await wrapper.setProps({ show: false })
     await wrapper.setProps({ show: true }); await flushPromises()
     expect(wrapper.get('[data-test="usage-day-2026-10-11"]').attributes('aria-pressed')).toBe('true')
+  })
+
+  it('shows actual-cost model shares for the selected user and day in at most four rows', async () => {
+    getDetails.mockResolvedValue(response())
+    getModels.mockResolvedValue({ models: [
+      { model: 'large', actual_cost: 8 }, { model: 'mid', actual_cost: 4 },
+      { model: 'small', actual_cost: 2 }, { model: 'tail-a', actual_cost: 1 },
+      { model: 'tail-b', actual_cost: 1 }, { model: 'free', actual_cost: 0 }
+    ] })
+    const wrapper = open(); await flushPromises()
+    expect(getModels).toHaveBeenCalledWith({ user_id: 1, start_date: '2026-10-11', end_date: '2026-10-11', timezone: 'Asia/Shanghai', model_source: 'requested' }, { signal: expect.any(AbortSignal) })
+    const rows = wrapper.findAll('[data-test="usage-model-row"]')
+    expect(rows).toHaveLength(4)
+    expect(rows[0].text()).toContain('large$8.0050.0%')
+    expect(rows[1].text()).toContain('mid$4.0025.0%')
+    expect(rows[2].text()).toContain('small$2.0012.5%')
+    expect(rows[3].text()).toContain('admin.users.usageDetails.otherModels$2.0012.5%')
+    expect(wrapper.get('[data-test="day-cost"]').text()).toBe('$4.00')
+  })
+
+  it('switches distribution dates and reuses only this open user session cache', async () => {
+    getDetails.mockResolvedValue(response())
+    getModels.mockResolvedValueOnce({ models: [{ model: 'today-model', actual_cost: 4 }] })
+      .mockResolvedValueOnce({ models: [{ model: 'yesterday-model', actual_cost: 3 }] })
+    const wrapper = open(); await flushPromises()
+    await wrapper.get('[data-test="usage-day-2026-10-10"]').trigger('click'); await flushPromises()
+    expect(getModels.mock.calls[1][0]).toEqual(expect.objectContaining({ user_id: 1, start_date: '2026-10-10', end_date: '2026-10-10' }))
+    expect(wrapper.get('[data-test="usage-model-consumption"]').text()).toContain('yesterday-model')
+    expect(wrapper.get('[data-test="usage-model-consumption"]').text()).not.toContain('today-model')
+    await wrapper.get('[data-test="usage-day-2026-10-11"]').trigger('click'); await flushPromises()
+    expect(wrapper.get('[data-test="usage-model-consumption"]').text()).toContain('today-model')
+    expect(getModels).toHaveBeenCalledTimes(2)
+    expect(getDetails).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels and ignores a stale model response when changing users', async () => {
+    const old = deferred<{ models: { model: string; actual_cost: number }[] }>()
+    getDetails.mockResolvedValueOnce(response(1)).mockResolvedValueOnce(response(2))
+    getModels.mockReturnValueOnce(old.promise).mockResolvedValueOnce({ models: [{ model: 'current-user-model', actual_cost: 1 }] })
+    const wrapper = open(); await flushPromises()
+    const signal = getModels.mock.calls[0][1].signal as AbortSignal
+    await wrapper.setProps({ user: user(2) }); await flushPromises()
+    expect(signal.aborted).toBe(true)
+    expect(getModels.mock.calls[1][0].user_id).toBe(2)
+    old.resolve({ models: [{ model: 'other-user-model', actual_cost: 99 }] }); await flushPromises()
+    expect(wrapper.get('[data-test="usage-model-consumption"]').text()).toContain('current-user-model')
+    expect(wrapper.get('[data-test="usage-model-consumption"]').text()).not.toContain('other-user-model')
+  })
+
+  it('keeps usage details available if the independent distribution request fails and can retry', async () => {
+    getDetails.mockResolvedValue(response())
+    getModels.mockRejectedValueOnce(new Error('unavailable')).mockResolvedValueOnce({ models: [{ model: 'recovered', actual_cost: 0.000736 }] })
+    const wrapper = open(); await flushPromises()
+    expect(wrapper.find('[data-test="usage-model-error"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="day-cost"]').text()).toBe('$4.00')
+    await wrapper.get('[data-test="usage-model-error"] button').trigger('click'); await flushPromises()
+    expect(wrapper.find('[data-test="usage-model-error"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="usage-model-row"]').text()).toContain('$0.000736')
+  })
+
+  it('cancels distribution loading when closed and clears it on reopening', async () => {
+    const old = deferred<{ models: { model: string; actual_cost: number }[] }>()
+    getDetails.mockResolvedValue(response())
+    getModels.mockReturnValueOnce(old.promise).mockResolvedValueOnce({ models: [] })
+    const wrapper = open(); await flushPromises()
+    const signal = getModels.mock.calls[0][1].signal as AbortSignal
+    await wrapper.setProps({ show: false }); await flushPromises()
+    expect(signal.aborted).toBe(true)
+    old.resolve({ models: [{ model: 'stale', actual_cost: 50 }] }); await flushPromises()
+    await wrapper.setProps({ show: true }); await flushPromises()
+    expect(getModels).toHaveBeenCalledTimes(2)
+    expect(wrapper.findAll('[data-test="usage-model-row"]')).toHaveLength(0)
+    expect(wrapper.get('[data-test="usage-model-consumption"]').text()).not.toContain('NaN')
   })
 })
