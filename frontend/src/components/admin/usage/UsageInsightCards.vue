@@ -83,10 +83,13 @@ const sparkPath = computed(() => {
 .insight-spark { height: 19px; width: 100%; margin-top: -.1rem; color: #a498d9; }
 .insight-footer { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-top: auto; padding-top: .35rem; font-size: .6rem; color: #8a9b9e; }
 .insight-footer > span:last-child { display: flex; align-items: center; gap: .15rem; color: #6f948b; }
-:global(.dark) .insight-card { border-color: #293d45; background: linear-gradient(145deg, #1b2b34, #172630); }
-:global(.dark) .insight-card:hover { border-color: #507b70; }
-:global(.dark) .insight-heading { color: #a8bec9; }
-:global(.dark) .insight-value { color: #e6f0ef; }
-:global(.dark) .insight-bar { background: #263a41; }
+.dark .insight-card { border-color: #293d45; background: linear-gradient(145deg, #1b2b34, #172630); }
+.dark .insight-card:hover { border-color: #507b70; }
+.dark .insight-heading { color: #a8bec9; }
+.dark .insight-value { color: #e6f0ef; }
+.dark .insight-description { color: #a0b2bf; }
+.dark .insight-footer { color: #8fa6af; }
+.dark .insight-footer > span:last-child { color: #8cc7b3; }
+.dark .insight-bar { background: #263a41; }
 @media (prefers-reduced-motion: reduce) { .insight-card { transition: none; } .insight-card:hover { transform: none; } }
 </style>
