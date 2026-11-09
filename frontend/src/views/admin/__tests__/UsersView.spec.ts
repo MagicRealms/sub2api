@@ -223,6 +223,27 @@ describe('admin UsersView', () => {
     vi.useRealTimers()
   })
 
+  it('uses latest activity first and ignores pre-migration sort preferences', async () => {
+    localStorage.setItem('admin-users-table-sort', JSON.stringify({ key: 'created_at', order: 'asc' }))
+    localStorage.setItem('admin-users-usage-sort', JSON.stringify({ key: 'usage', period: 'today', order: 'desc' }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    expect(listUsers).toHaveBeenLastCalledWith(
+      1, 20, expect.objectContaining({ sort_by: 'last_active_at', sort_order: 'desc' }), expect.any(Object)
+    )
+    wrapper.unmount()
+  })
+
+  it('keeps explicitly chosen sorting after the activity-default migration', async () => {
+    localStorage.setItem('admin-users-table-sort-v2', JSON.stringify({ key: 'last_used_at', order: 'asc' }))
+    const wrapper = mountBulkDeleteView()
+    await flushPromises()
+    expect(listUsers).toHaveBeenLastCalledWith(
+      1, 20, expect.objectContaining({ sort_by: 'last_used_at', sort_order: 'asc' }), expect.any(Object)
+    )
+    wrapper.unmount()
+  })
+
   it('cancels bulk deletion without deleting or clearing selected users', async () => {
     const wrapper = mountBulkDeleteView()
     await flushPromises()
@@ -493,12 +514,12 @@ describe('admin UsersView', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-test="row-order"]').text()).toBe('usage-first@example.com,last-used-first@example.com')
-    expect(localStorage.getItem('admin-users-usage-sort')).toContain('"key":"usage"')
+    expect(localStorage.getItem('admin-users-usage-sort-v2')).toContain('"key":"usage"')
 
     await wrapper.get('[data-test="sort-last-used"]').trigger('click')
     await flushPromises()
 
-    expect(localStorage.getItem('admin-users-usage-sort')).toBeNull()
+    expect(localStorage.getItem('admin-users-usage-sort-v2')).toBeNull()
     expect(wrapper.get('[data-test="row-order"]').text()).toBe('last-used-first@example.com,usage-first@example.com')
     expect(listUsers).toHaveBeenLastCalledWith(
       1,

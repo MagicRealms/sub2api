@@ -318,7 +318,7 @@ func TestGroupUsageSummaryIncludesYesterdayAcrossWatermark(t *testing.T) {
 func TestGroupUsageRollupSyncRebuildsAfterTimezoneChange(t *testing.T) {
 	ctx := context.Background()
 	useGroupUsageRepositoryTestTimezone(t, "America/New_York")
-	todayStart := time.Date(2026, 3, 9, 4, 0, 0, 0, time.UTC)
+	todayStart := time.Date(2026, 3, 8, 16, 0, 0, 0, time.UTC)
 	schema := createGroupUsageRollupTriggerTestSchema(t, ctx, false)
 	tx := beginGroupUsageRollupTriggerTestTx(t, ctx, schema)
 	defer func() { _ = tx.Rollback() }()
@@ -335,7 +335,7 @@ func TestGroupUsageRollupSyncRebuildsAfterTimezoneChange(t *testing.T) {
 		UPDATE usage_group_rollup_state
 		SET closed_before = DATE '2026-03-09',
 			retained_from = TIMESTAMPTZ '2026-03-08 05:30:00+00',
-			timezone_name = 'Asia/Shanghai'
+			timezone_name = 'America/Los_Angeles'
 		WHERE id = 1;
 	`)
 	require.NoError(t, err)
@@ -350,7 +350,7 @@ func TestGroupUsageRollupSyncRebuildsAfterTimezoneChange(t *testing.T) {
 		FROM usage_group_rollup_state
 		WHERE id = 1
 	`).Scan(&stateTimezone, &closedBefore))
-	require.Equal(t, "America/New_York", stateTimezone)
+	require.Equal(t, "Asia/Shanghai", stateTimezone)
 	require.Equal(t, "2026-03-09", closedBefore)
 
 	var rollupCost float64
@@ -370,10 +370,10 @@ func TestGroupUsageRollupSyncRebuildsAfterTimezoneChange(t *testing.T) {
 	require.InDelta(t, 3, result[0].YesterdayCost, 0.0000001)
 }
 
-func TestGroupUsageSummaryUsesConfiguredDSTBoundaries(t *testing.T) {
+func TestGroupUsageSummaryUsesBeijingBoundariesAcrossServerDST(t *testing.T) {
 	ctx := context.Background()
 	useGroupUsageRepositoryTestTimezone(t, "America/New_York")
-	todayStart := time.Date(2026, 3, 9, 4, 0, 0, 0, time.UTC)
+	todayStart := time.Date(2026, 3, 8, 16, 0, 0, 0, time.UTC)
 	schema := createGroupUsageRollupTriggerTestSchema(t, ctx, false)
 	tx := beginGroupUsageRollupTriggerTestTx(t, ctx, schema)
 	defer func() { _ = tx.Rollback() }()
@@ -383,14 +383,14 @@ func TestGroupUsageSummaryUsesConfiguredDSTBoundaries(t *testing.T) {
 		INSERT INTO groups (id) VALUES (10);
 		INSERT INTO users (id) VALUES (1);
 		INSERT INTO usage_logs (id, user_id, group_id, actual_cost, created_at) VALUES
-			(1, 1, 10, 100, TIMESTAMPTZ '2026-03-08 04:30:00+00'),
-			(2, 1, 10, 3, TIMESTAMPTZ '2026-03-08 05:30:00+00'),
-			(3, 1, 10, 4, TIMESTAMPTZ '2026-03-09 03:30:00+00'),
-			(4, 1, 10, 5, TIMESTAMPTZ '2026-03-09 04:30:00+00');
+			(1, 1, 10, 100, TIMESTAMPTZ '2026-03-07 15:59:59+00'),
+			(2, 1, 10, 3, TIMESTAMPTZ '2026-03-07 16:00:00+00'),
+			(3, 1, 10, 4, TIMESTAMPTZ '2026-03-08 15:59:59+00'),
+			(4, 1, 10, 5, TIMESTAMPTZ '2026-03-08 16:00:00+00');
 		UPDATE usage_group_rollup_state
 		SET closed_before = DATE '1970-01-01',
 			retained_from = TIMESTAMPTZ '1970-01-01 00:00:00+00',
-			timezone_name = 'America/New_York'
+			timezone_name = 'Asia/Shanghai'
 		WHERE id = 1;
 	`)
 	require.NoError(t, err)

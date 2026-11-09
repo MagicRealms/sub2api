@@ -16,14 +16,14 @@ import (
 type groupUsageRollupSnapshot struct {
 	valid        bool
 	closedBefore string    // date，历史日桶的右开边界
-	retainedDate string    // retained_from 在服务端时区内的日期，历史日桶的左闭边界
+	retainedDate string    // retained_from 按北京时间的日期，历史日桶的左闭边界
 	tailStart    time.Time // 尾段（还没进日桶的那部分 usage_logs）的起点
 }
 
 // readGroupUsageRollupSnapshot 读一次汇总水位并在 Go 侧判定有效性。
 //
 // 判定条件与原先 SQL 里的 state_values CTE 完全一致：
-// 恰好一行、时区名与当前服务端配置相同、且水位不在未来。
+// 恰好一行、时区名与北京时间统计日历相同、且水位不在未来。
 func (r *usageLogRepository) readGroupUsageRollupSnapshot(ctx context.Context, timezoneName, todayDate string) (groupUsageRollupSnapshot, error) {
 	epoch := time.Unix(0, 0).UTC()
 	invalid := groupUsageRollupSnapshot{
@@ -162,7 +162,7 @@ func (r *usageLogRepository) getAllGroupUsageSummaryFromRollups(ctx context.Cont
 	return results, nil
 }
 
-// SyncGroupUsageRollups 将服务端配置时区今日以前的用量发布为分组日桶。
+// SyncGroupUsageRollups 将北京时间今日以前的用量发布为分组日桶。
 func (r *dashboardAggregationRepository) SyncGroupUsageRollups(ctx context.Context, todayStart time.Time) error {
 	if r == nil || r.sql == nil {
 		return nil

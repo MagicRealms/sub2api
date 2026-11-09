@@ -285,7 +285,7 @@
           :selection-label="getUserSelectionLabel"
           :actions-count="7"
           :server-side-sort="true"
-          default-sort-key="created_at"
+          default-sort-key="last_active_at"
           default-sort-order="desc"
           :sort-storage-key="USER_SORT_STORAGE_KEY"
           @sort="handleSort"
@@ -1048,9 +1048,11 @@ const columns = computed<Column[]>(() =>
 const users = ref<AdminUser[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const USER_SORT_STORAGE_KEY = 'admin-users-table-sort'
+// Start this default once for existing browsers as well; subsequent explicit
+// column choices remain persistent under the new preference version.
+const USER_SORT_STORAGE_KEY = 'admin-users-table-sort-v2'
 const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' } => {
-  const fallback = { sort_by: 'created_at', sort_order: 'desc' as 'asc' | 'desc' }
+  const fallback = { sort_by: 'last_active_at', sort_order: 'desc' as 'asc' | 'desc' }
   const sortable = new Set(['email', 'id', 'username', 'role', 'balance', 'concurrency', 'status', 'last_used_at', 'last_active_at', 'created_at'])
   try {
     const raw = localStorage.getItem(USER_SORT_STORAGE_KEY)
@@ -1230,7 +1232,7 @@ const getPlatformUsage = (userId: number, platform: string) =>
 // 排序状态独立于后端 sortState 持久化；缺失数据按 0 处理（desc 沉底、asc 置顶）。
 type UsageMetric = 'today' | 'total'
 type UsageSortState = { key: string; metric: UsageMetric; order: 'asc' | 'desc' } | null
-const USAGE_SORT_STORAGE_KEY = 'admin-users-usage-sort'
+const USAGE_SORT_STORAGE_KEY = 'admin-users-usage-sort-v2'
 // 列头排序按钮点击后弹出的"今日/近30天"选择菜单，同时只允许一个列展开。
 const openUsageSortMenu = ref<string | null>(null)
 

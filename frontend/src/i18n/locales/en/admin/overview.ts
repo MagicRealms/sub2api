@@ -928,7 +928,7 @@ export default {
         apiKeys: 'API Keys',
         accounts: 'Accounts',
         capacity: 'Capacity',
-        usage: 'Usage',
+        usage: 'Usage (UTC+8)',
         status: 'Status',
         actions: 'Actions',
         billingType: 'Billing Type',

@@ -601,8 +601,8 @@ func (h *DashboardHandler) GetBatchUsersUsage(c *gin.Context) {
 		Day     string  `json:"day"`
 		UserIDs []int64 `json:"user_ids"`
 	}{
-		V:       2, // bump 当响应结构变化（如加入 by_platform 时）
-		Day:     timezone.Today().Format("2006-01-02"),
+		V:       3, // reporting calendar is Beijing; quota clocks are unchanged
+		Day:     usagestats.DashboardDay(time.Now()).Format("2006-01-02"),
 		UserIDs: userIDs,
 	})
 	cacheKey := string(keyRaw)

@@ -15,13 +15,13 @@ func TestUsageLogRepositoryGetAllGroupUsageSummaryUsesRollupTail(t *testing.T) {
 	db, mock := newSQLMock(t)
 	repo := newUsageLogRepositoryWithSQL(nil, db)
 	useGroupUsageRepositoryTestTimezone(t, "America/New_York")
-	todayStart := time.Date(2026, 3, 9, 4, 0, 0, 0, time.UTC)
-	yesterdayStart := time.Date(2026, 3, 8, 5, 0, 0, 0, time.UTC)
+	todayStart := time.Date(2026, 3, 8, 16, 0, 0, 0, time.UTC)
+	yesterdayStart := time.Date(2026, 3, 7, 16, 0, 0, 0, time.UTC)
 
 	// 水位有效：closed_before = 2026-03-07（≤ today），时区与配置一致。
 	mock.ExpectQuery(`(?s)COUNT\(\*\).*usage_group_rollup_state.*WHERE id = 1`).
 		WillReturnRows(sqlmock.NewRows([]string{"count", "closed_before", "retained_from", "timezone_name"}).
-			AddRow(1, "2026-03-07", time.Date(2026, 2, 1, 5, 0, 0, 0, time.UTC), "America/New_York"))
+			AddRow(1, "2026-03-07", time.Date(2026, 1, 31, 16, 0, 0, 0, time.UTC), "Asia/Shanghai"))
 
 	// 尾段起点必须以参数形式进 WHERE —— 这正是把 usage_logs 全表扫换回
 	// idx_usage_logs_created_at 索引扫的那一步。
@@ -33,7 +33,7 @@ func TestUsageLogRepositoryGetAllGroupUsageSummaryUsesRollupTail(t *testing.T) {
 			true,         // 水位有效
 			"2026-02-01", // retained_from 在配置时区内的日期
 			"2026-03-07", // closed_before
-			time.Date(2026, 3, 7, 5, 0, 0, 0, time.UTC), // tail_start = closed_before 在配置时区的零点
+			time.Date(2026, 3, 6, 16, 0, 0, 0, time.UTC), // tail_start = closed_before 在配置时区的零点
 		).
 		WillReturnRows(sqlmock.NewRows([]string{"group_id", "total_cost", "today_cost", "yesterday_cost"}).
 			AddRow(int64(7), 12.5, 1.25, 2.5))
@@ -52,8 +52,8 @@ func TestUsageLogRepositoryGetAllGroupUsageSummaryUsesRollupTail(t *testing.T) {
 // 历史日桶整段不参与，尾段起点回到 1970-01-01。
 func TestUsageLogRepositoryGetAllGroupUsageSummaryFallsBackWhenWatermarkInvalid(t *testing.T) {
 	epoch := time.Unix(0, 0).UTC()
-	todayStart := time.Date(2026, 3, 9, 4, 0, 0, 0, time.UTC)
-	yesterdayStart := time.Date(2026, 3, 8, 5, 0, 0, 0, time.UTC)
+	todayStart := time.Date(2026, 3, 8, 16, 0, 0, 0, time.UTC)
+	yesterdayStart := time.Date(2026, 3, 7, 16, 0, 0, 0, time.UTC)
 
 	cases := []struct {
 		name string
@@ -67,12 +67,12 @@ func TestUsageLogRepositoryGetAllGroupUsageSummaryFallsBackWhenWatermarkInvalid(
 		{
 			name: "时区与当前配置不一致",
 			rows: sqlmock.NewRows([]string{"count", "closed_before", "retained_from", "timezone_name"}).
-				AddRow(1, "2026-03-07", time.Date(2026, 2, 1, 5, 0, 0, 0, time.UTC), "Asia/Shanghai"),
+				AddRow(1, "2026-03-07", time.Date(2026, 1, 31, 16, 0, 0, 0, time.UTC), "America/Los_Angeles"),
 		},
 		{
 			name: "水位位于未来",
 			rows: sqlmock.NewRows([]string{"count", "closed_before", "retained_from", "timezone_name"}).
-				AddRow(1, "2026-03-10", time.Date(2026, 2, 1, 5, 0, 0, 0, time.UTC), "America/New_York"),
+				AddRow(1, "2026-03-10", time.Date(2026, 1, 31, 16, 0, 0, 0, time.UTC), "Asia/Shanghai"),
 		},
 	}
 

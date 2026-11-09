@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	appTimezone "github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
 const groupUsageDateFormat = "2006-01-02"
@@ -14,27 +14,27 @@ type GroupUsageRollupRepository interface {
 	SyncGroupUsageRollups(ctx context.Context, todayStart time.Time) error
 }
 
-// GroupUsageTimezoneName 返回服务端配置的时区名称。
+// Group usage is display reporting, independent of upstream quota calendars.
 func GroupUsageTimezoneName() string {
-	return appTimezone.Location().String()
+	return usagestats.DashboardTimezone
 }
 
-// GroupUsageTodayStart 返回指定时刻在服务端配置时区内的自然日 UTC 起点。
+// GroupUsageTodayStart returns Beijing midnight as an absolute UTC instant.
 func GroupUsageTodayStart(at time.Time) time.Time {
-	return appTimezone.StartOfDay(at).UTC()
+	return usagestats.DashboardDay(at).UTC()
 }
 
-// GroupUsageYesterdayStart 返回指定时刻前一个本地日历日的 UTC 起点。
+// GroupUsageYesterdayStart 返回指定时刻前一个北京时间日历日的 UTC 起点。
 func GroupUsageYesterdayStart(at time.Time) time.Time {
-	return appTimezone.StartOfDay(at).AddDate(0, 0, -1).UTC()
+	return usagestats.DashboardDay(at).AddDate(0, 0, -1).UTC()
 }
 
-// GroupUsageDate 返回指定时刻在服务端配置时区内的日期。
+// GroupUsageDate returns the Beijing reporting date.
 func GroupUsageDate(at time.Time) string {
-	return at.In(appTimezone.Location()).Format(groupUsageDateFormat)
+	return at.In(usagestats.DashboardLocation()).Format(groupUsageDateFormat)
 }
 
-// ParseGroupUsageDate 解析服务端配置时区内的日期并返回其零点。
+// ParseGroupUsageDate parses a Beijing reporting date.
 func ParseGroupUsageDate(value string) (time.Time, error) {
-	return appTimezone.ParseInLocation(groupUsageDateFormat, value)
+	return time.ParseInLocation(groupUsageDateFormat, value, usagestats.DashboardLocation())
 }

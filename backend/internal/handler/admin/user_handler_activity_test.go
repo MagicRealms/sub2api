@@ -14,6 +14,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUserHandlerListDefaultsToMostRecentlyActive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	adminSvc := newStubAdminService()
+	handler := NewUserHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+
+	handler.List(c)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, "last_active_at", adminSvc.lastListUsers.sortBy)
+	require.Equal(t, "desc", adminSvc.lastListUsers.sortOrder)
+}
+
 func TestUserHandlerListIncludesActivityFieldsAndSortParams(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

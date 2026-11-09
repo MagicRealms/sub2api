@@ -148,7 +148,7 @@ func (h *UserHandler) List(c *gin.Context) {
 			filters.APIKeyGroupID = id
 		}
 	}
-	sortBy := c.DefaultQuery("sort_by", "created_at")
+	sortBy := c.DefaultQuery("sort_by", "last_active_at")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 	if raw, ok := c.GetQuery("include_subscriptions"); ok {
 		includeSubscriptions := parseBoolQueryWithDefault(raw, true)

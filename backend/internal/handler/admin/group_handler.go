@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/platform/liveattestation"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -946,6 +947,7 @@ func (h *GroupHandler) GetUsageSummary(c *gin.Context) {
 		return
 	}
 	todayStart := service.GroupUsageTodayStart(time.Now())
+	c.Header("X-Usage-Timezone", usagestats.DashboardTimezone)
 
 	results, err := h.dashboardService.GetGroupUsageSummary(c.Request.Context(), todayStart)
 	if err != nil {
