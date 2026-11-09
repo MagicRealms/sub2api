@@ -596,6 +596,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/test-center', label: t('nav.testCenter'), icon: TestCenterIcon },
     { path: '/guide', label: t('usageGuide.nav'), icon: GuideIcon },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
+    ...(authStore.isTester ? [{ path: '/tester/monitor', label: t('tester.title'), icon: SignalIcon, hideInSimpleMode: true }] : []),
     { path: '/usage', label: t('nav.usage'), icon: { render: () => h(WorkspaceIcon, { name: 'analysis' }) }, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },

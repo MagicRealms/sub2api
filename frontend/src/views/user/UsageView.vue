@@ -1,6 +1,10 @@
 <template>
   <AppLayout :header-title="t('usage.title')" :header-subtitle="t('workspace.recordsDescription')" header-icon="analysis">
     <div class="console-usage-page sw-page">
+      <div v-if="authStore.isTester" class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-800 dark:bg-primary-900/15">
+        <p class="max-w-3xl text-xs leading-6 text-gray-600 dark:text-dark-300">{{ t('tester.sessionHint') }}</p>
+        <div class="flex flex-wrap gap-2"><RouterLink to="/tester/monitor" class="btn btn-secondary">{{ t('tester.title') }}</RouterLink><TesterHistoryResetButton :disabled="loading || errorLoading" @reset="onTesterHistoryReset" /></div>
+      </div>
       <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
 
       <div class="space-y-4">
@@ -259,6 +263,8 @@ import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import TesterHistoryResetButton from '@/components/user/TesterHistoryResetButton.vue'
 import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import { keysAPI, usageAPI, userGroupsAPI } from '@/api'
 import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
@@ -300,6 +306,7 @@ const advancedFilters = ref(false)
 const activeInsight = ref<UsageInsight | null>(null)
 const insightTitle = computed(() => t(activeInsight.value === 'models' ? 'admin.dashboard.consumptionDistribution' : activeInsight.value === 'groups' ? 'admin.dashboard.groupDistribution' : activeInsight.value === 'endpoints' ? 'usage.endpointDistribution' : 'usage.performanceTrends'))
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
@@ -412,7 +419,7 @@ const groupDistributionMetric = ref<DistributionMetric>('tokens')
 const endpointDistributionMetric = ref<DistributionMetric>('tokens')
 const endpointDistributionSource = ref<EndpointSource>('inbound')
 const activeTab = ref<'usage' | 'errors'>('usage')
-const errorViewEnabled = computed(() => appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false)
+const errorViewEnabled = computed(() => authStore.isTester || (appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false))
 
 const filters = ref<UsageQueryParams>({
   start_date: startDate.value,
@@ -485,6 +492,7 @@ const normalizedFilters = computed<UsageQueryParams>(() => {
   const legacyStream = requestType ? requestTypeToLegacyStream(requestType) : filters.value.stream
   return {
     ...filters.value,
+    test_session: authStore.isTester || undefined,
     start_date: startDate.value,
     end_date: endDate.value,
     stream: legacyStream === null ? undefined : legacyStream,
@@ -680,6 +688,13 @@ const applyFilters = () => {
   void loadModelStats()
   void loadChartData()
   resetErrorRows()
+}
+
+function onTesterHistoryReset() {
+  pagination.page = 1
+  errorPage.value = 1
+  selectedTrendPoint.value = null
+  refreshData()
 }
 
 const refreshData = () => {

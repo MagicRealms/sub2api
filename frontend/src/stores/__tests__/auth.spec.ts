@@ -66,6 +66,13 @@ describe('useAuthStore', () => {
   // --- login ---
 
   describe('login', () => {
+    it('recognizes testers without granting administrator permissions', async () => {
+      mockLogin.mockResolvedValue({ ...fakeAuthResponse, user:{...fakeUser,role:'tester'} })
+      const store=useAuthStore()
+      await store.login({ email:fakeUser.email,password:'example' })
+      expect(store.isTester).toBe(true)
+      expect(store.isAdmin).toBe(false)
+    })
     it('成功登录后设置 token 和 user', async () => {
       mockLogin.mockResolvedValue(fakeAuthResponse)
       const store = useAuthStore()

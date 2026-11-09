@@ -96,6 +96,8 @@ const appStoreState = vi.hoisted(() => ({
   cachedPublicSettings: { allow_user_view_error_requests: true } as Record<string, unknown>,
 }))
 
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ isTester: false }) }))
+
 vi.mock('@/stores/app', () => ({
   useAppStore: () => ({
     showError, showWarning, showSuccess, showInfo,
@@ -153,7 +155,7 @@ const usageLog = {
 function mountUsageView() {
   return mount(UsageView, {
     global: {
-      stubs: { Teleport: true,
+      stubs: { Teleport: true, RouterLink: true,
         AppLayout: simpleStub,
         Pagination: true,
         Select: true,

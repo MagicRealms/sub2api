@@ -90,6 +90,14 @@ func RegisterUserRoutes(
 			keys.DELETE("/:id", h.APIKey.Delete)
 		}
 
+		// 测试员本人监控与观察窗口重置；处理器再次校验角色。
+		tester := authenticated.Group("/tester")
+		tester.Use(panelRateLimiter.Heavy())
+		{
+			tester.GET("/monitor", h.Usage.TesterMonitoring)
+			tester.POST("/usage/reset", h.Usage.ResetTesterHistory)
+		}
+
 		// 用户可用分组（非管理员接口）
 		groups := authenticated.Group("/groups")
 		{

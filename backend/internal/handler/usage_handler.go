@@ -67,7 +67,7 @@ func NewUsageHandler(
 	}
 }
 
-func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) (*userUsageFilters, bool) {
+func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool, historyScope ...bool) (*userUsageFilters, bool) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
@@ -230,6 +230,13 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 		}
 	}
 
+	// Record lists and tester-session charts honor the personal observation
+	// boundary. Account billing dashboards retain their original full history.
+	if (len(historyScope) > 0 && historyScope[0]) || c.Query("test_session") == "true" {
+		if !h.applyTesterHistory(c, &startPtr) {
+			return nil, false
+		}
+	}
 	return &userUsageFilters{
 		Filters: usagestats.UsageLogFilters{
 			UserID:             subject.UserID,
@@ -261,7 +268,7 @@ func derefTime(value *time.Time) time.Time {
 // GET /api/v1/usage
 func (h *UsageHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
-	parsed, ok := h.parseUserUsageFilters(c, false)
+	parsed, ok := h.parseUserUsageFilters(c, false, true)
 	if !ok {
 		return
 	}
@@ -296,7 +303,7 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 	}
 
 	// Visibility switch (fail-closed). Defense-in-depth: frontend also hides the tab.
-	if h.settingService == nil || !h.settingService.IsUserErrorViewAllowed(c.Request.Context()) {
+	if !isTesterContext(c) && (h.settingService == nil || !h.settingService.IsUserErrorViewAllowed(c.Request.Context())) {
 		response.Forbidden(c, "Error requests view is disabled")
 		return
 	}
@@ -332,6 +339,27 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 		filter.EndTime = &t
 	}
 
+	if c.Query("start_time") != "" || c.Query("end_time") != "" {
+		if c.Query("start_date") != "" || c.Query("end_date") != "" {
+			response.BadRequest(c, "Use either start_time/end_time or start_date/end_date")
+			return
+		}
+		start, startErr := time.Parse(time.RFC3339Nano, c.Query("start_time"))
+		end, endErr := time.Parse(time.RFC3339Nano, c.Query("end_time"))
+		if startErr != nil || endErr != nil || !end.After(start) {
+			response.BadRequest(c, "Invalid start_time/end_time range, use RFC3339")
+			return
+		}
+		filter.StartTime, filter.EndTime = &start, &end
+	}
+	if raw := strings.TrimSpace(c.Query("group_id")); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "Invalid group_id")
+			return
+		}
+		filter.GroupID = &id
+	}
 	filter.Model = strings.TrimSpace(c.Query("model"))
 
 	if k := strings.TrimSpace(c.Query("api_key_id")); k != "" {
@@ -363,6 +391,9 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 	// 排序对齐用量明细:列白名单与方向归一在 repo 层,非法值回退 created_at DESC。
 	filter.SetSort(c.Query("sort_by"), c.Query("sort_order"))
 
+	if !h.applyTesterHistory(c, &filter.StartTime) {
+		return
+	}
 	result, err := h.opsService.ListUserErrorRequests(c.Request.Context(), subject.UserID, filter)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -379,7 +410,7 @@ func (h *UsageHandler) GetErrorDetail(c *gin.Context) {
 		response.Unauthorized(c, "User not authenticated")
 		return
 	}
-	if h.settingService == nil || !h.settingService.IsUserErrorViewAllowed(c.Request.Context()) {
+	if !isTesterContext(c) && (h.settingService == nil || !h.settingService.IsUserErrorViewAllowed(c.Request.Context())) {
 		response.Forbidden(c, "Error requests view is disabled")
 		return
 	}
@@ -395,6 +426,13 @@ func (h *UsageHandler) GetErrorDetail(c *gin.Context) {
 	detail, err := h.opsService.GetUserErrorRequestDetail(c.Request.Context(), subject.UserID, id)
 	if err != nil {
 		response.ErrorFrom(c, err)
+		return
+	}
+	if detail == nil {
+		response.Error(c, http.StatusNotFound, "Record not found")
+		return
+	}
+	if !h.testerRecordVisible(c, detail.CreatedAt) {
 		return
 	}
 	response.Success(c, detail)
@@ -427,13 +465,16 @@ func (h *UsageHandler) GetByID(c *gin.Context) {
 		return
 	}
 
+	if !h.testerRecordVisible(c, record.CreatedAt) {
+		return
+	}
 	response.Success(c, dto.UsageLogFromService(record).Localized(c.GetHeader("Accept-Language")))
 }
 
 // Stats handles getting usage statistics
 // GET /api/v1/usage/stats
 func (h *UsageHandler) Stats(c *gin.Context) {
-	parsed, ok := h.parseUserUsageFilters(c, true)
+	parsed, ok := h.parseUserUsageFilters(c, true, true)
 	if !ok {
 		return
 	}

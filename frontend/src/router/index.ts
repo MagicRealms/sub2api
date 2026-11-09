@@ -257,6 +257,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: false }
   },
   {
+    path: '/tester/monitor',
+    name: 'TesterMonitor',
+    component: () => import('@/views/user/TesterMonitorView.vue'),
+    meta: { requiresAuth: true, requiresTester: true, title: 'Personal Monitoring', titleKey: 'tester.title', descriptionKey: 'tester.description' }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),
@@ -970,6 +976,11 @@ router.beforeEach(async (to, _from, next) => {
       path: '/login',
       query: { redirect: to.fullPath } // Save intended destination
     })
+    return
+  }
+
+  if (to.meta.requiresTester === true && !authStore.isTester) {
+    next('/dashboard')
     return
   }
 

@@ -781,6 +781,7 @@ export default {
       createdAt: 'Created',
       totalRecharged: 'Total Recharged',
       roles: {
+        tester: 'Tester',
         admin: 'Admin',
         user: 'User'
       },

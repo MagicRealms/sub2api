@@ -1,3 +1,4 @@
+import tester from './tester'
 import adminAccessKeys from './adminAccessKeys'
 import mcp from './mcp'
 import landing from './landing'
@@ -12,6 +13,7 @@ import testCenter from './testCenter'
 import channelIQ from './channelIQ'
 
 export default {
+  tester,
   adminAccessKeys,
   mcp,
   ...landing,

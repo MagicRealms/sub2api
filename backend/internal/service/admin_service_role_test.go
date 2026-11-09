@@ -12,6 +12,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAdminService_TesterRoleLifecycleAndAdminProtection(t *testing.T) {
+	repo := &userRepoStub{nextID: 90}
+	svc := &adminServiceImpl{userRepo: repo}
+	created, err := svc.CreateUser(context.Background(), &CreateUserInput{Email: "tester@example.test", Password: "strong-pass", Role: RoleTester})
+	require.NoError(t, err)
+	require.Equal(t, RoleTester, created.Role)
+	require.False(t, created.IsAdmin())
+	for _, from := range []string{RoleUser, RoleAdmin} {
+		base := &userRepoStub{user: &User{ID: 42, Role: from}}
+		repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 1}
+		invalidator := &authCacheInvalidatorStub{}
+		svc := &adminServiceImpl{userRepo: repo, redeemCodeRepo: &redeemRepoStub{}, authCacheInvalidator: invalidator}
+		updated, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Role: RoleTester})
+		if from == RoleAdmin {
+			require.Equal(t, "LAST_ADMIN_DEMOTE_FORBIDDEN", infraerrors.Reason(err))
+			require.Nil(t, repo.lastUpdated)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, RoleTester, updated.Role)
+			require.Equal(t, []int64{42}, invalidator.userIDs)
+		}
+	}
+}
+
 func TestAdminService_CreateUser_WithAdminRole(t *testing.T) {
 	repo := &userRepoStub{nextID: 30}
 	svc := &adminServiceImpl{userRepo: repo}

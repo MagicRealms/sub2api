@@ -56,6 +56,7 @@ export interface UserDashboardStats {
 }
 
 export interface TrendParams {
+  test_session?: boolean
   start_date?: string
   end_date?: string
   granularity?: 'day' | 'hour' | 'week'
@@ -282,6 +283,7 @@ export async function getDashboardTrend(params?: TrendParams): Promise<TrendResp
  * @returns Model usage statistics for current user
  */
 export async function getDashboardModels(params?: {
+  test_session?: boolean
   start_date?: string
   end_date?: string
   api_key_id?: number
