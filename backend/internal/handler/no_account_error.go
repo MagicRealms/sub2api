@@ -2,11 +2,13 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -28,10 +30,11 @@ import (
 //     after a backoff can plausibly succeed (or, in the empty-pool case, the
 //     operator may be in the middle of adding accounts).
 type noAccountErrorClassification struct {
-	Status        int
-	ErrType       string
-	Message       string
-	ModelNotFound bool // true when this is a 404 model_not_found classification
+	Status            int
+	ErrType           string
+	Message           string
+	ModelNotFound     bool // true when this is a 404 model_not_found classification
+	RetryAfterSeconds int
 }
 
 var selectionModelRateLimitedPattern = regexp.MustCompile(`(?:model_rate_limited|rate_limited)=(\d+)`)
@@ -61,6 +64,16 @@ func classifySelectionFailureError(err error, fallback noAccountErrorClassificat
 	}
 	match := selectionModelRateLimitedPattern.FindStringSubmatch(strings.ToLower(err.Error()))
 	if len(match) != 2 {
+		var hint interface{ RetryAfter() time.Duration }
+		if fallback.Status == http.StatusServiceUnavailable && errors.As(err, &hint) {
+			delay := hint.RetryAfter()
+			// Model cooldowns are at most 45s. Bound independently here so a
+			// different error implementation cannot turn this into a long wait.
+			if delay > 0 && delay <= time.Minute {
+				fallback.RetryAfterSeconds = int((delay + time.Second - 1) / time.Second)
+				fallback.Message = "Upstream model capacity is temporarily cooling down. Please retry later."
+			}
+		}
 		return fallback
 	}
 	count, parseErr := strconv.Atoi(match[1])
@@ -72,6 +85,14 @@ func classifySelectionFailureError(err error, fallback noAccountErrorClassificat
 		ErrType: "rate_limit_error",
 		Message: "All available accounts are currently rate-limited. Please retry later.",
 	}
+}
+
+func classifySelectionFailureErrorFromGin(c *gin.Context, err error, fallback noAccountErrorClassification) noAccountErrorClassification {
+	result := classifySelectionFailureError(err, fallback)
+	if c != nil && result.RetryAfterSeconds > 0 && !c.Writer.Written() {
+		c.Header("Retry-After", strconv.Itoa(result.RetryAfterSeconds))
+	}
+	return result
 }
 
 // classifyNoAccountError decides between 404 model_not_found and 503

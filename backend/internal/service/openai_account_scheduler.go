@@ -1509,7 +1509,8 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		})
 	}
 	if len(filtered) == 0 {
-		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false, filterStats.summary(""))
+		retryAt := s.service.openAISelectionModelCooldownRetryAt(accounts, req.RequestedModel, filterStats)
+		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false, filterStats.summary(""), retryAt)
 	}
 	if req.StrictPriority {
 		return s.selectByStrictPriority(ctx, req, filtered, budget, filterStats)

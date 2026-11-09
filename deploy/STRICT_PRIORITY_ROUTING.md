@@ -36,3 +36,11 @@ conflicting stale priority snapshot fails closed until the snapshot catches up.
 
 Rollback: remove the group IDs (or use `[]`) and restart, or restore the preceding
 pinned fork image. Keep existing account priorities and billing multipliers.
+
+When every candidate is temporarily blocked by a known finite model cooldown,
+HTTP errors carry a bounded `Retry-After` until the earliest cooldown expires.
+This is guidance for the caller, not an additional server-side wait or retry.
+It does not change tier order, bounded queues, billing, or cooldown eligibility.
+No retry deadline is guessed for configuration, policy, quota, or unknown blocks.
+Ordered cross-group routing can still try the next compatible selected group
+immediately; a later success does not inherit a failed group's retry header.

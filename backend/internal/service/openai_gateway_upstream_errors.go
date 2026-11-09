@@ -391,7 +391,7 @@ func newOpenAIUpstreamFailoverError(
 	failoverErr := &UpstreamFailoverError{
 		StatusCode:             statusCode,
 		ResponseBody:           responseBody,
-		ResponseHeaders:        responseHeaders.Clone(),
+		ResponseHeaders:        upstreamFailoverResponseHeaders(statusCode, responseHeaders, responseBody),
 		RetryableOnSameAccount: retryableOnSameAccount || requestScopedCapacity,
 		RequestScopedTransient: requestScopedCapacity,
 	}

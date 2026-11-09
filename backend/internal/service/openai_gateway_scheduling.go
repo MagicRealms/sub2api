@@ -306,7 +306,7 @@ func NormalizeOpenAICompatiblePlatform(platform string) string {
 // never forward this error text to OpenAI-platform clients (they respond with
 // the generic classification message). Callers that must preserve the legacy
 // message pass "".
-func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool, details string) error {
+func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool, details string, retryAt ...time.Time) error {
 	if compactBlocked {
 		return ErrNoAvailableCompactAccounts
 	}
@@ -317,11 +317,26 @@ func noAvailableOpenAISelectionError(requestedModel string, compactBlocked bool,
 	if details != "" {
 		message += " (" + details + ")"
 	}
-	return openAINoAvailableSelectionError{message: message}
+	err := openAINoAvailableSelectionError{message: message}
+	if len(retryAt) > 0 {
+		err.retryAt = retryAt[0]
+	}
+	return err
 }
 
 type openAINoAvailableSelectionError struct {
 	message string
+	retryAt time.Time
+}
+
+// RetryAfter exposes only a finite model-cooldown deadline, never account IDs,
+// internal diagnostics, or a suggestion that a quota/configuration error is
+// recoverable. The deadline is evaluated when the handler emits its response.
+func (e openAINoAvailableSelectionError) RetryAfter() time.Duration {
+	if e.retryAt.IsZero() {
+		return 0
+	}
+	return time.Until(e.retryAt)
 }
 
 func (e openAINoAvailableSelectionError) Error() string {

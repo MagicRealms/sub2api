@@ -105,6 +105,41 @@ func TestOrderedGroupRoutesNeverRetryPolicyOrQuotaErrors(t *testing.T) {
 	}
 }
 
+func TestOrderedGroupRoutesRetryGuidanceDoesNotDelayOrContaminateFallback(t *testing.T) {
+	for _, recovered := range []bool{true, false} {
+		t.Run(fmt.Sprintf("recovered_%v", recovered), func(t *testing.T) {
+			calls := 0
+			engine := orderedTestEngine(t, orderedTestGroups(), func(c *gin.Context) {
+				calls++
+				key, ok := middleware.GetAPIKeyFromContext(c)
+				require.True(t, ok)
+				require.Equal(t, int64(1), key.RoutingBillingFloor.ID)
+				if calls == 1 {
+					c.Header("Retry-After", "10")
+					c.JSON(503, gin.H{"error": gin.H{"type": "api_error", "message": "Upstream model capacity is temporarily cooling down. Please retry later."}})
+					return
+				}
+				if recovered {
+					c.JSON(200, gin.H{"ok": true})
+				} else {
+					c.Header("Retry-After", "20")
+					c.JSON(503, gin.H{"error": gin.H{"type": "api_error", "message": "Upstream model capacity is temporarily cooling down. Please retry later."}})
+				}
+			})
+			response := orderedTestRequest(engine)
+			require.Equal(t, 2, calls, "retry hints must not suppress ordered cross-group failover")
+			if recovered {
+				require.Equal(t, 200, response.Code)
+				require.Empty(t, response.Header().Get("Retry-After"))
+				require.NotContains(t, response.Body.String(), "cooling down")
+			} else {
+				require.Equal(t, 503, response.Code)
+				require.Equal(t, "20", response.Header().Get("Retry-After"))
+			}
+		})
+	}
+}
+
 func TestOrderedGroupRoutesRejectAmbiguousModelFields(t *testing.T) {
 	calls := 0
 	engine := orderedTestEngine(t, orderedTestGroups(), func(c *gin.Context) { calls++ })

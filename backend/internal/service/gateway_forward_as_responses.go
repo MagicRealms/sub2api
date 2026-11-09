@@ -185,6 +185,7 @@ func (s *GatewayService) ForwardAsResponses(
 			return nil, &UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
+				ResponseHeaders:        upstreamFailoverResponseHeaders(resp.StatusCode, resp.Header, respBody),
 				RetryableOnSameAccount: !shouldDisable && account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
 			}
 		}
