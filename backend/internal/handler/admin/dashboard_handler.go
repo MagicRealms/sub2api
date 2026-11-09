@@ -32,9 +32,9 @@ func NewDashboardHandler(dashboardService *service.DashboardService, aggregation
 }
 
 // parseTimeRange parses start_date, end_date query parameters
-// Uses user's timezone if provided, otherwise falls back to server timezone
+// Reporting dates always use the site-wide Beijing calendar.
 func parseTimeRange(c *gin.Context) (time.Time, time.Time) {
-	userTZ := c.Query("timezone") // Get user's timezone from request
+	userTZ := usagestats.DashboardTimezone
 	now := timezone.NowInUserLocation(userTZ)
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
@@ -646,8 +646,10 @@ func (h *DashboardHandler) GetBatchAPIKeysUsage(c *gin.Context) {
 
 	keyRaw, _ := json.Marshal(struct {
 		APIKeyIDs []int64 `json:"api_key_ids"`
+		Day       string  `json:"day"`
 	}{
 		APIKeyIDs: apiKeyIDs,
+		Day:       usagestats.DashboardDay(time.Now()).Format("2006-01-02"),
 	})
 	cacheKey := string(keyRaw)
 	if cached, ok := dashboardBatchAPIKeysUsageCache.Get(cacheKey); ok {

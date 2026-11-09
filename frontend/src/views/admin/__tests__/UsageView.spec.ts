@@ -45,12 +45,7 @@ const messages: Record<string, string> = {
 	'common.no': 'No',
 }
 
-const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+const formatLocalDate = (date: Date): string => new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
@@ -854,6 +849,7 @@ describe('admin UsageView model audit export', () => {
 			'Upstream model mismatch',
 		])
 		const row = sheetAddAoa.mock.calls[0][1][0]
+		expect(row[0]).toBe('2026-08-04T08:00:00.000+08:00')
 		expect(row.slice(4, 8)).toEqual(['gpt-5.6-sol', 'gpt-5.5', 'gpt-5.4', 'Yes'])
 		expect(saveAs).toHaveBeenCalledTimes(1)
 	})

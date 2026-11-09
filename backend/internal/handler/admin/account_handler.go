@@ -26,8 +26,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/typesafe"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -1728,9 +1728,9 @@ func (h *AccountHandler) GetStats(c *gin.Context) {
 	}
 
 	// Calculate time range
-	now := timezone.Now()
-	endTime := timezone.StartOfDay(now.AddDate(0, 0, 1))
-	startTime := timezone.StartOfDay(now.AddDate(0, 0, -days+1))
+	today := usagestats.DashboardDay(time.Now())
+	endTime := today.AddDate(0, 0, 1)
+	startTime := today.AddDate(0, 0, -days+1)
 
 	stats, err := h.accountUsageService.GetAccountUsageStats(c.Request.Context(), accountID, startTime, endTime)
 	if err != nil {

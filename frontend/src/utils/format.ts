@@ -4,6 +4,7 @@
  */
 
 import { i18n, getLocale } from '@/i18n'
+import { DASHBOARD_TIMEZONE } from './dashboardTime'
 
 /**
  * 格式化相对时间
@@ -118,7 +119,7 @@ export function formatDate(
   if (isNaN(d.getTime())) return ''
 
   const locale = localeOverride ?? getLocale()
-  return new Intl.DateTimeFormat(locale, options).format(d)
+  return new Intl.DateTimeFormat(locale, { timeZone: DASHBOARD_TIMEZONE, ...options }).format(d)
 }
 
 /**

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -289,7 +290,7 @@ func parseAffiliateRecordFilter(c *gin.Context, page, pageSize int) service.Affi
 	if filter.PageSize > 100 {
 		filter.PageSize = 100
 	}
-	userTZ := c.Query("timezone")
+	userTZ := usagestats.DashboardTimezone
 	if t := parseAffiliateRecordStartTime(c.Query("start_at"), userTZ); t != nil {
 		filter.StartAt = t
 	}

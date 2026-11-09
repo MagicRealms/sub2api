@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
@@ -212,6 +213,7 @@ const hasEffectiveRate = computed(() => effectiveRate.value !== '-')
 const primaryValue = computed(() => hasEffectiveRate.value ? effectiveRate.value : statusLabel.value || '-')
 const formatDate = (value?: string) => value
   ? new Date(value).toLocaleString(undefined, {
+    timeZone: DASHBOARD_TIMEZONE,
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',

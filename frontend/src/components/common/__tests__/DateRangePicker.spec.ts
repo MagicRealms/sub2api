@@ -27,12 +27,7 @@ vi.mock('vue-i18n', () => ({
   })
 }))
 
-const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+const formatLocalDate = (date: Date): string => new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
 describe('DateRangePicker', () => {
   it('selects the current Beijing week from Monday through today, across the UTC date boundary', async () => {

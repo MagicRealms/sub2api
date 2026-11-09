@@ -15,8 +15,9 @@ type userUsageDetailsRepository interface {
 }
 
 // GetAdminUserUsageDetails returns seven calendar days (including today), plus
-// cumulative usage. The caller supplies a validated IANA timezone.
+// cumulative usage, always following the site-wide Beijing reporting calendar.
 func (s *UsageService) GetAdminUserUsageDetails(ctx context.Context, userID int64, location *time.Location) (*User, *usagestats.UserUsageDetails, error) {
+	location = usagestats.DashboardLocation()
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, nil, err

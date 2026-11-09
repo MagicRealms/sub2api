@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE, reportingDateTimeInput, parseReportingDateTimeInput } from '@/utils/dashboardTime'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
@@ -10,7 +11,7 @@ import { adminAPI } from '@/api'
 import { opsAPI, type OpsDashboardOverview, type OpsMetricThresholds, type OpsRealtimeTrafficSummary } from '@/api/admin/ops'
 import type { OpsRequestDetailsPreset } from './OpsRequestDetailsModal.vue'
 import { useAdminSettingsStore } from '@/stores'
-import { formatDateTimeLocalInput, formatNumber } from '@/utils/format'
+import { formatNumber } from '@/utils/format'
 import { formatMemorySizeMB } from '../utils/opsFormatters'
 
 type RealtimeWindow = '1min' | '5min' | '30min' | '1h'
@@ -97,11 +98,7 @@ function formatCustomTimeRangeLabel(startTime: string, endTime: string): string 
   const start = new Date(startTime)
   const end = new Date(endTime)
   const formatDate = (d: Date) => {
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hour = String(d.getHours()).padStart(2, '0')
-    const minute = String(d.getMinutes()).padStart(2, '0')
-    return `${month}-${day} ${hour}:${minute}`
+    return reportingDateTimeInput(d).slice(5).replace('T', ' ')
   }
   return `${formatDate(start)} ~ ${formatDate(end)}`
 }
@@ -178,8 +175,8 @@ function handleTimeRangeChange(val: string | number | boolean | null) {
     // 初始化为最近1小时
     const now = new Date()
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
-    customStartTimeInput.value = formatDateTimeLocalInput(oneHourAgo.getTime() / 1000)
-    customEndTimeInput.value = formatDateTimeLocalInput(now.getTime() / 1000)
+    customStartTimeInput.value = reportingDateTimeInput(oneHourAgo)
+    customEndTimeInput.value = reportingDateTimeInput(now)
     showCustomTimeRangeDialog.value = true
   } else {
     emit('update:timeRange', newValue)
@@ -188,8 +185,11 @@ function handleTimeRangeChange(val: string | number | boolean | null) {
 
 function handleCustomTimeRangeConfirm() {
   if (!customStartTimeInput.value || !customEndTimeInput.value) return
-  const startTime = new Date(customStartTimeInput.value).toISOString()
-  const endTime = new Date(customEndTimeInput.value).toISOString()
+  const start = parseReportingDateTimeInput(customStartTimeInput.value)
+  const end = parseReportingDateTimeInput(customEndTimeInput.value)
+  if (!start || !end || end <= start) return
+  const startTime = start.toISOString()
+  const endTime = end.toISOString()
   // Emit custom time range first so the parent can build correct API params
   // when it reacts to timeRange switching to "custom".
   emit('update:customTimeRange', startTime, endTime)
@@ -641,7 +641,7 @@ function formatTimeShort(ts?: string | null): string {
   if (!ts) return '-'
   const d = new Date(ts)
   if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleTimeString()
+  return d.toLocaleTimeString(undefined, { timeZone: DASHBOARD_TIMEZONE })
 }
 
 const cpuPercentValue = computed<number | null>(() => {
@@ -884,7 +884,7 @@ function handleToolbarRefresh() {
           </span>
 
           <span>·</span>
-          <span>{{ t('common.refresh') }}: {{ props.lastUpdated ? props.lastUpdated.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-') : t('common.unknown') }}</span>
+          <span>{{ t('common.refresh') }}: {{ props.lastUpdated ? props.lastUpdated.toLocaleString('zh-CN', { timeZone: DASHBOARD_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\//g, '-') : t('common.unknown') }}</span>
 
           <template v-if="props.autoRefreshEnabled && props.autoRefreshCountdown !== undefined">
             <span>·</span>

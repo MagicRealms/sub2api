@@ -3407,6 +3407,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { ref, reactive, computed, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -3586,7 +3587,7 @@ const opencodeGoFormatPercent = (value?: number) => typeof value === 'number' &&
 const opencodeGoFormatDate = (value?: string) => {
   if (!value) return '-'
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { timeZone: DASHBOARD_TIMEZONE })
 }
 const opencodeGoWindowSummary = (window?: OpenCodeGoUsageWindow) => {
   if (!window) return '-'

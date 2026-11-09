@@ -4,14 +4,14 @@ import { ref } from 'vue'
 import DateRangePicker from '../DateRangePicker.vue'
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key, locale: ref('en') }) }))
 enableAutoUnmount(afterEach)
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 30, 23, 59)) })
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-30T15:59:00Z')) })
 afterEach(() => vi.useRealTimers())
 async function reopenNextDay() {
   const w = mount(DateRangePicker, { props: { startDate: '2026-09-30', endDate: '2026-09-30' }, global: { stubs: { Teleport: true, Icon: true } } })
   await w.get('.date-picker-trigger').trigger('click')
   expect(w.findAll('input[type="date"]')[1].attributes('max')).toBe('2026-10-01')
   await w.get('.date-picker-trigger').trigger('click')
-  vi.setSystemTime(new Date(2026, 9, 1, 0, 1))
+  vi.setSystemTime(new Date('2026-09-30T16:01:00Z'))
   await w.get('.date-picker-trigger').trigger('click')
   return w
 }

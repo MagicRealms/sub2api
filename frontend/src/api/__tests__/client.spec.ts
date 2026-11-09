@@ -88,7 +88,7 @@ describe('API Client', () => {
       await apiClient.get('/test')
 
       const config = adapter.mock.calls[0][0]
-      expect(config.params).toHaveProperty('timezone')
+      expect(config.params.timezone).toBe('Asia/Shanghai')
     })
 
     it('preserves an explicit reporting timezone', async () => {

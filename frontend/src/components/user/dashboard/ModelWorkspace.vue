@@ -90,6 +90,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatTokenMillions } from '@/utils/workspace'
@@ -243,6 +244,7 @@ function formatResetTime(iso: string | null | undefined): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleString(undefined, {
+    timeZone: DASHBOARD_TIMEZONE,
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',

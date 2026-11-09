@@ -166,7 +166,7 @@ func (h *DashboardHandler) buildSnapshotV2Response(
 		StartDate:   startTime.Format("2006-01-02"),
 		EndDate:     endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		Granularity: granularity,
-		Timezone:    time.Local.String(),
+		Timezone:    usagestats.DashboardTimezone,
 	}
 
 	if includeStats {

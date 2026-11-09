@@ -10,11 +10,10 @@ vi.mock('vue-i18n', async () => ({
   useI18n: () => ({ t: (key: string) => key })
 }))
 enableAutoUnmount(afterEach)
-beforeEach(() => vi.stubEnv('TZ', 'Asia/Shanghai'))
+beforeEach(() => vi.stubEnv('TZ', 'America/Los_Angeles'))
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
 
 async function openCustomRange(now: Date) {
-  expect(now.getTimezoneOffset()).toBe(-480)
   vi.useFakeTimers()
   vi.setSystemTime(now)
   const wrapper = mount(OpsDashboardHeader, {
@@ -37,14 +36,14 @@ describe('ops custom time range timezone', () => {
   it.each([
     [14, 23, '2026-10-09T13:23', '2026-10-09T14:23'],
     [0, 15, '2026-10-08T23:15', '2026-10-09T00:15']
-  ] as const)('prefills the previous local hour at %i:%i', async (hour, minute, start, end) => {
-    const wrapper = await openCustomRange(new Date(2026, 9, 9, hour, minute))
+  ] as const)('prefills the previous Beijing hour in a Pacific browser at %i:%i', async (hour, minute, start, end) => {
+    const wrapper = await openCustomRange(new Date(`2026-10-09T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:00+08:00`))
     const inputs = wrapper.findAll<HTMLInputElement>('input[type="datetime-local"]')
     expect(inputs.map(input => input.element.value)).toEqual([start, end])
   })
 
   it('submits the previous real hour without applying the timezone offset twice', async () => {
-    const now = new Date(2026, 9, 9, 14, 23)
+    const now = new Date('2026-10-09T14:23:00+08:00')
     const wrapper = await openCustomRange(now)
     await wrapper.findAll('button').find(button => button.text() === 'common.confirm')!.trigger('click')
     expect(wrapper.emitted('update:customTimeRange')).toEqual([

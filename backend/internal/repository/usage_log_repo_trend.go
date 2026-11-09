@@ -27,17 +27,9 @@ type UserSpendingRankingResponse = usagestats.UserSpendingRankingResponse
 // APIKeyUsageTrendPoint represents API key usage trend data point
 type APIKeyUsageTrendPoint = usagestats.APIKeyUsageTrendPoint
 
-func usageTrendTimezone(at time.Time) string {
-	if name := at.Location().String(); name != "" {
-		return name
-	}
-	_, offset := at.Zone()
-	sign := '-'
-	if offset < 0 {
-		sign = '+'
-		offset = -offset
-	}
-	return fmt.Sprintf("UTC%c%02d:%02d:%02d", sign, offset/3600, offset%3600/60, offset%60)
+// Trend labels share one reporting calendar, including explicit RFC3339 ranges.
+func usageTrendTimezone(_ time.Time) string {
+	return usagestats.DashboardTimezone
 }
 
 // GetAPIKeyUsageTrend returns usage trend data grouped by API key and date
@@ -54,7 +46,7 @@ func (r *usageLogRepository) GetAPIKeyUsageTrend(ctx context.Context, startTime,
 			LIMIT $3
 		)
 		SELECT
-			TO_CHAR(u.created_at, '%s') as date,
+			TO_CHAR(u.created_at AT TIME ZONE $6, '%s') as date,
 			u.api_key_id,
 			COALESCE(k.name, '') as key_name,
 			COUNT(*) as requests,
@@ -67,7 +59,7 @@ func (r *usageLogRepository) GetAPIKeyUsageTrend(ctx context.Context, startTime,
 		ORDER BY date ASC, tokens DESC
 	`, dateFormat)
 
-	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, limit, startTime, endTime)
+	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, limit, startTime, endTime, usagestats.DashboardTimezone)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +238,7 @@ func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, user
 
 	query := fmt.Sprintf(`
 		SELECT
-			TO_CHAR(created_at, '%s') as date,
+			TO_CHAR(created_at AT TIME ZONE $4, '%s') as date,
 			COUNT(*) as requests,
 			COALESCE(SUM(input_tokens), 0) as input_tokens,
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -261,7 +253,7 @@ func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, user
 		ORDER BY date ASC
 	`, dateFormat)
 
-	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime)
+	rows, err := r.sql.QueryContext(ctx, query, userID, startTime, endTime, usagestats.DashboardTimezone)
 	if err != nil {
 		return nil, err
 	}

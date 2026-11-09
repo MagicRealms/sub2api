@@ -74,3 +74,19 @@ func TestAdminUserUsageDetailsMissingUser(t *testing.T) {
 	require.ErrorIs(t, err, ErrUserNotFound)
 	require.False(t, repo.called)
 }
+
+func TestAdminUserUsageDetailsIgnoresOperationalTimezone(t *testing.T) {
+	pacific, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+	for _, loc := range []*time.Location{nil, time.UTC, pacific} {
+		repo := &detailsUsageRepo{}
+		svc := NewUsageService(repo, detailsUserRepo{user: &User{ID: 42}}, nil, nil)
+		_, details, err := svc.GetAdminUserUsageDetails(context.Background(), 42, loc)
+		require.NoError(t, err)
+		require.Equal(t, "Asia/Shanghai", repo.timezone)
+		require.Equal(t, "Asia/Shanghai", details.Timezone)
+		require.Equal(t, 0, repo.start.Hour())
+		_, offset := repo.start.Zone()
+		require.Equal(t, 8*60*60, offset)
+	}
+}

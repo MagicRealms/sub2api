@@ -81,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -135,7 +136,7 @@ function criterionStatusClass(status: ChannelIQCriterionStatus): string {
 }
 
 function formatTime(value?: string): string {
-  return value ? new Date(value).toLocaleString() : '—'
+  return value ? new Date(value).toLocaleString(undefined, { timeZone: DASHBOARD_TIMEZONE }) : '—'
 }
 
 async function load(silent = false) {

@@ -7,6 +7,7 @@
 
 import type { OpsSeverity } from '@/api/admin/ops'
 import { formatBytes } from '@/utils/format'
+import { reportingDateTimeInput } from '@/utils/dashboardTime'
 
 export function getSeverityClass(severity: OpsSeverity): string {
   const classes: Record<string, string> = {
@@ -30,7 +31,7 @@ export function truncateMessage(msg: string, maxLength = 80): string {
 export function formatDateTime(dateStr: string): string {
   const d = new Date(dateStr)
   if (Number.isNaN(d.getTime())) return ''
-  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+  return `${reportingDateTimeInput(d).slice(5).replace('T', ' ')}:${String(d.getUTCSeconds()).padStart(2, '0')}`
 }
 
 export function sumNumbers(values: Array<number | null | undefined>): number {
@@ -64,9 +65,9 @@ export function formatHistoryLabel(date: string | undefined, timeRange: string):
   if (Number.isNaN(d.getTime())) return ''
   const minutes = parseTimeRangeMinutes(timeRange)
   if (minutes >= 24 * 60) {
-    return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return reportingDateTimeInput(d).slice(5).replace('T', ' ')
   }
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return reportingDateTimeInput(d).slice(11)
 }
 
 export function formatByteRate(bytes: number, windowMinutes: number): string {

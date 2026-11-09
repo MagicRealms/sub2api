@@ -48,7 +48,7 @@ func TestPaymentDashboardBreakdownsGroupAmountsAndRankingsByCurrency(t *testing.
 	orders[2].PaymentType = "stripe"
 	orders[3].PaymentType = "alipay"
 
-	daily := buildDailySeries(orders, firstDay.AddDate(0, 0, -1), 2)
+	daily := buildDailySeries(orders, firstDay, 2)
 	require.Equal(t, []DailyStats{
 		{Date: "2026-07-24", Amount: CurrencyAmounts{"CNY": 15.56}, Count: 2},
 		{Date: "2026-07-25", Amount: CurrencyAmounts{"USD": 30}, Count: 2},
@@ -81,4 +81,23 @@ func paymentStatsTestOrder(userID int64, email, currency string, amount float64,
 		PaidAt:           paidAt,
 		ProviderSnapshot: map[string]any{"currency": currency},
 	}
+}
+
+func TestPaymentSeriesUsesBeijingMidnightForUTCStoredPayments(t *testing.T) {
+	before := time.Date(2026, 11, 9, 15, 59, 59, 0, time.UTC)
+	after := before.Add(time.Second)
+	start := time.Date(2026, 11, 9, 0, 0, 0, 0, time.FixedZone("Asia/Shanghai", 8*3600))
+	orders := []*dbent.PaymentOrder{
+		paymentStatsTestOrder(1, "fixture@example.invalid", "USD", 2, &before),
+		paymentStatsTestOrder(1, "fixture@example.invalid", "USD", 3, &after),
+	}
+	series := buildDailySeries(orders, start, 2)
+	require.Equal(t, []DailyStats{
+		{Date: "2026-11-09", Amount: CurrencyAmounts{"USD": 2}, Count: 1},
+		{Date: "2026-11-10", Amount: CurrencyAmounts{"USD": 3}, Count: 1},
+	}, series)
+	stats := &DashboardStats{}
+	computeBasicStats(stats, orders, start.AddDate(0, 0, 1))
+	require.Equal(t, 1, stats.TodayCount)
+	require.Equal(t, CurrencyAmounts{"USD": 3}, stats.TodayAmount)
 }

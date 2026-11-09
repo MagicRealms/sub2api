@@ -14,6 +14,7 @@ import {
 } from './adminUIRequest'
 import { refreshAuthTokens } from './tokenRefresh'
 import { getAPIBaseURL } from './url'
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 export { buildApiUrl, buildGatewayUrl } from './url'
 
 // ==================== Axios Instance Configuration ====================
@@ -29,15 +30,6 @@ export const apiClient: AxiosInstance = axios.create({
 
 // ==================== Request Interceptor ====================
 
-// Get user's timezone
-const getUserTimezone = (): string => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone
-  } catch {
-    return 'UTC'
-  }
-}
-
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Attach token from localStorage
@@ -51,12 +43,13 @@ apiClient.interceptors.request.use(
       config.headers['Accept-Language'] = getLocale()
     }
 
-    // Attach timezone for all GET requests (backend may use it for default date ranges)
+    // Display/reporting calendars are site-wide Beijing time, independent of
+    // the browser location and the server's operational quota-reset timezone.
     if (config.method === 'get') {
       if (!config.params) {
         config.params = {}
       }
-      config.params.timezone ??= getUserTimezone()
+      config.params.timezone ??= DASHBOARD_TIMEZONE
     }
 
     if (config.headers) {

@@ -79,6 +79,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
@@ -170,7 +171,7 @@ async function loadDetails() {
   error.value = false
   try {
     const result = await adminAPI.users.getUserUsageDetails(userID, {
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: DASHBOARD_TIMEZONE,
       signal: controller.signal
     })
     if (version !== requestVersion) return

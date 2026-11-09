@@ -214,9 +214,9 @@ describe('KeyUsageView daily detail', () => {
     wrapper.unmount()
   })
 
-  it('queries the current local calendar date near midnight', async () => {
+  it('queries the Beijing date after UTC 16:00', async () => {
     vi.useFakeTimers()
-    vi.setSystemTime(new Date(2026, 6, 13, 0, 30))
+    vi.setSystemTime(new Date('2026-07-12T16:30:00Z'))
 
     const wrapper = mount(KeyUsageView, {
       global: {
@@ -235,6 +235,7 @@ describe('KeyUsageView daily detail', () => {
     const requestUrl = String(vi.mocked(fetch).mock.calls[0][0])
     expect(requestUrl).toContain('start_date=2026-07-13')
     expect(requestUrl).toContain('end_date=2026-07-13')
+    expect(requestUrl).toContain('timezone=Asia%2FShanghai')
 
     wrapper.unmount()
   })

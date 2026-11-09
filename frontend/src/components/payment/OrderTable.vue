@@ -42,6 +42,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { PaymentOrder } from '@/types/payment'
@@ -58,7 +59,7 @@ const props = defineProps<{
   showUser?: boolean
 }>()
 
-function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString() }
+function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString(undefined, { timeZone: DASHBOARD_TIMEZONE }) }
 
 const creditedAmountSymbol = currencySymbol('USD')
 

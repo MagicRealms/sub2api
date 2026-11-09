@@ -739,6 +739,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE } from '@/utils/dashboardTime'
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -2555,12 +2556,12 @@ function batchImageErrorMessage(error: any, fallback: string) {
 
 function formatDate(timestamp: number) {
   if (!timestamp) return ''
-  return new Date(timestamp * 1000).toLocaleString()
+  return new Date(timestamp * 1000).toLocaleString(undefined, { timeZone: DASHBOARD_TIMEZONE })
 }
 
 function defaultTaskName(timestamp?: number) {
   const date = timestamp ? new Date(timestamp * 1000) : new Date()
-  return date.toLocaleString()
+  return date.toLocaleString(undefined, { timeZone: DASHBOARD_TIMEZONE })
 }
 
 onMounted(() => {

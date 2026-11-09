@@ -235,7 +235,7 @@ import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import { getTrendPointRange } from '@/utils/trendPointRange'
 import UsageInsightCards, { type UsageInsight } from '@/components/admin/usage/UsageInsightCards.vue'
-import { DASHBOARD_TIMEZONE, dashboardDate } from '@/utils/dashboardTime'
+import { DASHBOARD_TIMEZONE, dashboardDate, reportingTimestamp } from '@/utils/dashboardTime'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
 import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
@@ -263,7 +263,7 @@ const insightTitle = computed(() => t(activeInsight.value === 'models' ? 'admin.
 const closeInsight = () => { activeInsight.value = null }
 const usageStats = ref<AdminUsageStatsResponse | null>(null); const usageLogs = ref<AdminUsageLog[]>([]); const loading = ref(false); const exporting = ref(false)
 const trendData = ref<TrendDataPoint[]>([]); const requestedModelStats = ref<ModelStat[]>([]); const upstreamModelStats = ref<ModelStat[]>([]); const mappingModelStats = ref<ModelStat[]>([]); const groupStats = ref<GroupStat[]>([]); const chartsLoading = ref(false); const modelStatsLoading = ref(false); const granularity = ref<'day' | 'hour'>('hour')
-const trendTimezone = ref('UTC')
+const trendTimezone = ref(DASHBOARD_TIMEZONE)
 const selectedTrendPoint = ref<TrendDataPoint | null>(null)
 const pointLogs = ref<AdminUsageLog[]>([])
 const pointLogTotal = ref(0)
@@ -338,14 +338,8 @@ const handleRankingSelectUser = (userId: number, email: string) => {
 }
 
 const granularityOptions = computed(() => [{ value: 'day', label: t('admin.dashboard.day') }, { value: 'hour', label: t('admin.dashboard.hour') }])
-// Use local timezone to avoid UTC timezone issues
-const formatLD = (d: Date) => {
-  if (route.query.timezone === DASHBOARD_TIMEZONE) return dashboardDate(d)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+// Every reporting date is a Beijing calendar date.
+const formatLD = (d: Date) => dashboardDate(d)
 const getLast24HoursRangeDates = (): { start: string; end: string } => {
   const end = new Date()
   const start = new Date(end.getTime() - 24 * 60 * 60 * 1000)
@@ -355,14 +349,14 @@ const getLast24HoursRangeDates = (): { start: string; end: string } => {
   }
 }
 const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
-  const startTime = new Date(`${start}T00:00:00`).getTime()
-  const endTime = new Date(`${end}T00:00:00`).getTime()
+  const startTime = new Date(`${start}T00:00:00Z`).getTime()
+  const endTime = new Date(`${end}T00:00:00Z`).getTime()
   const daysDiff = Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24))
   return daysDiff <= 1 ? 'hour' : 'day'
 }
 const defaultRange = getLast24HoursRangeDates()
 const startDate = ref(defaultRange.start); const endDate = ref(defaultRange.end)
-const filters = ref<AdminUsageQueryParams>({ user_id: undefined, model: undefined, group_id: undefined, request_type: undefined, native_compaction_v2: null, billing_type: null, start_date: startDate.value, end_date: endDate.value })
+const filters = ref<AdminUsageQueryParams>({ timezone: DASHBOARD_TIMEZONE, user_id: undefined, model: undefined, group_id: undefined, request_type: undefined, native_compaction_v2: null, billing_type: null, start_date: startDate.value, end_date: endDate.value })
 const pagination = reactive({ page: 1, page_size: getPersistedPageSize(), total: 0 })
 const sortState = reactive({
   sort_by: 'created_at',
@@ -396,7 +390,7 @@ const applyRouteQueryFilters = () => {
   filters.value = {
     ...filters.value,
     user_id: queryUserId,
-    timezone: getSingleQueryValue(route.query.timezone) === DASHBOARD_TIMEZONE ? DASHBOARD_TIMEZONE : undefined,
+    timezone: DASHBOARD_TIMEZONE,
     start_date: startDate.value,
     end_date: endDate.value
   }
@@ -592,7 +586,7 @@ const loadChartData = async () => {
     }, { signal: controller.signal })
     if (controller.signal.aborted || seq !== chartReqSeq) return
     trendData.value = snapshot.trend || []
-    trendTimezone.value = snapshot.timezone || 'UTC'
+    trendTimezone.value = DASHBOARD_TIMEZONE
     groupStats.value = snapshot.groups || []
   } catch (error) {
     if (!controller.signal.aborted && seq === chartReqSeq) console.error('Failed to load chart data:', error)
@@ -749,7 +743,7 @@ const exportToExcel = async () => {
       )
       if (c.signal.aborted) break; if (p === 1) { total = res.total; exportProgress.total = total }
       const rows = (res.items || []).map((log: AdminUsageLog) => [
-        log.created_at, log.user?.email || '', log.api_key?.name || '', log.account?.name || '', log.model,
+        reportingTimestamp(log.created_at), log.user?.email || '', log.api_key?.name || '', log.account?.name || '', log.model,
         log.upstream_model || log.model, log.upstream_response_model || '', log.upstream_model_mismatch == null ? '' : t(log.upstream_model_mismatch ? 'common.yes' : 'common.no'), formatReasoningEffort(log.reasoning_effort), formatReasoningEffort(log.upstream_reasoning_effort || log.reasoning_effort), log.group?.name || '',
         log.inbound_endpoint || '', log.upstream_endpoint || '', getRequestTypeLabel(log),
         log.input_tokens, log.output_tokens, log.cache_read_tokens, log.cache_creation_tokens,
@@ -972,9 +966,9 @@ const errSortOrder = ref<'asc' | 'desc'>('desc')
 const showErrorModal = ref(false)
 const selectedErrorId = ref<number | null>(null)
 
-// 注意：'YYYY-MM-DDT00:00:00' 无时区后缀，按本地时区解析后再转 UTC——与页面其它日期处理语义一致，刻意如此，勿改成 'T00:00:00Z'
+// Date-only reporting filters use Beijing midnight, including the errors tab.
 const toRFC3339 = (d: string | undefined, endOfDay = false): string | undefined =>
-  d ? new Date(d + (endOfDay ? 'T23:59:59.999' : 'T00:00:00')).toISOString() : undefined
+  d ? new Date(d + (endOfDay ? 'T23:59:59.999+08:00' : 'T00:00:00+08:00')).toISOString() : undefined
 
 const loadAdminErrors = async () => {
   errLoading.value = true

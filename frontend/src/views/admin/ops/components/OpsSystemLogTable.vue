@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE, parseReportingDateTimeInput } from '@/utils/dashboardTime'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
@@ -113,7 +114,7 @@ const formatTime = (value: string) => {
   if (!value) return '-'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString()
+  return d.toLocaleString(undefined, { timeZone: DASHBOARD_TIMEZONE })
 }
 
 const getExtraString = (extra: Record<string, any> | undefined, key: string) => {
@@ -168,9 +169,7 @@ const formatSystemLogDetail = (row: OpsSystemLog) => {
 
 const toRFC3339 = (value: string) => {
   if (!value) return undefined
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return undefined
-  return d.toISOString()
+  return parseReportingDateTimeInput(value)?.toISOString()
 }
 
 const buildQuery = () => {

@@ -153,7 +153,7 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool, 
 		return nil, false
 	}
 
-	userTZ := c.Query("timezone")
+	userTZ := usagestats.DashboardTimezone
 	now := timezone.NowInUserLocation(userTZ)
 	var startTime, endTime time.Time
 	var startPtr, endPtr *time.Time
@@ -320,7 +320,7 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 	filter := &service.OpsErrorLogFilter{Page: page, PageSize: pageSize}
 
 	// Date range (half-open [start, end)), reuse usage-list semantics.
-	userTZ := c.Query("timezone")
+	userTZ := usagestats.DashboardTimezone
 	if startDateStr := c.Query("start_date"); startDateStr != "" {
 		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
 		if err != nil {
@@ -508,6 +508,7 @@ func parseAPIKeyDailyUsageDays(raw string) (int, bool) {
 }
 
 func apiKeyDailyUsageRange(days int, userTZ string) (time.Time, time.Time) {
+	userTZ = usagestats.DashboardTimezone
 	now := timezone.NowInUserLocation(userTZ)
 	startTime := timezone.StartOfDayInUserLocation(now.AddDate(0, 0, -(days-1)), userTZ)
 	endTime := timezone.StartOfDayInUserLocation(now.AddDate(0, 0, 1), userTZ)
@@ -612,7 +613,7 @@ func (h *UsageHandler) DashboardSnapshotV2(c *gin.Context) {
 		"start_date":   parsed.StartTime.Format("2006-01-02"),
 		"end_date":     parsed.EndTime.Add(-24 * time.Hour).Format("2006-01-02"),
 		"granularity":  granularity,
-		"timezone":     time.Local.String(),
+		"timezone":     usagestats.DashboardTimezone,
 	}
 
 	if includeTrend {
@@ -776,7 +777,7 @@ func (h *UsageHandler) GetMyAPIKeyDailyUsage(c *gin.Context) {
 		return
 	}
 
-	userTZ := c.Query("timezone")
+	userTZ := usagestats.DashboardTimezone
 	startTime, endTime := apiKeyDailyUsageRange(days, userTZ)
 	items, err := h.usageService.GetAPIKeyDailyUsage(c.Request.Context(), subject.UserID, apiKeyID, startTime, endTime)
 	if err != nil {

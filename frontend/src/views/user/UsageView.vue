@@ -259,6 +259,7 @@
 </template>
 
 <script setup lang="ts">
+import { DASHBOARD_TIMEZONE, dashboardDate, reportingTimestamp } from '@/utils/dashboardTime'
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -314,7 +315,7 @@ type EndpointSource = 'inbound' | 'upstream' | 'path'
 const usageStats = ref<UsageStatsResponse | null>(null)
 const usageLogs = ref<UsageLog[]>([])
 const trendData = ref<TrendDataPoint[]>([])
-const trendTimezone = ref('UTC')
+const trendTimezone = ref(DASHBOARD_TIMEZONE)
 const selectedTrendPoint = ref<TrendDataPoint | null>(null)
 const pointLogs = ref<UsageLog[]>([])
 const pointLogTotal = ref(0)
@@ -394,8 +395,7 @@ let modelStatsReqSeq = 0
 let pointReqSeq = 0
 let pointAbortController: AbortController | null = null
 
-const formatLocalDate = (date: Date): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+const formatLocalDate = (date: Date): string => dashboardDate(date)
 
 const getLast24HoursRangeDates = () => {
   const end = new Date()
@@ -404,8 +404,8 @@ const getLast24HoursRangeDates = () => {
 }
 
 const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
-  const startTime = new Date(`${start}T00:00:00`).getTime()
-  const endTime = new Date(`${end}T00:00:00`).getTime()
+  const startTime = new Date(`${start}T00:00:00Z`).getTime()
+  const endTime = new Date(`${end}T00:00:00Z`).getTime()
   return Math.ceil((endTime - startTime) / (1000 * 60 * 60 * 24)) <= 1 ? 'hour' : 'day'
 }
 
@@ -422,6 +422,7 @@ const activeTab = ref<'usage' | 'errors'>('usage')
 const errorViewEnabled = computed(() => authStore.isTester || (appStore.cachedPublicSettings?.allow_user_view_error_requests ?? false))
 
 const filters = ref<UsageQueryParams>({
+  timezone: DASHBOARD_TIMEZONE,
   start_date: startDate.value,
   end_date: endDate.value,
   request_type: undefined,
@@ -592,7 +593,7 @@ const loadChartData = async () => {
     }, { signal: controller.signal })
     if (controller.signal.aborted || seq !== chartReqSeq) return
     trendData.value = snapshot.trend || []
-    trendTimezone.value = snapshot.timezone || 'UTC'
+    trendTimezone.value = DASHBOARD_TIMEZONE
     groupStats.value = snapshot.groups || []
   } catch (error) {
     if (controller.signal.aborted || seq !== chartReqSeq) return
@@ -840,7 +841,7 @@ const exportToCSV = async () => {
       'Duration (ms)',
     ]
     const rows = allLogs.map((log) => [
-      log.created_at,
+      reportingTimestamp(log.created_at),
       log.api_key?.name || '',
       log.model,
       formatReasoningEffort(log.reasoning_effort),

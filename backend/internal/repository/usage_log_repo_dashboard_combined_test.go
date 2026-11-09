@@ -37,7 +37,7 @@ func TestUserDashboardCombinedScansPreserveRatesAndTotals(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestUsageTrendTimezonePreservesExplicitOffsets(t *testing.T) {
+func TestUsageTrendTimezoneUsesBeijingForExplicitOffsets(t *testing.T) {
 	for _, tc := range []struct{ value, zone string }{
 		{"2026-11-08T16:30:00+08:00", "UTC-08:00:00"},
 		{"2026-11-08T16:30:00-05:30", "UTC+05:30:00"},
@@ -51,17 +51,17 @@ func TestUsageTrendTimezonePreservesExplicitOffsets(t *testing.T) {
 		if _, offset := at.Zone(); offset != 0 {
 			at = at.In(time.FixedZone("", offset))
 		}
-		require.Equal(t, tc.zone, usageTrendTimezone(at))
+		require.Equal(t, "Asia/Shanghai", usageTrendTimezone(at))
 	}
 }
 
-func TestUsageTrendTimezonePreservesNamedZones(t *testing.T) {
+func TestUsageTrendTimezoneUsesBeijingForNamedZones(t *testing.T) {
 	for _, name := range []string{"Asia/Shanghai", "America/Los_Angeles"} {
 		loc, err := time.LoadLocation(name)
 		require.NoError(t, err)
 		for _, month := range []time.Month{time.January, time.July} {
 			at := time.Date(2026, month, 8, 12, 0, 0, 0, loc)
-			require.Equal(t, name, usageTrendTimezone(at))
+			require.Equal(t, "Asia/Shanghai", usageTrendTimezone(at))
 		}
 	}
 }

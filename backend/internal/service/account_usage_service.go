@@ -17,7 +17,6 @@ import (
 	httppool "github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	openaipkg "github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
@@ -1505,7 +1504,7 @@ func (s *AccountUsageService) GetTodayStatsBatch(ctx context.Context, accountIDs
 		return result, nil
 	}
 
-	startTime := timezone.Today()
+	startTime := usagestats.DashboardDay(time.Now())
 	if batchReader, ok := s.usageLogRepo.(accountWindowStatsBatchReader); ok {
 		statsByAccount, err := batchReader.GetAccountWindowStatsBatch(ctx, uniqueIDs, startTime)
 		if err == nil {

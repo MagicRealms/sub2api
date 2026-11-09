@@ -13,7 +13,7 @@ import (
 
 func TestUserUsageDetailsRejectsInvalidParameters(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	for _, path := range []string{"/users/nope/usage-details", "/users/0/usage-details", "/users/-1/usage-details", "/users/42/usage-details?timezone=Not/A_Zone", "/users/42/usage-details?timezone=Local"} {
+	for _, path := range []string{"/users/nope/usage-details", "/users/0/usage-details", "/users/-1/usage-details"} {
 		t.Run(path, func(t *testing.T) {
 			router := gin.New()
 			router.GET("/users/:id/usage-details", (&UserHandler{}).GetUserUsageDetails)

@@ -506,7 +506,7 @@ func (r *usageLogRepository) getPerformanceStatsByAPIKey(ctx context.Context, ap
 // GetAPIKeyDashboardStats 获取指定 API Key 的仪表盘统计（按 api_key_id 过滤）
 func (r *usageLogRepository) GetAPIKeyDashboardStats(ctx context.Context, apiKeyID int64) (*UserDashboardStats, error) {
 	stats := &UserDashboardStats{}
-	today := timezone.Today()
+	today := usagestats.DashboardDay(time.Now())
 
 	// API Key 维度不需要统计 key 数量，设为 1
 	stats.TotalAPIKeys = 1

@@ -204,6 +204,7 @@ func (h *UsageHandler) List(c *gin.Context) {
 }
 
 func parseUsageListTimeRange(startDateStr, endDateStr, startTimeStr, endTimeStr, userTZ string) (*time.Time, *time.Time, error) {
+	userTZ = usagestats.DashboardTimezone
 	if strings.TrimSpace(startTimeStr) != "" || strings.TrimSpace(endTimeStr) != "" {
 		if strings.TrimSpace(startDateStr) != "" || strings.TrimSpace(endDateStr) != "" {
 			return nil, nil, fmt.Errorf("use either start_time/end_time or start_date/end_date")
@@ -333,7 +334,7 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 	}
 
 	// Parse date range
-	userTZ := c.Query("timezone")
+	userTZ := usagestats.DashboardTimezone
 	now := timezone.NowInUserLocation(userTZ)
 	var startTime, endTime time.Time
 
@@ -539,12 +540,12 @@ func (h *UsageHandler) CreateCleanupTask(c *gin.Context) {
 		return
 	}
 
-	startTime, err := timezone.ParseInUserLocation("2006-01-02", req.StartDate, req.Timezone)
+	startTime, err := timezone.ParseInUserLocation("2006-01-02", req.StartDate, usagestats.DashboardTimezone)
 	if err != nil {
 		response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
 		return
 	}
-	endTime, err := timezone.ParseInUserLocation("2006-01-02", req.EndDate, req.Timezone)
+	endTime, err := timezone.ParseInUserLocation("2006-01-02", req.EndDate, usagestats.DashboardTimezone)
 	if err != nil {
 		response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
 		return

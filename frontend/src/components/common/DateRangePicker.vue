@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
-import { dateInTimeZone } from '@/utils/dashboardTime'
+import { DASHBOARD_TIMEZONE, dateInTimeZone } from '@/utils/dashboardTime'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
@@ -97,7 +97,7 @@ interface Emits {
   (e: 'change', range: { startDate: string; endDate: string; preset: string | null }): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { timeZone: DASHBOARD_TIMEZONE })
 const emit = defineEmits<Emits>()
 
 const { t, locale } = useI18n()

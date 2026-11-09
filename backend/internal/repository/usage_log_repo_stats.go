@@ -4,13 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
+	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
@@ -259,22 +257,14 @@ func (r *usageLogRepository) GetDailyStatsAggregated(ctx context.Context, userID
 	return result, nil
 }
 
-// resolveUsageStatsTimezone 获取用于 SQL 分组的时区名称。
-// 优先使用应用初始化的时区，其次尝试读取 TZ 环境变量，最后回落为 UTC。
+// resolveUsageStatsTimezone is independent of the operational quota timezone.
 func resolveUsageStatsTimezone() string {
-	tzName := timezone.Name()
-	if tzName != "" && tzName != "Local" {
-		return tzName
-	}
-	if envTZ := strings.TrimSpace(os.Getenv("TZ")); envTZ != "" {
-		return envTZ
-	}
-	return "UTC"
+	return usagestats.DashboardTimezone
 }
 
 // GetAccountTodayStats 获取账号今日统计
 func (r *usageLogRepository) GetAccountTodayStats(ctx context.Context, accountID int64) (*usagestats.AccountStats, error) {
-	today := timezone.Today()
+	today := usagestats.DashboardDay(time.Now())
 
 	query := `
 		SELECT
@@ -579,7 +569,7 @@ func (r *usageLogRepository) GetBatchAPIKeyUsageStats(ctx context.Context, apiKe
 		  AND created_at >= LEAST($2, $4)
 		GROUP BY api_key_id
 	`
-	today := timezone.Today()
+	today := usagestats.DashboardDay(time.Now())
 	rows, err := r.sql.QueryContext(ctx, query, pq.Array(normalizedAPIKeyIDs), startTime, endTime, today)
 	if err != nil {
 		return nil, err
@@ -917,14 +907,14 @@ func (r *usageLogRepository) GetUpstreamEndpointStatsWithFilters(ctx context.Con
 
 // GetAccountUsageStats returns comprehensive usage statistics for an account over a time range
 func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID int64, startTime, endTime time.Time) (resp *AccountUsageStatsResponse, err error) {
-	daysCount := int(endTime.Sub(startTime).Hours()/24) + 1
+	daysCount := int(math.Ceil(endTime.Sub(startTime).Hours() / 24))
 	if daysCount <= 0 {
 		daysCount = 30
 	}
 
 	query := `
 		SELECT
-			TO_CHAR(created_at, 'YYYY-MM-DD') as date,
+			TO_CHAR(created_at AT TIME ZONE $4, 'YYYY-MM-DD') as date,
 			COUNT(*) as requests,
 			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as tokens,
 			COALESCE(SUM(total_cost), 0) as cost,
@@ -936,7 +926,7 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 		ORDER BY date ASC
 	`
 
-	rows, err := r.sql.QueryContext(ctx, query, accountID, startTime, endTime)
+	rows, err := r.sql.QueryContext(ctx, query, accountID, startTime, endTime, usagestats.DashboardTimezone)
 	if err != nil {
 		return nil, err
 	}
@@ -1021,7 +1011,7 @@ func (r *usageLogRepository) GetAccountUsageStats(ctx context.Context, accountID
 		AvgDurationMs:     avgDuration,
 	}
 
-	todayStr := timezone.Now().Format("2006-01-02")
+	todayStr := usagestats.DashboardDay(time.Now()).Format("2006-01-02")
 	for i := range history {
 		if history[i].Date == todayStr {
 			summary.Today = &struct {
@@ -1111,7 +1101,7 @@ func (r *usageLogRepository) GetBatchAPIKeyDisplayUsageStats(ctx context.Context
  COALESCE(SUM(ul.actual_cost) FILTER (WHERE ul.created_at >= GREATEST($2::timestamptz, COALESCE(k.usage_today_reset_at, '-infinity'::timestamptz))), 0)
  FROM api_keys k LEFT JOIN usage_logs ul ON ul.api_key_id = k.id
  AND ul.created_at >= LEAST(COALESCE(k.usage_total_reset_at, '-infinity'::timestamptz), GREATEST($2::timestamptz, COALESCE(k.usage_today_reset_at, '-infinity'::timestamptz)))
- WHERE k.id = ANY($1) AND k.deleted_at IS NULL GROUP BY k.id`, pq.Array(ids), timezone.Today())
+ WHERE k.id = ANY($1) AND k.deleted_at IS NULL GROUP BY k.id`, pq.Array(ids), usagestats.DashboardDay(time.Now()))
 	if err != nil {
 		return nil, err
 	}

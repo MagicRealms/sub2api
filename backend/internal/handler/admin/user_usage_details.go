@@ -2,11 +2,9 @@ package admin
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/gin-gonic/gin"
 )
@@ -18,21 +16,7 @@ func (h *UserHandler) GetUserUsageDetails(c *gin.Context) {
 		response.BadRequest(c, "Invalid user ID")
 		return
 	}
-	location := timezone.Location()
-	if name := c.Query("timezone"); name != "" {
-		if name == "Local" {
-			response.BadRequest(c, "Use an explicit timezone")
-			return
-		}
-		location, err = time.LoadLocation(name)
-		if err != nil {
-			response.BadRequest(c, "Invalid timezone")
-			return
-		}
-	}
-	if location.String() == "Local" {
-		location = time.UTC
-	}
+	location := usagestats.DashboardLocation()
 	user, details, err := h.usageService.GetAdminUserUsageDetails(c.Request.Context(), userID, location)
 	if err != nil {
 		response.ErrorFrom(c, err)

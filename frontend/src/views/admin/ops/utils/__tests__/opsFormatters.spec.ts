@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatMemorySizeMB } from '../opsFormatters'
+import { formatMemorySizeMB, formatDateTime, formatHistoryLabel } from '../opsFormatters'
 
 describe('formatMemorySizeMB', () => {
   it('keeps capacities below one GiB in MB', () => {
@@ -21,5 +21,14 @@ describe('formatMemorySizeMB', () => {
     expect(formatMemorySizeMB(Number.POSITIVE_INFINITY)).toBe('-')
     expect(formatMemorySizeMB(null)).toBe('-')
     expect(formatMemorySizeMB(undefined)).toBe('-')
+  })
+})
+
+
+describe('ops Beijing reporting labels', () => {
+  it('uses the next Beijing calendar day after 16:00 UTC', () => {
+    expect(formatDateTime('2026-11-09T16:05:03Z')).toBe('11-10 00:05:03')
+    expect(formatHistoryLabel('2026-11-09T16:05:03Z', '24h')).toBe('11-10 00:05')
+    expect(formatHistoryLabel('2026-11-09T16:05:03Z', '1h')).toBe('00:05')
   })
 })

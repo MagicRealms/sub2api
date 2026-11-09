@@ -36,3 +36,20 @@ func TestParseUsageListTimeRangeRejectsInvalidExactRange(t *testing.T) {
 		})
 	}
 }
+
+func TestParseUsageListDateRangeAlwaysUsesBeijing(t *testing.T) {
+	for _, zone := range []string{"", "UTC", "America/Los_Angeles", "Asia/Shanghai", "invalid-zone"} {
+		t.Run(zone, func(t *testing.T) {
+			start, end, err := parseUsageListTimeRange("2026-11-09", "2026-11-09", "", "", zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := start.UTC().Format(time.RFC3339); got != "2026-11-08T16:00:00Z" {
+				t.Fatalf("start=%s", got)
+			}
+			if got := end.UTC().Format(time.RFC3339); got != "2026-11-09T16:00:00Z" {
+				t.Fatalf("end=%s", got)
+			}
+		})
+	}
+}
