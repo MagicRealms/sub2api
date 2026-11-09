@@ -462,6 +462,11 @@ gateway:
       upstream_cost: 0.0
   # OpenAI 高级调度器补充配置
   openai_scheduler:
+    # Opt-in OpenAI text groups: lower numeric account priority always wins.
+    # A full primary queues (then busy), never spills to a higher-cost backup.
+    # Existing hard response/task ownership and all billing gates are preserved.
+    # Empty keeps legacy routing. Changing this list requires an app restart.
+    strict_priority_group_ids: []
     # 是否允许 session_hash sticky 在账号健康度恶化时临时逃逸；false 可一键回退旧行为
     sticky_escape_enabled: true
     # TTFT EWMA 超过该阈值（毫秒）时跳过 sticky，默认 15s，避免轻微抖动就逃逸

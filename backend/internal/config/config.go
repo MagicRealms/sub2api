@@ -1484,6 +1484,10 @@ func (w GatewayOpenAIWSSchedulerScoreWeights) IsValid() bool {
 
 // GatewayOpenAISchedulerConfig OpenAI 高级调度器配置。
 type GatewayOpenAISchedulerConfig struct {
+	// StrictPriorityGroupIDs opts OpenAI text groups into failover-only priority
+	// tiers. Lower numeric priorities win; a busy tier queues instead of spilling
+	// to a more expensive tier. Empty preserves the existing scheduler behavior.
+	StrictPriorityGroupIDs []int64 `mapstructure:"strict_priority_group_ids"`
 	// StickyEscapeEnabled: 是否允许 session_hash sticky 在账号健康度劣化时临时逃逸
 	StickyEscapeEnabled bool `mapstructure:"sticky_escape_enabled"`
 	// StickyEscapeTTFTMs: TTFT EWMA 超过该阈值时跳过 sticky
@@ -2587,6 +2591,7 @@ func setDefaults() {
 	// OpenAI HTTP upstream protocol strategy
 	viper.SetDefault("gateway.openai_http2.enabled", true)
 	viper.SetDefault("gateway.openai_request_gzip_enabled", false)
+	viper.SetDefault("gateway.openai_request_gzip_hosts", []string{})
 	viper.SetDefault("gateway.openai_http2.allow_proxy_fallback_to_http1", true)
 	viper.SetDefault("gateway.openai_http2.fallback_error_threshold", 2)
 	viper.SetDefault("gateway.openai_http2.fallback_window_seconds", 60)
@@ -2753,6 +2758,7 @@ func setEnvReachableDefaults() {
 	// disable sticky escape, so register the effective default instead. An
 	// explicit false in config or env still wins.
 	viper.SetDefault("gateway.openai_scheduler.sticky_escape_enabled", true)
+	viper.SetDefault("gateway.openai_scheduler.strict_priority_group_ids", []int64{})
 	viper.SetDefault("gateway.openai_scheduler.sticky_escape_error_rate", 0.0)
 	viper.SetDefault("gateway.openai_scheduler.sticky_escape_ttft_ms", 0)
 
@@ -3737,6 +3743,11 @@ func (c *Config) Validate() error {
 	}
 	if totalWeightSum := weights.TotalWeightSum(); math.IsNaN(totalWeightSum) || math.IsInf(totalWeightSum, 0) {
 		return fmt.Errorf("gateway.openai_ws.scheduler_score_weights total-weight sum must be finite")
+	}
+	for _, groupID := range c.Gateway.OpenAIScheduler.StrictPriorityGroupIDs {
+		if groupID <= 0 {
+			return fmt.Errorf("gateway.openai_scheduler.strict_priority_group_ids must contain positive group IDs")
+		}
 	}
 	if c.Gateway.OpenAIScheduler.StickyEscapeTTFTMs <= 0 {
 		return fmt.Errorf("gateway.openai_scheduler.sticky_escape_ttft_ms must be positive")

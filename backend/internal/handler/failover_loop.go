@@ -102,6 +102,13 @@ func sameAccountRetryAllowed(failoverErr *service.UpstreamFailoverError, retryCo
 	return retryLimit > 0 && retryCount < retryLimit
 }
 
+// An eligible error on a strictly ordered text route should advance to the
+// next account, not repeatedly spend requests on the unhealthy primary. The
+// caller still checks replay safety and ShouldRetryNextAccount first.
+func sameAccountRetryAllowedForSchedule(failoverErr *service.UpstreamFailoverError, retryCount, retryLimit int, decision service.OpenAIAccountScheduleDecision) bool {
+	return !decision.PreferOrderedFailover() && sameAccountRetryAllowed(failoverErr, retryCount, retryLimit)
+}
+
 // sameAccountRetryDeadlineAllows prevents a retry from starting after the
 // service-provided same-account retry window has elapsed.
 func sameAccountRetryDeadlineAllows(failoverErr *service.UpstreamFailoverError) bool {

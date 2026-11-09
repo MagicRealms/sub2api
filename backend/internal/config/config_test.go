@@ -517,6 +517,7 @@ func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	if !cfg.Gateway.OpenAIScheduler.StickyEscapeEnabled {
 		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeEnabled = false, want true")
 	}
+	require.Empty(t, cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs)
 	if cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs != 15000 {
 		t.Fatalf("Gateway.OpenAIScheduler.StickyEscapeTTFTMs = %d, want 15000", cfg.Gateway.OpenAIScheduler.StickyEscapeTTFTMs)
 	}
@@ -602,6 +603,22 @@ func TestLoadDefaultOpenAIWSConfig(t *testing.T) {
 	if cfg.Gateway.OpenAIWS.MaxIngressConnectionsPerAPIKey != 64 {
 		t.Fatalf("Gateway.OpenAIWS.MaxIngressConnectionsPerAPIKey = %d, want 64", cfg.Gateway.OpenAIWS.MaxIngressConnectionsPerAPIKey)
 	}
+}
+
+func TestLoadOpenAIStrictPriorityGroupIDs(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	viper.Set("gateway.openai_scheduler.strict_priority_group_ids", []int64{6, 10})
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, []int64{6, 10}, cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs)
+}
+
+func TestLoadOpenAIRequestGzipHostsFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_OPENAI_REQUEST_GZIP_HOSTS", "sharellm.net,example.com")
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, []string{"sharellm.net", "example.com"}, cfg.Gateway.OpenAIRequestGzipHosts)
 }
 
 func TestLoadOpenAIWSClientFirstMessageTimeoutFromEnv(t *testing.T) {
@@ -2311,6 +2328,16 @@ func TestValidateConfig_OpenAIWSRules(t *testing.T) {
 		mutate  func(*Config)
 		wantErr string
 	}{
+		{
+			name:    "strict priority group IDs must be positive",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.StrictPriorityGroupIDs = []int64{6, 0} },
+			wantErr: "gateway.openai_scheduler.strict_priority_group_ids",
+		},
+		{
+			name:    "strict priority group IDs cannot be negative",
+			mutate:  func(c *Config) { c.Gateway.OpenAIScheduler.StrictPriorityGroupIDs = []int64{-1} },
+			wantErr: "gateway.openai_scheduler.strict_priority_group_ids",
+		},
 		{
 			name:    "max_conns_per_account 必须为正数",
 			mutate:  func(c *Config) { c.Gateway.OpenAIWS.MaxConnsPerAccount = 0 },

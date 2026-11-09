@@ -25,6 +25,7 @@ const (
 	openAIAccountScheduleLayerGuardianParent   = "guardian_parent"
 	openAIAccountScheduleLayerSessionSticky    = "session_hash"
 	openAIAccountScheduleLayerLoadBalance      = "load_balance"
+	openAIAccountScheduleLayerStrictPriority   = "strict_priority"
 	openAIAdvancedSchedulerSettingKey          = "openai_advanced_scheduler_enabled"
 )
 
@@ -77,6 +78,7 @@ type OpenAIAccountScheduleRequest struct {
 	StickyPreviousAccountID int64
 	StickyWeighted          bool
 	SubscriptionPriority    bool
+	StrictPriority          bool
 	PreserveStickyBinding   bool
 	// DisableStickyEscape keeps task-owner lookups on their account even when
 	// generic sticky health or concurrency heuristics would prefer another.
@@ -105,6 +107,13 @@ type OpenAIAccountScheduleDecision struct {
 	LoadSkew            float64
 	SelectedAccountID   int64
 	SelectedAccountType string
+}
+
+// PreferOrderedFailover applies only to ordinary selections from an opted-in
+// priority tier. Hard response/guardian ownership uses its own decision layer
+// and retains the existing state-safe retry policy.
+func (d OpenAIAccountScheduleDecision) PreferOrderedFailover() bool {
+	return d.Layer == openAIAccountScheduleLayerStrictPriority
 }
 
 type OpenAIAccountSchedulerMetricsSnapshot struct {
@@ -177,7 +186,7 @@ func (m *openAIAccountSchedulerMetrics) recordSelect(decision OpenAIAccountSched
 	if decision.StickyPreviousHit || decision.StickySessionHit {
 		m.stickyHitTotal.Add(1)
 	}
-	if decision.Layer == openAIAccountScheduleLayerLoadBalance {
+	if decision.Layer == openAIAccountScheduleLayerLoadBalance || decision.Layer == openAIAccountScheduleLayerStrictPriority {
 		m.loadBalanceSelectTotal.Add(1)
 	}
 }
@@ -397,7 +406,16 @@ func (s *defaultOpenAIAccountScheduler) Select(
 
 	previousResponseID := strings.TrimSpace(req.PreviousResponseID)
 	if previousResponseID != "" && NormalizeOpenAICompatiblePlatform(req.Platform) == PlatformOpenAI &&
-		(!req.StickyWeighted || !req.PreviousResponseCanMove) {
+		(!req.PreviousResponseCanMove || (!req.StickyWeighted && !req.StrictPriority)) {
+		// A known, nonmovable response belongs to its original upstream key.
+		// Remember ownership before the lookup can reject/delete a stale binding;
+		// exhausting that owner must not turn into a fresh priority-tier request.
+		boundOwnerID := int64(0)
+		if req.StrictPriority && !req.PreviousResponseCanMove {
+			if store := s.service.getOpenAIWSStateStore(); store != nil {
+				boundOwnerID, _ = store.GetResponseAccount(ctx, derefGroupID(req.GroupID), previousResponseID)
+			}
+		}
 		selection, err := s.service.selectAccountByPreviousResponseIDForCapability(
 			ctx,
 			req.GroupID,
@@ -435,6 +453,9 @@ func (s *defaultOpenAIAccountScheduler) Select(
 			}
 			return selection, decision, nil
 		}
+		if boundOwnerID > 0 {
+			return nil, decision, fmt.Errorf("%w: bound response account is unavailable", ErrNoAvailableAccounts)
+		}
 	}
 
 	if req.GuardianParentAccountID > 0 {
@@ -454,7 +475,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 		}
 	}
 
-	if !req.StickyWeighted {
+	if !req.StickyWeighted && !req.StrictPriority {
 		selection, escapedSticky, err := s.selectBySessionHash(ctx, req)
 		if err != nil {
 			return nil, decision, err
@@ -473,6 +494,9 @@ func (s *defaultOpenAIAccountScheduler) Select(
 
 	selection, candidateCount, topK, loadSkew, err := s.selectByLoadBalance(ctx, req)
 	decision.Layer = openAIAccountScheduleLayerLoadBalance
+	if req.StrictPriority {
+		decision.Layer = openAIAccountScheduleLayerStrictPriority
+	}
 	decision.CandidateCount = candidateCount
 	decision.TopK = topK
 	decision.LoadSkew = loadSkew
@@ -1214,6 +1238,10 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrderWithBudget
 			break
 		}
 		fresh = s.service.recheckSelectedOpenAIAccountFromDB(ctx, fresh, req.GroupID, req.Platform, req.RequestedModel, false, req.RequiredCapability)
+		if req.StrictPriority && fresh != nil && fresh.Priority != candidate.account.Priority {
+			release(result)
+			return nil, compactBlocked, errOpenAIStrictPriorityChanged
+		}
 		if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatible(ctx, fresh, req) {
 			release(result)
 			continue
@@ -1273,7 +1301,7 @@ func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
 ) (*AccountSelectionResult, error) {
-	if !req.StickyWeighted {
+	if !req.StickyWeighted || req.StrictPriority {
 		return nil, nil
 	}
 	for _, accountID := range []int64{req.StickyPreviousAccountID, req.StickyAccountID} {
@@ -1482,6 +1510,9 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	}
 	if len(filtered) == 0 {
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false, filterStats.summary(""))
+	}
+	if req.StrictPriority {
+		return s.selectByStrictPriority(ctx, req, filtered, budget, filterStats)
 	}
 
 	loadMap := map[int64]*AccountLoadInfo{}
@@ -1713,6 +1744,9 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 				return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, compactBlocked, filterStats.summary("selection_order_exhausted"))
 			}
 			fresh = s.service.recheckSelectedOpenAIAccountFromDB(ctx, fresh, req.GroupID, req.Platform, req.RequestedModel, false, req.RequiredCapability)
+			if req.StrictPriority && fresh != nil && fresh.Priority != candidate.account.Priority {
+				return nil, candidateCount, topK, loadSkew, errOpenAIStrictPriorityChanged
+			}
 			if fresh == nil || !s.isAccountTransportCompatible(fresh, req.RequiredTransport) || !s.isAccountRequestCompatible(ctx, fresh, req) {
 				continue
 			}
@@ -2082,6 +2116,10 @@ func (s *OpenAIGatewayService) getOpenAIAccountScheduler(ctx context.Context) Op
 	if !s.isOpenAIAdvancedSchedulerEnabled(ctx) {
 		return nil
 	}
+	return s.ensureOpenAIAccountScheduler()
+}
+
+func (s *OpenAIGatewayService) ensureOpenAIAccountScheduler() OpenAIAccountScheduler {
 	s.openaiSchedulerOnce.Do(func() {
 		if s.openaiAccountStats == nil {
 			s.openaiAccountStats = newOpenAIAccountRuntimeStats()
@@ -2365,6 +2403,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 		ctx = s.withOpenAIProfitControlGate(ctx, groupID)
 	}
 	platform = NormalizeOpenAICompatiblePlatform(platform)
+	strictPriority := s.useOpenAIStrictPriority(ctx, groupID, platform, requiredImageCapability, useUpstreamTokenCost)
 	decision := OpenAIAccountScheduleDecision{}
 	preserveStickyBinding := preserveOpenAIGuardianParentBinding(ctx, sessionHash) || openAIImageSizeSpilloverPass(ctx)
 	guardianParentAccountID := int64(0)
@@ -2372,6 +2411,9 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 		guardianParentAccountID = s.resolveOpenAIGuardianParentAccountID(ctx, groupID)
 	}
 	scheduler := s.getOpenAIAccountScheduler(ctx)
+	if scheduler == nil && strictPriority {
+		scheduler = s.ensureOpenAIAccountScheduler()
+	}
 	if scheduler == nil {
 		decision.Layer = openAIAccountScheduleLayerLoadBalance
 		if selection, hit, err := s.selectLegacyAccountByPreviousResponse(ctx, groupID, previousResponseID, sessionHash, requestedModel, excludedIDs, requiredTransport, requiredCapability, requiredImageCapability, requireCompact, platform); err != nil {
@@ -2500,6 +2542,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 		StickyPreviousAccountID: stickyPreviousAccountID,
 		StickyWeighted:          stickyWeighted,
 		SubscriptionPriority:    subscriptionPriority,
+		StrictPriority:          strictPriority,
 		PreserveStickyBinding:   preserveStickyBinding,
 		RequirePrivacySet:       s.openAIGroupRequiresPrivacySet(ctx, groupID),
 		PreviousResponseID:      previousResponseID,
