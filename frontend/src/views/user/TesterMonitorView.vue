@@ -9,7 +9,10 @@
             <p class="mt-2 text-xs text-gray-500 dark:text-dark-400">{{ t('tester.updated') }}：{{ dateTime(snapshot?.generated_at) }} · {{ t('tester.resetAt') }}：{{ snapshot?.visible_after ? dateTime(snapshot.visible_after) : t('tester.notReset') }}</p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <RouterLink to="/test-center" class="btn btn-secondary">{{ t('tester.testNow') }}</RouterLink>
+            <button type="button" class="btn btn-secondary" data-test="export-tester-report" :disabled="loading || exporting || !snapshot" @click="exportReport">
+              <Icon :name="exporting ? 'refresh' : 'download'" size="sm" class="mr-1.5" :class="exporting && 'animate-spin'" />
+              {{ t(exporting ? 'tester.exportingData' : 'tester.exportData') }}
+            </button>
             <TesterHistoryResetButton :disabled="loading" @reset="afterReset" />
             <button class="btn btn-primary" :disabled="loading" @click="load">{{ t('tester.refresh') }}</button>
           </div>
@@ -109,16 +112,20 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import Icon from '@/components/icons/Icon.vue'
 import Select from '@/components/common/Select.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import TesterHistoryResetButton from '@/components/user/TesterHistoryResetButton.vue'
+import { useAppStore } from '@/stores/app'
 import { apiClient } from '@/api/client'
 import { keysAPI, usageAPI } from '@/api'
 import { getTesterSnapshot, type TesterMetric, type TesterSnapshot } from '@/api/tester'
 import { testerCacheRate, testerMoney, testerRange, testerTime, testerTokens, type TesterPeriod } from '@/utils/testerMetrics'
 import type { ApiKey, UsageLog, UserErrorRequest, PaginatedResponse } from '@/types'
+import { saveAs } from 'file-saver'
 
 const { t } = useI18n()
+const appStore = useAppStore()
 const snapshot = ref<TesterSnapshot | null>(null)
 const period = ref<TesterPeriod>('today')
 const keyId = ref<number | null>(null)
@@ -139,12 +146,16 @@ const activeTab = ref<'samples' | 'errors'>('samples')
 const requests = ref<UsageLog[]>([])
 const errors = ref<UserErrorRequest[]>([])
 const selectedRecord = ref<UsageLog | null>(null)
+const exporting = ref(false)
+const appliedFilters = ref<{ period: TesterPeriod; keyId: number | null; groupId?: number; groupName: string; model: string }>({ period: 'today', keyId: null, groupName: '', model: '' })
+let exportController: AbortController | null = null
 let controller: AbortController | undefined
 let seq = 0
 const periodOptions = computed(() => (['today', 'week', 'month', 'session'] as const).map(value => ({ value, label: t(`tester.${value}`) })))
 const keyOptions = computed(() => [{ value: null, label: t('tester.allKeys') }, ...keys.value.map(key => ({ value: key.id, label: key.name || `#${key.id}` }))])
 const speed = (value?: number | null) => value != null ? `${value.toFixed(1)} tok/s` : '—'
 const dateTime = (value?: string | null) => value ? new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '—'
+const exportDateTime = (value: string) => `${new Intl.DateTimeFormat('sv-SE', { timeZone:'Asia/Shanghai', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23' }).format(new Date(value))} +08:00`
 const cards = computed(() => {
   const s = snapshot.value?.summary
   return [
@@ -188,8 +199,12 @@ async function load() {
   controller = new AbortController()
   const signal = controller.signal
   const current = ++seq
+  const selectedPeriod = period.value
+  const selectedKeyId = keyId.value
+  const selectedGroupId = groupId.value
+  const selectedModel = model.value.trim()
   loading.value = true
-  const params = { ...testerRange(period.value, new Date(), snapshot.value?.visible_after), api_key_id:keyId.value || undefined, group_id:groupId.value, model:model.value.trim() || undefined }
+  const params = { ...testerRange(selectedPeriod, new Date(), snapshot.value?.visible_after), api_key_id:selectedKeyId || undefined, group_id:selectedGroupId, model:selectedModel || undefined }
   try {
     const [stats, usage, failed] = await Promise.all([
       getTesterSnapshot(params, signal),
@@ -198,12 +213,129 @@ async function load() {
     ])
     if (signal.aborted || current !== seq) return
     snapshot.value = stats
+    appliedFilters.value = { period:selectedPeriod, keyId:selectedKeyId, groupId:selectedGroupId, groupName:groupName.value, model:selectedModel }
     requests.value = usage?.items || []
     errors.value = failed?.data.items || []
     hasNext.value = page.value * 20 < (usage?.total ?? failed?.data.total ?? 0)
     loadFailed.value = false
   } catch { if (!signal.aborted && current === seq) loadFailed.value = true }
   finally { if (current === seq) loading.value = false }
+}
+async function exportReport() {
+  const current = snapshot.value
+  if (!current || exporting.value) return
+  exporting.value = true
+  const controller = new AbortController()
+  exportController = controller
+  const filters = { ...appliedFilters.value }
+  try {
+    const XLSX = await import('xlsx')
+    const pageSize = 1000
+    const requestRows: UsageLog[] = []
+    const requestParams = {
+      start_time:current.start_time,
+      end_time:current.end_time,
+      timezone:'Asia/Shanghai',
+      api_key_id:filters.keyId || undefined,
+      group_id:filters.groupId,
+      model:filters.model || undefined,
+      page_size:pageSize,
+      sort_by:'created_at' as const,
+      sort_order:'asc' as const,
+    }
+    if (Date.parse(current.end_time) > Date.parse(current.start_time)) {
+      for (let page = 1, total = 0; ; page++) {
+        const result = await usageAPI.query({ ...requestParams, page }, { signal:controller.signal })
+        requestRows.push(...result.items)
+        total = result.total
+        if (requestRows.length >= total || result.items.length < pageSize) break
+      }
+    }
+    if (controller.signal.aborted) return
+    const summary = current.summary
+    const keyName = filters.keyId
+      ? keys.value.find(key => key.id === filters.keyId)?.name || `#${filters.keyId}`
+      : t('tester.allKeys')
+    const overview = [
+      [t('tester.exportField'), t('tester.exportValue')],
+      [t('tester.exportedAt'), exportDateTime(new Date().toISOString())],
+      [t('tester.exportPeriod'), t(`tester.${filters.period}`)],
+      [t('tester.exportStart'), exportDateTime(current.start_time)],
+      [t('tester.exportEnd'), exportDateTime(current.end_time)],
+      [t('tester.exportKey'), keyName],
+      [t('tester.exportGroup'), filters.groupId ? filters.groupName : t('tester.allGroups')],
+      [t('tester.exportModel'), filters.model || t('tester.allModels')],
+      [t('tester.modelCount'), current.models.length],
+      [t('tester.exportRequestRows'), requestRows.length],
+      [t('tester.requests'), summary.requests],
+      [t('tester.failures'), current.error_records],
+      [t('tester.exportInputTokens'), summary.input_tokens],
+      [t('tester.exportOutputTokens'), summary.output_tokens],
+      [t('tester.exportCacheReadTokens'), summary.cache_read_tokens],
+      [t('tester.exportCacheCreationTokens'), summary.cache_creation_tokens],
+      [t('tester.nominal'), summary.total_cost],
+      [t('tester.billed'), summary.actual_cost],
+      [t('tester.cache'), summary.cache_hit_rate],
+      [`${t('tester.ttft')} P50 (ms)`, summary.first_token_p50_ms],
+      [`${t('tester.ttft')} P95 (ms)`, summary.first_token_p95_ms],
+      [`${t('tester.latency')} P50 (ms)`, summary.duration_p50_ms],
+      [`${t('tester.latency')} P95 (ms)`, summary.duration_p95_ms],
+      [t('tester.speed'), summary.output_tokens_per_second],
+      [t('tester.unitCost'), summary.cost_per_million_tokens],
+      [t('tester.exportDataLimit'), current.models_truncated ? t('tester.exportTruncated') : t('tester.exportComplete')],
+    ]
+    const modelRows: (string | number | null)[][] = [[
+      t('tester.modelColumn'), t('tester.group'), t('tester.groupId'), t('tester.requestCount'),
+      t('tester.exportInputTokens'), t('tester.exportOutputTokens'),
+      t('tester.exportCacheReadTokens'), t('tester.exportCacheCreationTokens'),
+      t('tester.exportNominalCost'), t('tester.exportActualCost'), t('tester.exportCacheHitRate'),
+      `${t('tester.ttft')} P50 (ms)`, `${t('tester.ttft')} P95 (ms)`,
+      `${t('tester.latency')} P50 (ms)`, `${t('tester.latency')} P95 (ms)`,
+      t('tester.speed'), t('tester.unitCost'),
+    ], ...current.models.map(row => [
+      row.model, row.group_name || t('tester.ungrouped'), row.group_id, row.requests,
+      row.input_tokens, row.output_tokens, row.cache_read_tokens, row.cache_creation_tokens,
+      row.total_cost, row.actual_cost, row.cache_hit_rate,
+      row.first_token_p50_ms, row.first_token_p95_ms,
+      row.duration_p50_ms, row.duration_p95_ms,
+      row.output_tokens_per_second, row.cost_per_million_tokens,
+    ])]
+    const requestTable: (string | number | boolean | null)[][] = [[
+      t('tester.requestId'), t('tester.time'), t('tester.modelColumn'), t('tester.group'), t('tester.groupId'), t('tester.key'),
+      t('tester.exportInputTokens'), t('tester.exportOutputTokens'), t('tester.exportCacheReadTokens'), t('tester.exportCacheCreationTokens'),
+      t('tester.exportCacheHitRate'), `${t('tester.ttft')} (ms)`, `${t('tester.latency')} (ms)`, t('tester.exportNominalCost'), t('tester.exportActualCost'),
+      t('tester.billingMode'), t('tester.multiplier'), t('tester.stream'),
+    ], ...requestRows.map(row => [
+      row.request_id, exportDateTime(row.created_at), row.model, row.group?.name || t('tester.ungrouped'), row.group_id || 0,
+      row.api_key?.name || `#${row.api_key_id}`, row.input_tokens, row.output_tokens, row.cache_read_tokens, row.cache_creation_tokens,
+      testerCacheRate(row), row.first_token_ms, row.duration_ms, row.total_cost, row.actual_cost,
+      row.billing_mode || 'token', row.rate_multiplier, row.stream ? t('common.yes') : t('common.no'),
+    ])]
+    const overviewSheet = XLSX.utils.aoa_to_sheet(overview)
+    overviewSheet['!cols'] = [{ wch: 28 }, { wch: 38 }]
+    const modelsSheet = XLSX.utils.aoa_to_sheet(modelRows)
+    modelsSheet['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 14 }, ...Array.from({ length: 14 }, () => ({ wch: 18 }))]
+    modelsSheet['!autofilter'] = { ref: `A1:Q${Math.max(1, modelRows.length)}` }
+    const requestsSheet = XLSX.utils.aoa_to_sheet(requestTable)
+    requestsSheet['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 28 }, { wch: 22 }, { wch: 14 }, { wch: 24 }, ...Array.from({ length: 12 }, () => ({ wch: 18 }))]
+    requestsSheet['!autofilter'] = { ref: `A1:R${Math.max(1, requestTable.length)}` }
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, overviewSheet, t('tester.exportOverview').slice(0, 31))
+    XLSX.utils.book_append_sheet(workbook, modelsSheet, t('tester.exportModels').slice(0, 31))
+    XLSX.utils.book_append_sheet(workbook, requestsSheet, t('tester.exportRequests').slice(0, 31))
+    workbook.Props = { Title:t('tester.exportTitle'), Subject:t('tester.exportSubject'), CreatedDate:new Date() }
+    const bytes = XLSX.write(workbook, { bookType:'xlsx', type:'array' })
+    const day = exportDateTime(new Date().toISOString()).slice(0, 10)
+    saveAs(new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `tester-model-report_${day}.xlsx`)
+    appStore.showSuccess(t('tester.exportSuccess'))
+  } catch {
+    if (!controller.signal.aborted) appStore.showError(t('tester.exportFailed'))
+  } finally {
+    if (exportController === controller) {
+      exportController = null
+      exporting.value = false
+    }
+  }
 }
 function applyFilters() { page.value = 1; selectedRecord.value = null; void load() }
 function clearFilters() { keyId.value = null; model.value = ''; groupId.value = undefined; applyFilters() }
@@ -218,5 +350,5 @@ function afterReset(visibleAfter: string) {
   void load()
 }
 onMounted(() => { void load(); void loadMoreKeys() })
-onUnmounted(() => { controller?.abort(); keyController.abort(); seq++ })
+onUnmounted(() => { controller?.abort(); exportController?.abort(); keyController.abort(); seq++ })
 </script>
