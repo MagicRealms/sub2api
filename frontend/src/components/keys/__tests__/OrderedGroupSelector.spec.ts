@@ -11,16 +11,22 @@ const options = [
 ]
 const create = (ids: number[] = []) => mount(OrderedGroupSelector, {
   props: { modelValue: ids, options },
-  global: { stubs: { GroupOptionItem: true } }
+  global: {
+    stubs: {
+      GroupBadge: { props: ['name'], template: '<span>{{ name }}</span>' },
+      Icon: true
+    }
+  }
 })
 
 describe('ordered key group selection', () => {
   it('appends groups across providers in selection order', async () => {
     const wrapper = create([6])
-    await wrapper.findAll('input[type="checkbox"]')[2]!.setValue(true)
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(2)
+    await wrapper.findAll('input[type="checkbox"]')[1]!.setValue(true)
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[6, 20]])
     await wrapper.setProps({ modelValue: [6, 20] })
-    await wrapper.findAll('input[type="checkbox"]')[1]!.setValue(true)
+    await wrapper.findAll('input[type="checkbox"]')[0]!.setValue(true)
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[6, 20, 16]])
   })
 
@@ -40,5 +46,15 @@ describe('ordered key group selection', () => {
     expect(wrapper.find('[data-route-id="20"]').text()).toContain('Claude Code')
     await wrapper.find('[data-route-id="6"] [aria-label="common.remove"]').trigger('click')
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[20]])
+  })
+
+  it('keeps selected routes out of the available list and shows the empty state', async () => {
+    const wrapper = create([6, 16, 20])
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
+    expect(wrapper.text()).toContain('keys.routing.noMoreGroups')
+
+    await wrapper.setProps({ modelValue: [] })
+    expect(wrapper.text()).toContain('keys.routing.emptySelection')
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(3)
   })
 })

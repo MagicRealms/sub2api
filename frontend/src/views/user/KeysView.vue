@@ -1102,29 +1102,33 @@
     </BaseDialog>
 
     <!-- Group Selector Dropdown (Teleported to body to avoid overflow clipping) -->
-    <FloatingPanel :open="groupSelectorKeyId !== null" :anchor="groupSelectorAnchor" :min-width="380" :max-height="640" class="w-[380px] rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10" @close="groupSelectorKeyId = null">
-        <!-- Search box -->
-        <div class="border-b border-gray-100 p-2 dark:border-dark-700">
-          <div class="relative">
-            <svg class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              v-model="groupSearchQuery"
-              type="text"
-              class="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-primary-300 focus:ring-1 focus:ring-primary-300 dark:border-dark-600 dark:bg-dark-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-600 dark:focus:ring-primary-600"
-              :placeholder="t('keys.searchGroup')"
-              @click.stop
-            />
+    <FloatingPanel :open="groupSelectorKeyId !== null" :anchor="groupSelectorAnchor" :min-width="380" :max-height="640" class="w-[min(26rem,calc(100vw-1rem))] rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10" @close="groupSelectorKeyId = null">
+      <div class="sticky top-0 z-10 border-b border-gray-100 bg-white/95 px-3 pb-3 pt-3 backdrop-blur dark:border-dark-700 dark:bg-dark-800/95">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ t('keys.routing.editTitle') }}</h2>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t('keys.routing.selectedCount', { count: routeDraft.length }) }}</p>
           </div>
+          <button type="button" class="btn btn-primary btn-sm shrink-0" data-test="save-group-routes" :disabled="routeSaving || !routeDraft.length" @click="saveGroupRoutes">
+            <Icon v-if="routeSaving" name="refresh" size="sm" class="mr-1.5 animate-spin" />
+            <Icon v-else name="check" size="sm" class="mr-1.5" />
+            {{ t('keys.routing.save') }}
+          </button>
         </div>
-        <div class="max-h-[65vh] overflow-y-auto p-3">
-          <OrderedGroupSelector v-model="routeDraft" :options="filteredGroupOptions" :all-options="groupOptions" :disabled="routeSaving" />
-        </div>
-        <div class="border-t border-gray-100 p-3 dark:border-dark-700">
-          <button type="button" class="btn btn-primary w-full" :disabled="routeSaving || !routeDraft.length" @click="saveGroupRoutes">{{ t('common.save') }}</button>
-        </div>
-
+        <label class="relative block">
+          <Icon name="search" size="sm" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            v-model="groupSearchQuery"
+            type="text"
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100 dark:border-dark-600 dark:bg-dark-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-500 dark:focus:bg-dark-700 dark:focus:ring-primary-900/40"
+            :placeholder="t('keys.searchGroup')"
+            @click.stop
+          />
+        </label>
+      </div>
+      <div class="max-h-[65vh] overflow-y-auto overscroll-contain p-3">
+        <OrderedGroupSelector v-model="routeDraft" :options="filteredGroupOptions" :all-options="groupOptions" :disabled="routeSaving" />
+      </div>
     </FloatingPanel>
   </AppLayout>
 </template>

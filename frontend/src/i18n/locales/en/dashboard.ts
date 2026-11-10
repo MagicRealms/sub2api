@@ -105,11 +105,19 @@ export default {
     usageResetSuccess: "Usage display reset",
     usageResetFailed: "Failed to reset usage",
     routing: {
-      hint: 'Select up to 16 groups across providers. Selection order sets priority; use the arrows to reorder.',
+      editTitle: 'Edit key groups',
+      selectedCount: '{count} selected, up to 16',
+      save: 'Save groups',
+      selectedGroups: 'Route order',
+      availableGroups: 'Add a group',
+      addHint: 'New groups are added last',
+      emptySelection: 'Select at least one group so this key can continue to work.',
+      noMoreGroups: 'No other groups available to add',
+      hint: 'New groups are added to the end. Numbers show request priority; use the arrows to reorder. Select up to 16.',
       priority: 'Priority {order}',
       moveUp: 'Increase priority',
       moveDown: 'Decrease priority',
-      billingHint: 'The first group supporting the model is tried first, followed by later groups on failure. Billing uses the higher charge of the initial and actual groups. Image and other independent models choose their own initial group.'
+      billingHint: 'Groups are tried in order when they support the model. Billing uses the higher rate of the initial and actual group, so fallback never lowers the charge. Images and other independent models use their matching group rate.'
     },
 
     title: 'API Keys',

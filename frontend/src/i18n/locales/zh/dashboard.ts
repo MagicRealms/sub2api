@@ -105,11 +105,19 @@ export default {
     usageResetSuccess: "用量统计已重置",
     usageResetFailed: "重置用量失败",
     routing: {
-      hint: '可跨平台选择多个分组，按勾选先后编号；使用箭头调整优先级。最多选择 16 个分组。',
+      editTitle: '调整密钥分组',
+      selectedCount: '已选 {count} 个，最多 16 个',
+      save: '保存分组',
+      selectedGroups: '路由顺序',
+      availableGroups: '可添加分组',
+      addHint: '勾选后加入末尾',
+      emptySelection: '至少选择一个分组，保存后密钥才能继续使用。',
+      noMoreGroups: '没有其他可添加的分组',
+      hint: '勾选分组后会加入路由末尾；上方编号表示调用优先级，可用箭头调整。最多选择 16 个。',
       priority: '第 {order} 优先级',
       moveUp: '提高优先级',
       moveDown: '降低优先级',
-      billingHint: '按顺序选择首个支持该模型的分组，失败后依次尝试后续分组。按初始分组与实际调用分组中较高的费用计费，切换不降价；独立图片等模型单独确定起始分组。'
+      billingHint: '系统按顺序尝试支持该模型的分组，失败后再切换。计费倍率按初始与实际调用分组中较高值计算，切换不会降价。图片等独立模型按其对应分组计费。'
     },
 
     title: 'API 密钥',

@@ -177,6 +177,7 @@ const DataTableStub = {
           <slot name="cell-id" :value="row.id" :row="row" />
         </div>
         <slot name="cell-name" :value="row.name" :row="row" />
+        <div data-test="key-group"><slot name="cell-group" :row="row" /></div>
         <slot name="cell-actions" :row="row" />
         <div data-test="usage"><slot name="cell-usage" :row="row" /></div>
         <div data-test="current-concurrency">
@@ -281,6 +282,29 @@ describe('user KeysView column settings', () => {
     expect(listKeys).toHaveBeenCalledTimes(requests)
     wrapper.unmount()
   })
+
+  it('keeps group save in the pinned header and persists the selected route order', async () => {
+    const key = { ...createApiKey(), group_id: 1, group_ids: [1] } as ApiKey
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateKey.mockResolvedValue({ ...key, group_id: 1, group_ids: [1, 2] })
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'Primary', platform: 'openai', rate_multiplier: 0.3 },
+      { id: 2, name: 'Backup', platform: 'anthropic', rate_multiplier: 0.5 },
+    ])
+
+    const wrapper = await mountView()
+    await wrapper.get('[data-test="key-group"] button').trigger('click')
+    const save = wrapper.get('[data-test="save-group-routes"]')
+    expect(save.exists()).toBe(true)
+    expect(save.element.closest('.sticky')).not.toBeNull()
+
+    await wrapper.get('[data-test="ordered-group-selector"] input[type="checkbox"]').setValue(true)
+    await save.trigger('click')
+    await flushPromises()
+    expect(updateKey).toHaveBeenCalledWith(1, { group_id: 1, group_ids: [1, 2] })
+    wrapper.unmount()
+  })
+
   beforeEach(() => {
     authState.user.role = 'user'
     resetUsage.mockReset()
