@@ -47,7 +47,7 @@ export async function getTesterSnapshot(params: TesterParams, signal?: AbortSign
   return data
 }
 
-export async function resetTesterHistory(): Promise<{ visible_after: string; billing_preserved: boolean }> {
+export async function resetTesterHistory(): Promise<{ visible_after: string; billing_preserved: boolean; usage_records_preserved: boolean }> {
   const { data } = await apiClient.post('/tester/usage/reset')
   return data
 }

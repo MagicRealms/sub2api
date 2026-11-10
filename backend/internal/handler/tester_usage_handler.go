@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -15,7 +14,6 @@ func isTesterContext(c *gin.Context) bool {
 	role, ok := middleware.GetUserRoleFromContext(c)
 	return ok && role == service.RoleTester
 }
-
 func requireTesterSubject(c *gin.Context) (int64, bool) {
 	subject, ok := middleware.GetAuthSubjectFromContext(c)
 	if !ok || subject.UserID <= 0 {
@@ -62,37 +60,9 @@ func (h *UsageHandler) ResetTesterHistory(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, gin.H{"visible_after": since, "billing_preserved": true})
-}
-
-func (h *UsageHandler) applyTesterHistory(c *gin.Context, start **time.Time) bool {
-	if !isTesterContext(c) {
-		return true
-	}
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return false
-	}
-	since, err := h.usageService.TesterHistorySince(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return false
-	}
-	if since != nil && (*start == nil || since.After(**start)) {
-		*start = since
-	}
-	return true
-}
-
-func (h *UsageHandler) testerRecordVisible(c *gin.Context, createdAt time.Time) bool {
-	var since *time.Time
-	if !h.applyTesterHistory(c, &since) {
-		return false
-	}
-	if since != nil && createdAt.Before(*since) {
-		response.Error(c, http.StatusNotFound, "Record is outside the current test history")
-		return false
-	}
-	return true
+	response.Success(c, gin.H{
+		"visible_after":           since,
+		"billing_preserved":       true,
+		"usage_records_preserved": true,
+	})
 }
