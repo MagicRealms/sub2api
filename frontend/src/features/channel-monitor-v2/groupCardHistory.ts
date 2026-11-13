@@ -30,5 +30,7 @@ export function groupCardHistory(buckets: MonitorMatrixBucket[], coverage: Monit
     const currentRank = slot.bucket ? severity[healthModeState(slot.bucket.health, mode)] : -1
     if (!slot.bucket || rank > currentRank || (rank === currentRank && score != null && (currentScore == null || score < currentScore))) slot.bucket = bucket
   }
-  return slots
+  // An idle interval is not a health state. Only display intervals with an
+  // observed bucket so no-traffic periods do not appear as gray samples.
+  return slots.filter((slot) => slot.bucket != null)
 }

@@ -30,7 +30,7 @@
 
     <div class="card-body min-h-0 flex-1 !p-0">
       <div
-        v-if="rows.length"
+        v-if="rows.length && bucketStarts.length"
         ref="scrollRef"
         class="matrix-scroll max-h-[min(42vh,420px)] max-w-full overflow-auto rounded-2xl bg-gray-50/60 p-2 dark:bg-dark-900/30"
         @wheel="onMatrixWheel"
@@ -82,26 +82,22 @@
               {{ formatPercent(entry.row.metrics.cache_rate) }}
             </strong>
             <div class="pulse-track grid items-stretch" :style="pulseStyle">
-              <span
-                v-for="slot in entry.slots"
-                :key="slot.start"
-                class="pulse-cell relative rounded-sm border-0 p-0 outline-offset-1"
-                :class="[
-                  slot.bucket ? cellClass(slot.bucket.health, slot.bucket.metrics.request_count) : 'health-unknown',
-                  slot.bucket ? 'has-data' : 'is-empty',
-                ]"
-                tabindex="0"
-                role="img"
-                :title="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
-                :aria-label="slot.bucket ? bucketTooltip(slot.bucket) : t('channelMonitorV2.matrix.noTrafficAt', { time: formatBucketRange(slot.start) })"
-                @mouseenter="showTooltip($event, slot)"
-                @mousemove="moveTooltip($event)"
-                @mouseleave="hideTooltip"
-                @focus="showTooltip($event, slot)"
-                @blur="hideTooltip"
-              >
-                <span class="pulse-tooltip" role="tooltip">
-                  <template v-if="slot.bucket">
+              <template v-for="slot in entry.slots" :key="slot.start">
+                <span
+                  v-if="slot.bucket"
+                  class="pulse-cell relative rounded-sm border-0 p-0 outline-offset-1"
+                  :class="[cellClass(slot.bucket.health, slot.bucket.metrics.request_count), 'has-data']"
+                  tabindex="0"
+                  role="img"
+                  :title="bucketTooltip(slot.bucket)"
+                  :aria-label="bucketTooltip(slot.bucket)"
+                  @mouseenter="showTooltip($event, slot)"
+                  @mousemove="moveTooltip($event)"
+                  @mouseleave="hideTooltip"
+                  @focus="showTooltip($event, slot)"
+                  @blur="hideTooltip"
+                >
+                  <span class="pulse-tooltip" role="tooltip">
                     <span class="pulse-tooltip-line pulse-tooltip-title">{{ formatBucketRange(slot.start) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.matrix.scoreLine', { score: formatScore(slot.bucket.health) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.successRateValue', { value: successRate(slot.bucket.metrics) }) }}</span>
@@ -111,13 +107,10 @@
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.errorRateValue', { value: formatPercent(slot.bucket.metrics.error_rate) }) }}</span>
                     <span v-if="showThroughput" class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.rpmValue', { value: formatRate(slot.bucket.metrics.rpm) }) }}</span>
                     <span class="pulse-tooltip-line">{{ t('channelMonitorV2.metrics.durationValue', { value: latencyPrivacy(slot.bucket.metrics.duration) }) }}</span>
-                  </template>
-                  <template v-else>
-                    <span class="pulse-tooltip-line pulse-tooltip-title">{{ formatBucketRange(slot.start) }}</span>
-                    <span class="pulse-tooltip-line">{{ t('channelMonitorV2.matrix.noTraffic') }}</span>
-                  </template>
+                  </span>
                 </span>
-              </span>
+                <span v-else class="pulse-gap" aria-hidden="true"></span>
+              </template>
             </div>
           </div>
         </div>
@@ -218,8 +211,7 @@ const zoom = ref<ZoomState>(resetZoom())
 const zoomed = computed(() => isZoomed(zoom.value))
 
 const allBucketStarts = computed(() => {
-  // X-axis always spans the UI-selected range [requested_start, requested_end).
-  // Partial backfill leaves empty cells until coverage_start/data_through fill in.
+  // Only timestamps with observed buckets belong on the shared time axis.
   const step = Math.max(60, props.coverage.bucket_seconds) * 1000
   const requestedStart = new Date(props.coverage.requested_start).getTime()
   const requestedEndRaw = props.coverage.requested_end
@@ -231,11 +223,17 @@ const allBucketStarts = computed(() => {
     ? requestedEndRaw
     : dataThrough
   if (![requestedStart, end].every(Number.isFinite) || requestedStart >= end) return []
-  const starts: string[] = []
-  for (let cursor = Math.floor(requestedStart / step) * step; cursor < end; cursor += step) {
-    starts.push(new Date(cursor).toISOString())
+  const firstBucket = Math.floor(requestedStart / step) * step
+  const observedStarts = new Set<number>()
+  for (const row of props.rows) {
+    for (const bucket of row.buckets || []) {
+      const timestamp = new Date(bucket.bucket_start).getTime()
+      if (!Number.isFinite(timestamp)) continue
+      const start = Math.floor(timestamp / step) * step
+      if (start >= firstBucket && start < end) observedStarts.add(start)
+    }
   }
-  return starts
+  return [...observedStarts].sort((a, b) => a - b).map((start) => new Date(start).toISOString())
 })
 /** Visible bucket window after X zoom (cursor-centered), not always the tail. */
 const bucketStarts = computed(() => sliceByZoom(allBucketStarts.value, zoom.value))
@@ -530,9 +528,10 @@ function formatBucketRange(value: string) {
 .pulse-cell.has-data {
   cursor: help;
 }
-.pulse-cell.is-empty {
-  opacity: 0.55;
-  cursor: default;
+.pulse-gap {
+  min-width: 0;
+  background: transparent;
+  pointer-events: none;
 }
 .pulse-cell.has-data:hover,
 .pulse-cell.has-data:focus-visible {

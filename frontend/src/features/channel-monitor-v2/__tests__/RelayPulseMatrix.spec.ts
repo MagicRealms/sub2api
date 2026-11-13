@@ -112,7 +112,7 @@ describe('RelayPulseMatrix', () => {
     })
 
     const cells = wrapper.findAll('.pulse-cell')
-    expect(cells).toHaveLength(3)
+    expect(cells).toHaveLength(2)
     // Hover tooltip content (privacy-safe: no absolute request/error counts)
     const tip = cells[0].text()
     expect(tip).toContain('成功率')
@@ -132,9 +132,8 @@ describe('RelayPulseMatrix', () => {
     expect(header).toContain('缓存率')
     // Multi-band class from score 52 → score5
     expect(cells[0].classes().some((c) => c.startsWith('health-score'))).toBe(true)
-    // Redacted user payloads may have request_count=0 but still include score.
+    // A sampled bucket remains visible even when public volume is redacted.
     expect(cells[1].classes().some((c) => c.startsWith('health-score'))).toBe(true)
-    expect(cells[2].classes()).toContain('health-unknown')
 
     // No click-to-open modal
     await cells[0].trigger('click')
@@ -170,7 +169,67 @@ describe('RelayPulseMatrix axis range', () => {
         healthMode: 'overall',
       },
     })
-    // 5 minutes @ 60s buckets → 5 cells spanning the selected range
-    expect(wrapper.findAll('.pulse-cell')).toHaveLength(5)
+    // Only the sampled minute is shown; idle periods are not gray cells.
+    expect(wrapper.findAll('.pulse-cell')).toHaveLength(1)
+    expect(wrapper.findAll('.pulse-gap')).toHaveLength(0)
+  })
+
+  it('keeps shared timestamps aligned with transparent gaps between rows', () => {
+    const wrapper = mount(RelayPulseMatrix, {
+      props: {
+        rows: [
+          {
+            platform: 'openai', group_id: 7, group_name: 'Group A', model: 'gpt-5',
+            metrics: metrics(10), health,
+            buckets: [
+              { bucket_start: '2026-08-01T00:00:00Z', metrics: metrics(2), health },
+              { bucket_start: '2026-08-01T00:02:00Z', metrics: metrics(8), health },
+            ],
+          },
+          {
+            platform: 'anthropic', group_id: 8, group_name: 'Group B', model: 'claude-sonnet',
+            metrics: metrics(8), health,
+            buckets: [{ bucket_start: '2026-08-01T00:02:00Z', metrics: metrics(8), health }],
+          },
+        ],
+        coverage: {
+          requested_start: '2026-08-01T00:00:00Z',
+          requested_end: '2026-08-01T00:03:00Z',
+          coverage_start: '2026-08-01T00:00:00Z',
+          data_through: '2026-08-01T00:03:00Z',
+          computed_at: '2026-08-01T00:03:00Z',
+          aggregation_lag_seconds: 0,
+          coverage_complete: true,
+          bucket_seconds: 60,
+        },
+        healthMode: 'overall',
+      },
+    })
+
+    expect(wrapper.findAll('.pulse-cell')).toHaveLength(3)
+    expect(wrapper.findAll('.pulse-gap')).toHaveLength(1)
+    expect(wrapper.findAll('.pulse-cell.health-unknown')).toHaveLength(0)
+  })
+
+  it('shows the empty state when the range contains no sampled traffic', () => {
+    const wrapper = mount(RelayPulseMatrix, {
+      props: {
+        rows: [{ platform: 'openai', metrics: metrics(0), health, buckets: [] }],
+        coverage: {
+          requested_start: '2026-08-01T00:00:00Z',
+          requested_end: '2026-08-01T00:03:00Z',
+          coverage_start: '2026-08-01T00:00:00Z',
+          data_through: '2026-08-01T00:03:00Z',
+          computed_at: '2026-08-01T00:03:00Z',
+          aggregation_lag_seconds: 0,
+          coverage_complete: true,
+          bucket_seconds: 60,
+        },
+        healthMode: 'overall',
+      },
+    })
+
+    expect(wrapper.find('.matrix-scroll').exists()).toBe(false)
+    expect(wrapper.findAll('.pulse-cell')).toHaveLength(0)
   })
 })

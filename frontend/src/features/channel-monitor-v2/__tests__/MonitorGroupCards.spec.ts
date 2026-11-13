@@ -16,20 +16,21 @@ function render(cards: MonitorGroupCard[]) {
   return mount(MonitorGroupCards, { props: { cards, coverage, healthMode: 'overall', rangeLabel: '90分钟' }, global: { plugins: [createI18n({ legacy: false, locale: 'zh', messages: { zh: messages } })], stubs: { FloatingPanel: true } } })
 }
 describe('MonitorGroupCards observed health', () => {
-  it('renders red/yellow/green observations and keeps unsampled slots gray', () => {
+  it('renders sampled red/yellow/green observations without idle gray slots', () => {
     const wrapper = render([card(6)])
     expect(wrapper.findAll('.group-history .health-healthy')).toHaveLength(1)
     expect(wrapper.findAll('.group-history .health-warning')).toHaveLength(1)
     expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(1)
-    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(27)
+    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(0)
+    expect(wrapper.findAll('.group-history button')).toHaveLength(3)
     expect(wrapper.text()).toContain('少量样本')
   })
-  it('keeps a missing first-token signal gray when changing dimensions', async () => {
+  it('keeps an observed sample unknown when its selected metric is unavailable', async () => {
     const data = card(6)
     data.buckets[0]!.health.ttft = 'unknown'
     const wrapper = render([data])
     await wrapper.setProps({ healthMode: 'ttft' })
-    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(28)
+    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(1)
     expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(1)
   })
   it('uses the group platform brand marks and colors, independent of health or order', async () => {
@@ -55,6 +56,6 @@ describe('MonitorGroupCards observed health', () => {
     const wrapper = render([data])
     expect(wrapper.findAll('dd').map(x => x.text())).toEqual(['—', '—', '—'])
     expect(wrapper.find('header .status-dot').classes()).toContain('health-unknown')
-    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(30)
+    expect(wrapper.findAll('.group-history button')).toHaveLength(0)
   })
 })
