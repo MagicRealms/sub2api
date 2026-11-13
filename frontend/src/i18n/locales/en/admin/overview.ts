@@ -15,6 +15,7 @@ export default {
       totalRequests: 'Total Requests',
       todayCost: 'Today Cost',
       totalCost: 'Total Cost',
+      monthCost: 'Month Spend',
       newUsersToday: 'New Users Today',
       todayTokens: 'Today Tokens',
       totalTokens: 'Total Tokens',

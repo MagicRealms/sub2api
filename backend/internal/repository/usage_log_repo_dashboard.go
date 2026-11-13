@@ -89,6 +89,9 @@ func (r *usageLogRepository) GetDashboardStats(ctx context.Context) (*DashboardS
 	if err := r.fillDashboardUsageStatsAggregated(ctx, stats, todayStart, now); err != nil {
 		return nil, err
 	}
+	if err := r.fillDashboardMonthActualCost(ctx, stats, now); err != nil {
+		return nil, err
+	}
 
 	rpm, tpm, err := r.getPerformanceStats(ctx, 0)
 	if err != nil {
@@ -117,6 +120,9 @@ func (r *usageLogRepository) GetDashboardStatsWithRange(ctx context.Context, sta
 	if err := r.fillDashboardUsageStatsFromUsageLogs(ctx, stats, startUTC, endUTC, todayStart, now); err != nil {
 		return nil, err
 	}
+	if err := r.fillDashboardMonthActualCost(ctx, stats, now); err != nil {
+		return nil, err
+	}
 
 	rpm, tpm, err := r.getPerformanceStats(ctx, 0)
 	if err != nil {
@@ -126,6 +132,16 @@ func (r *usageLogRepository) GetDashboardStatsWithRange(ctx context.Context, sta
 	stats.Tpm = tpm
 
 	return stats, nil
+}
+
+func (r *usageLogRepository) fillDashboardMonthActualCost(ctx context.Context, stats *DashboardStats, now time.Time) error {
+	// Daily aggregate buckets use the server timezone; query raw indexed timestamps for the Beijing month boundary.
+	const query = `
+		SELECT COALESCE(SUM(actual_cost), 0)
+		FROM usage_logs
+		WHERE created_at >= $1 AND created_at < $2
+	`
+	return scanSingleRow(ctx, r.sql, query, []any{usagestats.DashboardMonth(now), now}, &stats.MonthActualCost)
 }
 
 func (r *usageLogRepository) fillDashboardEntityStats(ctx context.Context, stats *DashboardStats, todayUTC, now time.Time) error {

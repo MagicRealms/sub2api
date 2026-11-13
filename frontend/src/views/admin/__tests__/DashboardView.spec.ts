@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 
 import { dashboardDate } from '@/utils/dashboardTime'
 import type { DashboardStats } from '@/types'
+import MetricCard from '@/components/workspace/MetricCard.vue'
 import DashboardView from '../DashboardView.vue'
 
 const { getSnapshotV2, getUserUsageTrend, getUserSpendingRanking } = vi.hoisted(() => ({
@@ -72,6 +73,7 @@ const createDashboardStats = (): DashboardStats => ({
   total_tokens: 0,
   total_cost: 0,
   total_actual_cost: 0,
+  total_account_cost: 0,
   today_requests: 0,
   today_input_tokens: 0,
   today_output_tokens: 0,
@@ -80,6 +82,8 @@ const createDashboardStats = (): DashboardStats => ({
   today_tokens: 0,
   today_cost: 0,
   today_actual_cost: 0,
+  today_account_cost: 0,
+  month_actual_cost: 0,
   average_duration_ms: 0,
   uptime: 0,
   rpm: 0,
@@ -166,5 +170,28 @@ describe('admin DashboardView', () => {
       timezone: 'Asia/Shanghai',
       granularity: 'hour'
     }))
+  })
+
+  it('shows account cost, current month spend, and lifetime spend under today cost', async () => {
+    const stats = createDashboardStats()
+    stats.today_actual_cost = 12.34
+    stats.today_account_cost = 5.67
+    stats.month_actual_cost = 89.01
+    stats.total_actual_cost = 456.78
+    getSnapshotV2.mockResolvedValueOnce({ stats, trend: [], models: [] })
+
+    const wrapper = mount(DashboardView, {
+      global: { stubs: {
+        AppLayout: { template: '<div><slot /></div>' }, LoadingSpinner: true,
+        Icon: true, DateRangePicker: true, Select: true, ModelDistributionChart: true,
+        TokenUsageTrend: true
+      } }
+    })
+    await flushPromises()
+
+    const costCard = wrapper.findAllComponents(MetricCard).find(card => card.props('label') === 'admin.dashboard.todayCost')
+    expect(costCard?.text()).toContain('$5.67')
+    expect(costCard?.text()).toContain('$89.01')
+    expect(costCard?.text()).toContain('$456.78')
   })
 })

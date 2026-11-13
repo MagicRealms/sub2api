@@ -14,3 +14,8 @@ func DashboardDay(at time.Time) time.Time {
 	local := at.In(dashboardLocation)
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, dashboardLocation)
 }
+
+func DashboardMonth(at time.Time) time.Time {
+	local := at.In(dashboardLocation)
+	return time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, dashboardLocation)
+}

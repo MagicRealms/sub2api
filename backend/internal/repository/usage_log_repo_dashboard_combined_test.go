@@ -7,8 +7,23 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/stretchr/testify/require"
 )
+
+func TestDashboardMonthActualCostUsesBeijingCalendar(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+	now := time.Date(2026, time.November, 1, 12, 0, 0, 0, time.FixedZone("PDT", -8*60*60))
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(actual_cost\), 0\).*FROM usage_logs`).
+		WithArgs(usagestats.DashboardMonth(now), now).
+		WillReturnRows(sqlmock.NewRows([]string{"month_actual_cost"}).AddRow(89.01))
+
+	stats := &DashboardStats{}
+	require.NoError(t, repo.fillDashboardMonthActualCost(t.Context(), stats, now))
+	require.Equal(t, 89.01, stats.MonthActualCost)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
 
 func TestUserDashboardCombinedScansPreserveRatesAndTotals(t *testing.T) {
 	db, mock := newSQLMock(t)

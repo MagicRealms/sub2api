@@ -16,6 +16,7 @@ export default {
       totalRequests: '总请求数',
       todayCost: '今日消费',
       totalCost: '总消费',
+      monthCost: '本月消费',
       newUsersToday: '今日新增用户',
       actual: '实际',
       standard: '标准',

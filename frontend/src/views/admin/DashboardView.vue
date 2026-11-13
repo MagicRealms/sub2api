@@ -19,7 +19,13 @@
         <div class="sw-metric-grid">
           <MetricCard :label="t('admin.dashboard.todayRequests')" :value="formatNumber(stats.today_requests)" icon="pulse" tone="sky"><span>{{ t('common.total') }} {{ formatNumber(stats.total_requests) }}</span></MetricCard>
           <MetricCard :label="t('admin.dashboard.todayTokens')" :value="formatTokenMillions(stats.today_tokens)" icon="models" tone="violet"><span>{{ t('admin.dashboard.totalTokens') }} {{ formatTokenMillions(stats.total_tokens) }}</span></MetricCard>
-          <MetricCard :label="t('admin.dashboard.todayCost')" :value="`$${formatCost(stats.today_actual_cost)}`" icon="wallet" tone="mint"><span>{{ t('admin.dashboard.accountCost') }} ${{ formatCost(stats.today_account_cost) }}</span></MetricCard>
+          <MetricCard :label="t('admin.dashboard.todayCost')" :value="`$${formatCost(stats.today_actual_cost)}`" icon="wallet" tone="mint">
+            <div class="dashboard-cost-detail">
+              <span>{{ t('admin.dashboard.accountCost') }} <b>${{ formatCost(stats.today_account_cost) }}</b></span>
+              <span>{{ t('admin.dashboard.monthCost') }} <b>${{ formatCost(stats.month_actual_cost) }}</b></span>
+              <span>{{ t('admin.dashboard.totalCost') }} <b>${{ formatCost(stats.total_actual_cost) }}</b></span>
+            </div>
+          </MetricCard>
           <MetricCard :label="t('admin.dashboard.users')" :value="formatNumber(stats.total_users)" icon="users" tone="sun"><span>+{{ stats.today_new_users }} {{ t('admin.dashboard.newUsersToday') }}</span></MetricCard>
         </div>
         <div class="sw-secondary-metrics">
@@ -538,4 +544,19 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.dashboard-cost-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+
+.dashboard-cost-detail span {
+  white-space: nowrap;
+}
+
+.dashboard-cost-detail b {
+  color: var(--sw-ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
 </style>
