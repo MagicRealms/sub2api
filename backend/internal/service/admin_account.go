@@ -965,6 +965,16 @@ func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, upd
 	return s.accountRepo.UpdateExtra(ctx, id, updates)
 }
 
+func (s *adminServiceImpl) UpdateAccountModelMapping(ctx context.Context, id int64, mapping map[string]any) error {
+	updater, ok := s.accountRepo.(interface {
+		UpdateAccountModelMapping(context.Context, int64, map[string]any) error
+	})
+	if !ok {
+		return errors.New("account repository does not support model mapping updates")
+	}
+	return updater.UpdateAccountModelMapping(ctx, id, mapping)
+}
+
 // BulkUpdateAccounts updates multiple accounts in one request.
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {

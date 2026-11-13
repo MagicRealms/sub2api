@@ -361,6 +361,51 @@ func TestUpdateCredentialsAtomicallyClearsProbeForOpenAIAPIKeyIdentityChange(t *
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestUpdateAccountModelMappingMergesOnlyMappingAndPublishesChange(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() { _ = client.Close() })
+
+	mapping := map[string]any{"gpt-6.1": "gpt-6.1", "gpt-6.1-mini": "gpt-6.1-mini"}
+	mock.ExpectBegin()
+	mock.ExpectExec(`(?s)UPDATE accounts\s+SET credentials = COALESCE\(credentials, '\{\}'::jsonb\) \|\| jsonb_build_object\('model_mapping', \$1::jsonb\).*WHERE id = \$2 AND deleted_at IS NULL`).
+		WithArgs(`{"gpt-6.1":"gpt-6.1","gpt-6.1-mini":"gpt-6.1-mini"}`, int64(27)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO scheduler_outbox")).
+		WithArgs(service.SchedulerOutboxEventAccountChanged, int64(27), nil, nil, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	repo := newAccountRepositoryWithSQL(client, db, nil)
+	err = repo.UpdateAccountModelMapping(context.Background(), 27, mapping)
+
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestUpdateAccountModelMappingRollsBackWhenOutboxFails(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	client := dbent.NewClient(dbent.Driver(entsql.OpenDB(dialect.Postgres, db)))
+	t.Cleanup(func() { _ = client.Close() })
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`(?s)UPDATE accounts.*jsonb_build_object\('model_mapping', \$1::jsonb\).*WHERE id = \$2`).
+		WithArgs(`{"gpt-6.1":"gpt-6.1"}`, int64(27)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO scheduler_outbox")).WillReturnError(errors.New("outbox failed"))
+	mock.ExpectRollback()
+
+	repo := newAccountRepositoryWithSQL(client, db, nil)
+	err = repo.UpdateAccountModelMapping(context.Background(), 27, map[string]any{"gpt-6.1": "gpt-6.1"})
+
+	require.EqualError(t, err, "outbox failed")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestUpdateWithAccountBillingSettingsRollsBackWhenOutboxFails(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)

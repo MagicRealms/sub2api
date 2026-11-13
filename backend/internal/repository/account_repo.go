@@ -997,6 +997,68 @@ func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, cre
 	return nil
 }
 
+// UpdateAccountModelMapping patches only the model restriction inside credentials.
+// Bulk catalog sync must not use UpdateCredentials, which replaces the whole JSON object.
+func (r *accountRepository) UpdateAccountModelMapping(ctx context.Context, id int64, mapping map[string]any) error {
+	if scoped := r.accountTransactionScope(ctx); scoped != r {
+		return scoped.UpdateAccountModelMapping(ctx, id, mapping)
+	}
+	if len(mapping) == 0 {
+		return errors.New("model mapping must not be empty")
+	}
+
+	payload, err := json.Marshal(normalizeJSONMap(mapping))
+	if err != nil {
+		return err
+	}
+	baseCtx := ctx
+	contextTx := dbent.TxFromContext(ctx)
+	client := r.client
+	var tx *dbent.Tx
+	if contextTx != nil {
+		client = contextTx.Client()
+	} else if r.client != nil {
+		tx, err = r.client.Tx(ctx)
+		if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
+			return err
+		}
+		if tx != nil {
+			defer func() { _ = tx.Rollback() }()
+			ctx = dbent.NewTxContext(ctx, tx)
+			client = tx.Client()
+		}
+	}
+
+	result, err := client.ExecContext(ctx, `
+		UPDATE accounts
+		SET credentials = COALESCE(credentials, '{}'::jsonb) || jsonb_build_object('model_mapping', $1::jsonb),
+			updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+	`, string(payload), id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrAccountNotFound
+	}
+	if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
+		return err
+	}
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	if contextTx == nil {
+		r.syncSchedulerAccountSnapshot(baseCtx, id)
+	}
+	return nil
+}
+
 func (r *accountRepository) Delete(ctx context.Context, id int64) error {
 	if scoped := r.accountTransactionScope(ctx); scoped != r {
 		return scoped.Delete(ctx, id)

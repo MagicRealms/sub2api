@@ -3111,6 +3111,10 @@ type bulkUpstreamModelSyncResult struct {
 	Error       string `json:"error,omitempty"`
 }
 
+type accountModelMappingUpdater interface {
+	UpdateAccountModelMapping(ctx context.Context, id int64, mapping map[string]any) error
+}
+
 // BulkSyncUpstreamModels replaces each selected account's model restriction with
 // the live model IDs returned by that account's upstream.
 // POST /api/v1/admin/accounts/models/sync-upstream/batch
@@ -3203,9 +3207,14 @@ func (h *AccountHandler) BulkSyncUpstreamModels(c *gin.Context) {
 				return nil
 			}
 
-			_, updateErr := h.adminService.UpdateAccount(gctx, account.ID, &service.UpdateAccountInput{
-				Credentials: map[string]any{"model_mapping": mapping},
-			})
+			updater, ok := h.adminService.(accountModelMappingUpdater)
+			if !ok {
+				result.Status = "failed"
+				result.Error = "Model restriction updates are not supported"
+				results[index] = result
+				return nil
+			}
+			updateErr := updater.UpdateAccountModelMapping(gctx, account.ID, mapping)
 			if updateErr != nil {
 				result.Status = "failed"
 				result.Error = "Failed to save model restrictions"

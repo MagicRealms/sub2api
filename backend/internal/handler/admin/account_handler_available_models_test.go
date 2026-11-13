@@ -47,8 +47,8 @@ type syncUpstreamHTTPUpstream struct {
 
 type bulkSyncModelsAdminService struct {
 	*stubAdminService
-	account    service.Account
-	updateCall *service.UpdateAccountInput
+	account     service.Account
+	mappingCall map[string]any
 }
 
 func (s *bulkSyncModelsAdminService) GetAccountsByIDs(_ context.Context, ids []int64) ([]*service.Account, error) {
@@ -62,9 +62,12 @@ func (s *bulkSyncModelsAdminService) GetAccountsByIDs(_ context.Context, ids []i
 	return accounts, nil
 }
 
-func (s *bulkSyncModelsAdminService) UpdateAccount(_ context.Context, _ int64, input *service.UpdateAccountInput) (*service.Account, error) {
-	s.updateCall = input
-	return &s.account, nil
+func (s *bulkSyncModelsAdminService) UpdateAccountModelMapping(_ context.Context, id int64, mapping map[string]any) error {
+	if id != s.account.ID {
+		return service.ErrAccountNotFound
+	}
+	s.mappingCall = mapping
+	return nil
 }
 
 func (u *syncUpstreamHTTPUpstream) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
@@ -139,13 +142,11 @@ func TestAccountHandlerBulkSyncUpstreamModelsReplacesWhitelistWithLiveCatalog(t 
 	require.Equal(t, 1, resp.Data.Synced)
 	require.Len(t, resp.Data.Results, 1)
 	require.Equal(t, "synced", resp.Data.Results[0].Status)
-	require.NotNil(t, svc.updateCall)
+	require.NotNil(t, svc.mappingCall)
 	require.Equal(t, map[string]any{
-		"model_mapping": map[string]any{
-			"new-model-a": "new-model-a",
-			"new-model-b": "new-model-b",
-		},
-	}, svc.updateCall.Credentials)
+		"new-model-a": "new-model-a",
+		"new-model-b": "new-model-b",
+	}, svc.mappingCall)
 }
 
 func TestAccountHandlerBulkSyncUpstreamModelsKeepsWhitelistWhenCatalogIsEmpty(t *testing.T) {
@@ -174,7 +175,7 @@ func TestAccountHandlerBulkSyncUpstreamModelsKeepsWhitelistWhenCatalogIsEmpty(t 
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Nil(t, svc.updateCall)
+	require.Nil(t, svc.mappingCall)
 	require.Contains(t, rec.Body.String(), "Upstream returned no supported models")
 }
 
@@ -199,7 +200,7 @@ func TestAccountHandlerBulkSyncUpstreamModelsKeepsWhitelistWhenUpstreamFails(t *
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.Nil(t, svc.updateCall)
+	require.Nil(t, svc.mappingCall)
 	require.Contains(t, rec.Body.String(), "Failed to request upstream model list")
 }
 
