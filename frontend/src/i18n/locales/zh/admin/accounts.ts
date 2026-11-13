@@ -973,6 +973,12 @@ export default {
       syncUpstreamModelsMetadataIncomplete: '模型 ID 已同步，但未能更新任何能力元数据。',
       syncUpstreamModelsMetadataPartial: '已更新部分模型的能力元数据；其余模型能力仍不完整。',
       clearAllModels: '清除所有模型',
+      autoSyncUpstreamModels: {
+        title: '自动同步上游模型',
+        hint: '按所选周期读取此账号自己的上游模型目录；失败或返回空目录时保留当前模型限制。',
+        interval: '同步周期',
+        intervalHours: '{hours} 小时'
+      },
       customModelName: '自定义模型名称',
       enterCustomModelName: '输入自定义模型名称',
       addModel: '填入',

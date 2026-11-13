@@ -120,6 +120,46 @@
       </button>
     </div>
 
+    <div
+      v-if="accountId && canSyncUpstream && autoSyncConfig"
+      class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900/70 dark:bg-emerald-950/20"
+      data-testid="auto-sync-upstream-models"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-gray-800 dark:text-gray-100">
+            {{ t('admin.accounts.autoSyncUpstreamModels.title') }}
+          </p>
+          <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            {{ t('admin.accounts.autoSyncUpstreamModels.hint') }}
+          </p>
+        </div>
+        <Toggle
+          :model-value="autoSyncConfig.enabled"
+          :aria-label="t('admin.accounts.autoSyncUpstreamModels.title')"
+          data-testid="auto-sync-upstream-models-enabled"
+          @update:model-value="setAutoSyncEnabled"
+        />
+      </div>
+      <div class="mt-3 flex items-center gap-3">
+        <label for="auto-sync-upstream-models-interval" class="shrink-0 text-xs font-medium text-gray-700 dark:text-gray-300">
+          {{ t('admin.accounts.autoSyncUpstreamModels.interval') }}
+        </label>
+        <select
+          id="auto-sync-upstream-models-interval"
+          :value="autoSyncConfig.intervalHours"
+          :disabled="!autoSyncConfig.enabled"
+          class="input min-w-0 max-w-40 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          data-testid="auto-sync-upstream-models-interval"
+          @change="setAutoSyncInterval(($event.target as HTMLSelectElement).value)"
+        >
+          <option v-for="option in autoSyncIntervals" :key="option" :value="option">
+            {{ t('admin.accounts.autoSyncUpstreamModels.intervalHours', { hours: option }) }}
+          </option>
+        </select>
+      </div>
+    </div>
+
     <!-- Custom Model Input -->
     <div class="mb-3">
       <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.accounts.customModelName') }}</label>
@@ -155,11 +195,19 @@ import type { SyncUpstreamPreviewParams } from '@/api/admin/accounts'
 import { useClipboard } from '@/composables/useClipboard'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
 import { supportsUpstreamModelSync } from '@/constants/platformCatalog'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
+
+interface AutoSyncConfig {
+  enabled: boolean
+  intervalHours: string
+}
+
+const autoSyncIntervals = ['0.5', '1', '1.5', '2', '3', '4', '5']
 
 const props = withDefaults(defineProps<{
   modelValue: string[]
@@ -174,12 +222,14 @@ const props = withDefaults(defineProps<{
     api_key: string
   }
   showSyncButton?: boolean
+  autoSyncConfig?: AutoSyncConfig
 }>(), { showSyncButton: true })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string[]]
   'upstream-synced': []
   'upstream-sync-finished': []
+  'update:autoSyncConfig': [value: AutoSyncConfig]
 }>()
 
 const appStore = useAppStore()
@@ -232,6 +282,16 @@ const canSyncUpstream = computed(() => {
   }
   return false
 })
+
+const setAutoSyncEnabled = (enabled: boolean) => {
+  if (!props.autoSyncConfig) return
+  emit('update:autoSyncConfig', { ...props.autoSyncConfig, enabled })
+}
+
+const setAutoSyncInterval = (intervalHours: string) => {
+  if (!props.autoSyncConfig || !autoSyncIntervals.includes(intervalHours)) return
+  emit('update:autoSyncConfig', { ...props.autoSyncConfig, intervalHours })
+}
 
 const availableOptions = computed(() => {
   if (normalizedPlatforms.value.length === 0) {

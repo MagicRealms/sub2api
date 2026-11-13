@@ -58,6 +58,7 @@ var schedulerNeutralExtraKeyPrefixes = []string{
 	"codex_5h_",
 	"codex_7d_",
 	"codex_reset_credit_",
+	"auto_sync_upstream_models_",
 	"passive_usage_",
 	"upstream_billing_probe",
 	"upstream_billing_rate_sync",
@@ -116,6 +117,10 @@ func NewAccountRepository(client *dbent.Client, sqlDB *sql.DB, schedulerCache se
 // NewAdminAccountRepository exposes the account repository's atomic duplication capability
 // as an explicit dependency of the admin service.
 func NewAdminAccountRepository(client *dbent.Client, sqlDB *sql.DB, schedulerCache service.SchedulerCache) service.AdminAccountRepository {
+	return newAccountRepositoryWithSQL(client, sqlDB, schedulerCache)
+}
+
+func NewAutoUpstreamModelSyncStore(client *dbent.Client, sqlDB *sql.DB, schedulerCache service.SchedulerCache) service.AutoUpstreamModelSyncStore {
 	return newAccountRepositoryWithSQL(client, sqlDB, schedulerCache)
 }
 
@@ -691,7 +696,8 @@ func lockAndMergeAccountProbeExtra(
 			extra -> 'opencode_go_usage_auto_refresh',
 			extra -> 'opencode_go_usage_snapshot',
 			extra -> 'grok_observed_models',
-			extra -> 'upstream_model_metadata'
+			extra -> 'upstream_model_metadata',
+			extra -> 'auto_sync_upstream_models_last_attempt_ms'
 		FROM accounts
 		WHERE id = $1 AND deleted_at IS NULL
 		FOR NO KEY UPDATE
@@ -708,20 +714,21 @@ func lockAndMergeAccountProbeExtra(
 	}
 
 	var (
-		identityUnchanged              bool
-		ollamaGroupIdentityUnchanged   bool
-		ollamaProxyIdentityUnchanged   bool
-		opencodeGroupIdentityUnchanged bool
-		currentEnabled                 []byte
-		currentRateSyncEnabled         []byte
-		currentSnapshot                []byte
-		currentOllamaSession           []byte
-		currentOllamaAutoRefresh       []byte
-		currentOllamaSnapshot          []byte
-		currentOpenCodeAutoRefresh     []byte
-		currentOpenCodeSnapshot        []byte
-		currentGrokObservedModels      []byte
-		currentUpstreamModelMetadata   []byte
+		identityUnchanged                       bool
+		ollamaGroupIdentityUnchanged            bool
+		ollamaProxyIdentityUnchanged            bool
+		opencodeGroupIdentityUnchanged          bool
+		currentEnabled                          []byte
+		currentRateSyncEnabled                  []byte
+		currentSnapshot                         []byte
+		currentOllamaSession                    []byte
+		currentOllamaAutoRefresh                []byte
+		currentOllamaSnapshot                   []byte
+		currentOpenCodeAutoRefresh              []byte
+		currentOpenCodeSnapshot                 []byte
+		currentGrokObservedModels               []byte
+		currentUpstreamModelMetadata            []byte
+		currentAutoUpstreamModelSyncLastAttempt []byte
 	)
 	if err := rows.Scan(
 		&identityUnchanged,
@@ -738,6 +745,7 @@ func lockAndMergeAccountProbeExtra(
 		&currentOpenCodeSnapshot,
 		&currentGrokObservedModels,
 		&currentUpstreamModelMetadata,
+		&currentAutoUpstreamModelSyncLastAttempt,
 	); err != nil {
 		return nil, err
 	}
@@ -755,6 +763,7 @@ func lockAndMergeAccountProbeExtra(
 		service.OllamaCloudUsageSnapshotExtraKey,
 		service.OpenCodeGoUsageAutoRefreshExtraKey,
 		service.OpenCodeGoUsageSnapshotExtraKey,
+		service.AutoUpstreamModelSyncLastAttemptExtraKey,
 	} {
 		delete(extra, key)
 	}
@@ -854,8 +863,9 @@ func lockAndMergeAccountProbeExtra(
 	// Grok 目录和能力 metadata 是同步写入的受管状态。普通更新在行锁内采用最新
 	// 数据库值，忽略表单旧值、缺键和注入。来源身份变化不删除已有成功快照。
 	for key, raw := range map[string][]byte{
-		"grok_observed_models":                currentGrokObservedModels,
-		service.UpstreamModelMetadataExtraKey: currentUpstreamModelMetadata,
+		"grok_observed_models":                           currentGrokObservedModels,
+		service.UpstreamModelMetadataExtraKey:            currentUpstreamModelMetadata,
+		service.AutoUpstreamModelSyncLastAttemptExtraKey: currentAutoUpstreamModelSyncLastAttempt,
 	} {
 		delete(extra, key)
 		value, ok, err := decodeAccountExtraJSON(raw)
@@ -1057,6 +1067,103 @@ func (r *accountRepository) UpdateAccountModelMapping(ctx context.Context, id in
 		r.syncSchedulerAccountSnapshot(baseCtx, id)
 	}
 	return nil
+}
+
+const autoUpstreamModelSyncLastAttemptMSExpr = `CASE
+	WHEN COALESCE(extra ->> 'auto_sync_upstream_models_last_attempt_ms', '') ~ '^[0-9]{1,16}$'
+	THEN (extra ->> 'auto_sync_upstream_models_last_attempt_ms')::bigint
+	ELSE 0
+END`
+
+const autoUpstreamModelSyncIntervalMSExpr = `CASE extra ->> 'auto_sync_upstream_models_interval_hours'
+	WHEN '0.5' THEN 1800000
+	WHEN '1' THEN 3600000
+	WHEN '1.5' THEN 5400000
+	WHEN '2' THEN 7200000
+	WHEN '3' THEN 10800000
+	WHEN '4' THEN 14400000
+	WHEN '5' THEN 18000000
+	ELSE 0
+END`
+
+const listDueAutoUpstreamModelSyncSQL = `SELECT id,
+	extra ->> 'auto_sync_upstream_models_interval_hours',
+	` + autoUpstreamModelSyncLastAttemptMSExpr + ` AS last_attempt_ms
+FROM accounts
+WHERE deleted_at IS NULL
+	AND extra ->> 'auto_sync_upstream_models_enabled' = 'true'
+	AND extra ->> 'auto_sync_upstream_models_interval_hours' IN ('0.5', '1', '1.5', '2', '3', '4', '5')
+	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $1 - (` + autoUpstreamModelSyncIntervalMSExpr + `)
+ORDER BY id
+LIMIT 100`
+
+const claimAutoUpstreamModelSyncSQL = `UPDATE accounts
+SET extra = jsonb_set(
+	COALESCE(extra, '{}'::jsonb),
+	'{auto_sync_upstream_models_last_attempt_ms}',
+	to_jsonb($2::bigint),
+	true
+)
+WHERE id = $1
+	AND deleted_at IS NULL
+	AND extra ->> 'auto_sync_upstream_models_enabled' = 'true'
+	AND extra ->> 'auto_sync_upstream_models_interval_hours' = $3
+	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $2 - $4`
+
+func (r *accountRepository) ListDueAutoUpstreamModelSync(ctx context.Context, now time.Time) ([]service.AutoUpstreamModelSyncCandidate, error) {
+	rows, err := r.sql.QueryContext(ctx, listDueAutoUpstreamModelSyncSQL, now.UnixMilli())
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	candidates := make([]service.AutoUpstreamModelSyncCandidate, 0)
+	for rows.Next() {
+		var accountID int64
+		var rawInterval string
+		var lastAttemptMS int64
+		if err := rows.Scan(&accountID, &rawInterval, &lastAttemptMS); err != nil {
+			return nil, err
+		}
+		intervalHours, parseErr := strconv.ParseFloat(rawInterval, 64)
+		if parseErr != nil {
+			continue
+		}
+		interval, valid := service.AutoUpstreamModelSyncInterval(intervalHours)
+		if !valid || time.UnixMilli(lastAttemptMS).Add(interval).After(now) {
+			continue
+		}
+		candidates = append(candidates, service.AutoUpstreamModelSyncCandidate{
+			AccountID:     accountID,
+			IntervalHours: intervalHours,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return candidates, nil
+}
+
+func (r *accountRepository) ClaimAutoUpstreamModelSync(ctx context.Context, accountID int64, intervalHours float64, now time.Time) (bool, error) {
+	interval, valid := service.AutoUpstreamModelSyncInterval(intervalHours)
+	if accountID <= 0 || !valid {
+		return false, nil
+	}
+	intervalText := strconv.FormatFloat(intervalHours, 'f', -1, 64)
+	result, err := r.sql.ExecContext(ctx, claimAutoUpstreamModelSyncSQL,
+		accountID,
+		now.UnixMilli(),
+		intervalText,
+		interval.Milliseconds(),
+	)
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected == 1, nil
 }
 
 func (r *accountRepository) Delete(ctx context.Context, id int64) error {

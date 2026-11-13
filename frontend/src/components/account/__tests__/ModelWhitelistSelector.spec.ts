@@ -144,6 +144,24 @@ describe('ModelWhitelistSelector', () => {
     }
   )
 
+  it('shows the saved-account auto-sync schedule and emits changes', async () => {
+    const wrapper = mountSelector({
+      accountId: 46,
+      autoSyncConfig: { enabled: false, intervalHours: '1' }
+    })
+
+    expect(wrapper.get('[data-testid="auto-sync-upstream-models"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="auto-sync-upstream-models-interval"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[data-testid="auto-sync-upstream-models-enabled"]').trigger('click')
+    expect(wrapper.emitted('update:autoSyncConfig')).toEqual([[{ enabled: true, intervalHours: '1' }]])
+
+    await wrapper.setProps({ autoSyncConfig: { enabled: true, intervalHours: '1' } })
+    const interval = wrapper.get<HTMLSelectElement>('[data-testid="auto-sync-upstream-models-interval"]')
+    expect(Array.from(interval.element.options).map(option => option.value)).toEqual(['0.5', '1', '1.5', '2', '3', '4', '5'])
+    await interval.setValue('1.5')
+    expect(wrapper.emitted('update:autoSyncConfig')?.at(-1)).toEqual([{ enabled: true, intervalHours: '1.5' }])
+  })
+
   it('requires a supported request builder for newly registered platforms', async () => {
     const wrapper = mountSelector({ platform: 'acme_router', accountId: 46 })
     const platforms = [

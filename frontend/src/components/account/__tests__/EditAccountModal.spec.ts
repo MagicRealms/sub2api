@@ -76,12 +76,13 @@ const ModelWhitelistSelectorStub = defineComponent({
   name: 'ModelWhitelistSelector',
   props: {
     modelMappings: { type: Array, default: () => [] },
+    autoSyncConfig: { type: Object, default: () => ({ enabled: false, intervalHours: '1' }) },
     modelValue: {
       type: Array,
       default: () => []
     }
   },
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'update:autoSyncConfig'],
   template: `
     <div>
       <button
@@ -94,6 +95,13 @@ const ModelWhitelistSelectorStub = defineComponent({
       <span data-testid="model-whitelist-value">
         {{ Array.isArray(modelValue) ? modelValue.join(',') : '' }}
       </span>
+      <button
+        type="button"
+        data-testid="set-auto-sync-config"
+        @click="$emit('update:autoSyncConfig', { enabled: false, intervalHours: '4' })"
+      >
+        update auto sync
+      </button>
     </div>
   `
 })
@@ -352,6 +360,30 @@ describe('EditAccountModal', () => {
     expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('modelMappings')).toEqual([
       { from: 'gpt-latest', to: 'deepseek-chat' }
     ])
+  })
+
+  it('loads and saves the per-account upstream model sync schedule', async () => {
+    const account = buildAccount()
+    account.extra = {
+      auto_sync_upstream_models_enabled: true,
+      auto_sync_upstream_models_interval_hours: '1.5'
+    }
+    updateAccountMock.mockReset().mockResolvedValue(account)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+    const wrapper = mountModal(account)
+
+    expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('autoSyncConfig')).toEqual({
+      enabled: true,
+      intervalHours: '1.5'
+    })
+    await wrapper.get('[data-testid="set-auto-sync-config"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+      auto_sync_upstream_models_enabled: false,
+      auto_sync_upstream_models_interval_hours: '4'
+    })
+    wrapper.unmount()
   })
 
   it('sets expiry presets from now instead of extending the saved expiry', async () => {

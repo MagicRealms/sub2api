@@ -365,6 +365,7 @@
               :platform="account?.platform || 'anthropic'"
               :account-id="account?.id"
               :show-sync-button="account.platform !== 'grok' || !account.id"
+              v-model:auto-sync-config="autoUpstreamModelSyncConfig"
               @upstream-sync-finished="refreshGrokDiagnostics"
             />
 
@@ -961,6 +962,7 @@
             :platform="account?.platform || 'anthropic'"
             :account-id="account?.id"
             :show-sync-button="account.platform !== 'grok' || !account.id"
+            v-model:auto-sync-config="autoUpstreamModelSyncConfig"
             @upstream-sync-finished="refreshGrokDiagnostics"
           />
 
@@ -1228,7 +1230,13 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :model-mappings="modelMappings" :platform="account?.platform || 'anthropic'" :account-id="account?.id" />
+            <ModelWhitelistSelector
+              v-model="allowedModels"
+              v-model:auto-sync-config="autoUpstreamModelSyncConfig"
+              :model-mappings="modelMappings"
+              :platform="account?.platform || 'anthropic'"
+              :account-id="account?.id"
+            />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0 && modelMappings.length === 0">{{
@@ -3510,6 +3518,7 @@ import { supportsAccountQuota } from '@/utils/accountQuota'
 import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
+import { supportsUpstreamModelSync } from '@/constants/platformCatalog'
 import {
   OPENAI_WS_MODE_CTX_POOL,
   OPENAI_WS_MODE_OFF,
@@ -4117,6 +4126,7 @@ const autoResetCreditEnabled = ref(false)
 const autoResetCreditExpiringEnabled = ref(false)
 const autoResetCredit5hThreshold = ref(100)
 const autoResetCredit7dThreshold = ref(100)
+const autoUpstreamModelSyncConfig = ref({ enabled: false, intervalHours: '1' })
 const upstreamBillingAutoProbeEnabled = ref(false)
 const upstreamBillingRateSyncEnabled = ref(false)
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
@@ -4675,6 +4685,12 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
 	autoResetCreditEnabled.value = extra?.auto_reset_credit_enabled === true
 	autoResetCreditExpiringEnabled.value = extra?.auto_reset_credit_expiring_enabled === true
+	autoUpstreamModelSyncConfig.value = {
+		enabled: extra?.auto_sync_upstream_models_enabled === true,
+		intervalHours: ['0.5', '1', '1.5', '2', '3', '4', '5'].includes(String(extra?.auto_sync_upstream_models_interval_hours))
+			? String(extra?.auto_sync_upstream_models_interval_hours)
+			: '1'
+	}
 	autoResetCredit5hThreshold.value =
 		typeof extra?.auto_reset_credit_5h_threshold === 'number' ? extra.auto_reset_credit_5h_threshold * 100 : 100
 	autoResetCredit7dThreshold.value =
@@ -6430,6 +6446,16 @@ const handleSubmit = async () => {
         delete newExtra.upstream_request_id_header
       }
       updatePayload.extra = newExtra
+    }
+
+    if (supportsUpstreamModelSync(props.account.platform)) {
+      const currentExtra = (updatePayload.extra as Record<string, unknown>) ||
+        (props.account.extra as Record<string, unknown>) || {}
+      updatePayload.extra = {
+        ...currentExtra,
+        auto_sync_upstream_models_enabled: autoUpstreamModelSyncConfig.value.enabled,
+        auto_sync_upstream_models_interval_hours: autoUpstreamModelSyncConfig.value.intervalHours
+      }
     }
 
     const canContinue = await ensureAntigravityMixedChannelConfirmed(async () => {

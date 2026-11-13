@@ -862,6 +862,12 @@ export default {
       syncUpstreamModelsMetadataPartial:
         'Some model capabilities were updated; remaining models are still incomplete.',
       clearAllModels: 'Clear all models',
+      autoSyncUpstreamModels: {
+        title: 'Automatically sync upstream models',
+        hint: 'Fetch this account’s own upstream model catalog on the selected interval. Failures and empty catalogs keep the current restrictions.',
+        interval: 'Sync interval',
+        intervalHours: '{hours} hours'
+      },
       customModelName: 'Custom model name',
       enterCustomModelName: 'Enter custom model name',
       addModel: 'Add',
