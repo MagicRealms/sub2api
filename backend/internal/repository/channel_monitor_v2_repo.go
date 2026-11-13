@@ -50,6 +50,27 @@ func (r *channelMonitorV2Repository) GetConfig(ctx context.Context) (*service.Ch
 	return &cfg, nil
 }
 
+func (r *channelMonitorV2Repository) ListPublicActiveGroupIDs(ctx context.Context) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id
+		FROM groups
+		WHERE deleted_at IS NULL AND status = 'active' AND is_exclusive = FALSE
+		ORDER BY sort_order, id`)
+	if err != nil {
+		return nil, fmt.Errorf("list public channel monitor groups: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 func (r *channelMonitorV2Repository) UpdateConfig(ctx context.Context, cfg service.ChannelMonitorV2Config, expectedVersion int) (*service.ChannelMonitorV2Config, error) {
 	platforms, err := json.Marshal(cfg.Platforms)
 	if err != nil {
@@ -462,6 +483,7 @@ func (r *channelMonitorV2Repository) GetMatrix(ctx context.Context, filter servi
 		if key.groupID > 0 {
 			groupID := key.groupID
 			row.GroupID = &groupID
+			row.Platform = channelMonitorV2DisplayPlatform(groupBy, groupID, key.platform, groupInfo)
 		}
 		bucketKeys := make([]string, 0, len(acc.buckets))
 		for bucket := range acc.buckets {
@@ -655,6 +677,16 @@ func channelMonitorV2RestrictedGroupScopeEmpty(filter service.ChannelMonitorV2Fi
 type channelMonitorV2GroupInfo struct {
 	name     string
 	platform string
+}
+
+func channelMonitorV2DisplayPlatform(groupBy service.ChannelMonitorV2GroupBy, groupID int64, trafficPlatform string, groups map[int64]channelMonitorV2GroupInfo) string {
+	if groupBy != service.ChannelMonitorV2GroupByPlatformGroup && groupBy != service.ChannelMonitorV2GroupByPlatformGroupModel {
+		return trafficPlatform
+	}
+	if group := groups[groupID]; group.platform != "" {
+		return group.platform
+	}
+	return trafficPlatform
 }
 
 func (r *channelMonitorV2Repository) listActiveGroupIDs(ctx context.Context) ([]int64, error) {

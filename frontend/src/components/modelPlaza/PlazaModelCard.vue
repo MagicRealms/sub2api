@@ -16,7 +16,7 @@
       </span>
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-gray-500 dark:text-dark-400">
-          <span>{{ platformLabel(entry.platform) }}</span>
+          <span>{{ modelPlazaPlatformLabel(entry.platform) }}</span>
           <span class="plaza-provider rounded px-1.5 py-0.5 font-medium">{{ modeLabel }}</span>
           <span data-test="model-rate" :title="t('modelPlaza.cards.effectiveRate')" class="font-semibold text-gray-700 dark:text-gray-200">{{ rate }}×</span>
         </div>
@@ -62,9 +62,9 @@ import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN } from '@/constants/channel'
 import { formatScaled } from '@/utils/pricing'
-import { platformAccentColor, platformLabel } from '@/utils/platformColors'
+import { platformAccentColor } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
-import { baseTokenPrices, modelKind, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
+import { baseTokenPrices, modelKind, modelPlazaPlatformLabel, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
 
 const props = defineProps<{ entry: PlazaModelEntry }>()
 const emit = defineEmits<{ open: [variant: PlazaModelVariant] }>()

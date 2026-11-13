@@ -18,9 +18,26 @@ type channelMonitorV2GroupAuthorizerStub struct {
 	calls  []int64
 }
 
+type channelMonitorV2PublicGroupListerStub struct {
+	groups []int64
+	err    error
+}
+
+func (s *channelMonitorV2PublicGroupListerStub) ListPublicActiveGroupIDs(context.Context) ([]int64, error) {
+	return s.groups, s.err
+}
+
 func (s *channelMonitorV2GroupAuthorizerStub) GetAvailableGroups(_ context.Context, userID int64) ([]service.Group, error) {
 	s.calls = append(s.calls, userID)
 	return s.groups, s.err
+}
+
+func monitorV2HandlerWithPublicGroups(publicIDs []int64, authorizer *channelMonitorV2GroupAuthorizerStub) *ChannelMonitorV2Handler {
+	return &ChannelMonitorV2Handler{
+		service:           service.NewChannelMonitorV2Service(nil),
+		publicGroupLister: &channelMonitorV2PublicGroupListerStub{groups: publicIDs},
+		apiKeyService:     authorizer,
+	}
 }
 
 func TestChannelMonitorV2QueryListSupportsRepeatedAndCommaValues(t *testing.T) {
@@ -52,8 +69,8 @@ func TestChannelMonitorV2ScopeFilterUsesAvailableGroupsForOrdinaryUser(t *testin
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/channel-monitor-v2/snapshot", nil)
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 42})
-	authorizer := &channelMonitorV2GroupAuthorizerStub{groups: []service.Group{{ID: 3}, {ID: 7}}}
-	h := &ChannelMonitorV2Handler{apiKeyService: authorizer}
+	authorizer := &channelMonitorV2GroupAuthorizerStub{groups: []service.Group{{ID: 3}, {ID: 7}, {ID: 9, IsExclusive: true}}}
+	h := monitorV2HandlerWithPublicGroups([]int64{3, 7}, authorizer)
 	filter := service.ChannelMonitorV2Filter{GroupIDs: []int64{7, 9}}
 
 	require.True(t, h.scopeFilter(c, &filter, false))
@@ -67,7 +84,7 @@ func TestChannelMonitorV2ScopeFilterPreservesEmptyOrdinaryUserScope(t *testing.T
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/channel-monitor-v2/snapshot", nil)
 	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 42})
-	h := &ChannelMonitorV2Handler{apiKeyService: &channelMonitorV2GroupAuthorizerStub{}}
+	h := monitorV2HandlerWithPublicGroups(nil, &channelMonitorV2GroupAuthorizerStub{})
 	filter := service.ChannelMonitorV2Filter{}
 
 	require.True(t, h.scopeFilter(c, &filter, false))
@@ -75,13 +92,16 @@ func TestChannelMonitorV2ScopeFilterPreservesEmptyOrdinaryUserScope(t *testing.T
 	require.Empty(t, filter.AllowedGroupIDs)
 }
 
-func TestChannelMonitorV2ScopeFilterLeavesAdminUnrestricted(t *testing.T) {
+func TestChannelMonitorV2ScopeFilterRestrictsAdminToPublicGroups(t *testing.T) {
 	authorizer := &channelMonitorV2GroupAuthorizerStub{}
-	h := &ChannelMonitorV2Handler{apiKeyService: authorizer}
+	h := monitorV2HandlerWithPublicGroups([]int64{3, 7}, authorizer)
 	filter := service.ChannelMonitorV2Filter{GroupIDs: []int64{9}}
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/channel-monitor-v2/snapshot", nil)
 
-	require.True(t, h.scopeFilter(nil, &filter, true))
-	require.False(t, filter.RestrictGroups)
-	require.Nil(t, filter.AllowedGroupIDs)
+	require.True(t, h.scopeFilter(c, &filter, true))
+	require.True(t, filter.RestrictGroups)
+	require.Equal(t, []int64{3, 7}, filter.AllowedGroupIDs)
 	require.Empty(t, authorizer.calls)
 }

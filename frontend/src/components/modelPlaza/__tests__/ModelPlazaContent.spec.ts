@@ -43,6 +43,12 @@ function render(groups: ModelPlazaGroup[], description = '') {
 }
 
 describe('Model Plaza cards and filters', () => {
+  it('labels ShareLLM models as 聚合站 in the plaza', () => {
+    const wrapper = render([group(1, { models: [{ ...model('aggregate-model'), platform: 'sharellm' }] })])
+    expect(wrapper.text()).toContain('聚合站')
+    expect(wrapper.text()).not.toContain('ShareLLM')
+  })
+
   it('filters concrete models inside composite groups and resets a removed group', async () => {
     const wrapper = render([group(1, { platform: 'composite', models: [model('gpt-6.1-sol'), { ...model('claude-opus-5-5'), platform: 'anthropic' }] })])
     const anthropic = wrapper.findAll('button').find(b => b.text() === 'Claude') ?? wrapper.findAll('button').find(b => b.text() === 'Anthropic')

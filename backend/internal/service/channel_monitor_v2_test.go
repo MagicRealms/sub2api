@@ -11,6 +11,7 @@ import (
 
 type channelMonitorV2RepoStub struct {
 	config       serviceChannelMonitorV2ConfigAlias
+	publicGroups []int64
 	users        *ChannelMonitorV2List[ChannelMonitorV2UserRow]
 	matrix       *ChannelMonitorV2Matrix
 	errors       *ChannelMonitorV2List[ChannelMonitorV2ErrorRow]
@@ -30,6 +31,9 @@ func (s *channelMonitorV2RepoStub) GetConfig(context.Context) (*ChannelMonitorV2
 }
 func (s *channelMonitorV2RepoStub) UpdateConfig(context.Context, ChannelMonitorV2Config, int) (*ChannelMonitorV2Config, error) {
 	return nil, nil
+}
+func (s *channelMonitorV2RepoStub) ListPublicActiveGroupIDs(context.Context) ([]int64, error) {
+	return append([]int64(nil), s.publicGroups...), nil
 }
 func (s *channelMonitorV2RepoStub) GetDimensions(context.Context, ChannelMonitorV2Filter, ChannelMonitorV2Config) (*ChannelMonitorV2Dimensions, error) {
 	return nil, nil

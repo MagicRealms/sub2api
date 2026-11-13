@@ -70,7 +70,9 @@ async function add(wrapper: Awaited<ReturnType<typeof panel>>, platform: string)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.groups.mockResolvedValue([])
+  mocks.groups.mockResolvedValue([
+    { id: 42, name: 'Public', platform: 'openai', status: 'active', is_exclusive: false },
+  ])
   mocks.updateConfig.mockImplementation(async (value) => JSON.parse(JSON.stringify(value)))
 })
 
@@ -123,6 +125,23 @@ describe('MonitorSettingsPanel platform configuration', () => {
     expect(mocks.updateConfig.mock.calls[0][0].platforms).toEqual([
       { platform: 'kimi', enabled: true, models: [] },
     ])
+    wrapper.unmount()
+  })
+
+  it('only offers active public groups for channel monitoring', async () => {
+    mocks.groups.mockResolvedValue([
+      { id: 42, name: 'Public', platform: 'openai', status: 'active', is_exclusive: false },
+      { id: 43, name: 'Exclusive', platform: 'openai', status: 'active', is_exclusive: true },
+      { id: 44, name: 'Inactive', platform: 'openai', status: 'inactive', is_exclusive: false },
+    ])
+    const wrapper = await panel({ ...config(), group_ids: [42, 43, 44] })
+    expect(wrapper.text()).toContain('Public')
+    expect(wrapper.text()).not.toContain('Exclusive')
+    expect(wrapper.text()).not.toContain('Inactive')
+    await wrapper.find('input[type="number"]').setValue('80')
+    await button(wrapper, 'save').trigger('click')
+    await flushPromises()
+    expect(mocks.updateConfig.mock.calls[0][0].group_ids).toEqual([42])
     wrapper.unmount()
   })
 

@@ -157,7 +157,7 @@
         <div class="max-h-[min(40vh,280px)] overflow-y-auto px-3 py-2 sm:px-4">
           <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
             <label
-              v-for="group in groups"
+              v-for="group in visibleGroups"
               :key="group.id"
               class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-gray-50 dark:hover:bg-dark-800/60"
             >
@@ -171,7 +171,7 @@
               <small class="shrink-0 text-xs text-gray-400">{{ platformLabel(group.platform) }} · #{{ group.id }}</small>
             </label>
           </div>
-          <p v-if="groups.length === 0" class="empty-state py-8 text-sm text-gray-400">{{ t('channelMonitorV2.settings.groupsEmpty') }}</p>
+          <p v-if="visibleGroups.length === 0" class="empty-state py-8 text-sm text-gray-400">{{ t('channelMonitorV2.settings.groupsEmpty') }}</p>
         </div>
       </div>
 
@@ -304,6 +304,7 @@ const saving = ref(false)
 const draft = ref<MonitorConfig | null>(null)
 const original = ref('')
 const groups = ref<AdminGroup[]>([])
+const visibleGroups = computed(() => groups.value.filter((group) => group.status === 'active' && !group.is_exclusive))
 const selectedPlatform = ref('')
 const availablePlatforms = computed(() =>
   CONCRETE_PLATFORM_OPTIONS.filter(
@@ -444,9 +445,13 @@ async function load() {
   loading.value = true
   try {
     const [value, groupRows] = await Promise.all([getConfig(), adminAPI.groups.getAllIncludingInactive()])
-    const normalized = normalizeConfig(value)
-    draft.value = structuredClone(normalized)
     groups.value = groupRows
+    const visibleGroupIDs = new Set(groupRows.filter((group) => group.status === 'active' && !group.is_exclusive).map((group) => group.id))
+    const normalized = normalizeConfig({
+      ...value,
+      group_ids: value.group_ids.filter((id) => visibleGroupIDs.has(id)),
+    })
+    draft.value = structuredClone(normalized)
     original.value = JSON.stringify(normalized)
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('channelMonitorV2.settings.loadFailed')))

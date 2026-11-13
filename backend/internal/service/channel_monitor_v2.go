@@ -301,6 +301,7 @@ type ChannelMonitorV2List[T any] struct {
 type ChannelMonitorV2Repository interface {
 	GetConfig(ctx context.Context) (*ChannelMonitorV2Config, error)
 	UpdateConfig(ctx context.Context, config ChannelMonitorV2Config, expectedVersion int) (*ChannelMonitorV2Config, error)
+	ListPublicActiveGroupIDs(ctx context.Context) ([]int64, error)
 	GetDimensions(ctx context.Context, filter ChannelMonitorV2Filter, config ChannelMonitorV2Config) (*ChannelMonitorV2Dimensions, error)
 	GetSnapshot(ctx context.Context, filter ChannelMonitorV2Filter, config ChannelMonitorV2Config, includeAdmin bool) (*ChannelMonitorV2Snapshot, error)
 	GetModels(ctx context.Context, filter ChannelMonitorV2Filter, config ChannelMonitorV2Config, includeAdmin bool) (*ChannelMonitorV2List[ChannelMonitorV2ModelRow], error)
@@ -386,6 +387,10 @@ type ChannelMonitorV2Service struct {
 
 func NewChannelMonitorV2Service(repo ChannelMonitorV2Repository) *ChannelMonitorV2Service {
 	return &ChannelMonitorV2Service{repo: repo, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func (s *ChannelMonitorV2Service) ListPublicActiveGroupIDs(ctx context.Context) ([]int64, error) {
+	return s.repo.ListPublicActiveGroupIDs(ctx)
 }
 
 // SetRuntimeReader wires optional settings for privacy flags (hide throughput).

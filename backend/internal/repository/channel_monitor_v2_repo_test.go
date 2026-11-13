@@ -25,6 +25,20 @@ func TestChannelMonitorV2CardsKeepOtherFilterButExpandModelIdentity(t *testing.T
 	require.Equal(t, service.ChannelMonitorV2OtherModel, key.model)
 }
 
+func TestListPublicActiveChannelMonitorGroupsExcludesExclusiveAndInactiveGroups(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	mock.ExpectQuery(`SELECT id\s+FROM groups\s+WHERE deleted_at IS NULL AND status = 'active' AND is_exclusive = FALSE\s+ORDER BY sort_order, id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(6).AddRow(34))
+
+	ids, err := (&channelMonitorV2Repository{db: db}).ListPublicActiveGroupIDs(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, []int64{6, 34}, ids)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestChannelMonitorV2DateBinOriginIsUTC(t *testing.T) {
 	require.Equal(t, "TIMESTAMPTZ '1970-01-01 00:00:00+00'", channelMonitorV2DateBinOrigin)
 	require.Equal(t, "date_bin($1::interval,m.bucket_start,TIMESTAMPTZ '1970-01-01 00:00:00+00')", channelMonitorV2DateBinExpr("m.bucket_start"))
@@ -64,6 +78,14 @@ func TestChannelMonitorV2MatrixDimensionKey(t *testing.T) {
 	require.Equal(t, channelMonitorV2MatrixKey{platform: "openai", model: service.ChannelMonitorV2OtherModel}, key)
 	key = channelMonitorV2MatrixDimensionKey(service.ChannelMonitorV2GroupByPlatform, cfg, "openai", 7, "gpt-5")
 	require.Equal(t, channelMonitorV2MatrixKey{platform: "openai"}, key)
+}
+
+func TestChannelMonitorV2GroupRowsUseConfiguredGroupPlatform(t *testing.T) {
+	groups := map[int64]channelMonitorV2GroupInfo{
+		34: {name: "聚合福利组", platform: "composite"},
+	}
+	require.Equal(t, "composite", channelMonitorV2DisplayPlatform(service.ChannelMonitorV2GroupByPlatformGroupModel, 34, "openai", groups))
+	require.Equal(t, "openai", channelMonitorV2DisplayPlatform(service.ChannelMonitorV2GroupByPlatformModel, 34, "openai", groups))
 }
 
 func TestChannelMonitorV2HistogramPercentilesAreMergedFromCounts(t *testing.T) {

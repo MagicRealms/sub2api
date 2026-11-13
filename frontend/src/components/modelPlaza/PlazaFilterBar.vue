@@ -44,7 +44,7 @@
         @click="$emit('update:platform', p)"
       >
         <PlatformIcon v-if="p !== 'all'" :platform="p as GroupPlatform" size="xs" />
-        {{ p === 'all' ? t('modelPlaza.filters.all') : platformLabel(p) }}
+        {{ p === 'all' ? t('modelPlaza.filters.all') : modelPlazaPlatformLabel(p) }}
       </button>
     </div>
   </div>
@@ -54,8 +54,9 @@
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import { platformAccentColor, platformLabel } from '@/utils/platformColors'
+import { platformAccentColor } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
+import { modelPlazaPlatformLabel } from './modelCards'
 
 const props = defineProps<{
   /** 数据中出现的平台(去重排序后)。 */

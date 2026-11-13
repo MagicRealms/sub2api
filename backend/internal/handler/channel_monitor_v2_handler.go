@@ -14,8 +14,13 @@ import (
 )
 
 type ChannelMonitorV2Handler struct {
-	service       *service.ChannelMonitorV2Service
-	apiKeyService channelMonitorV2GroupAuthorizer
+	service           *service.ChannelMonitorV2Service
+	publicGroupLister channelMonitorV2PublicGroupLister
+	apiKeyService     channelMonitorV2GroupAuthorizer
+}
+
+type channelMonitorV2PublicGroupLister interface {
+	ListPublicActiveGroupIDs(ctx context.Context) ([]int64, error)
 }
 
 type channelMonitorV2GroupAuthorizer interface {
@@ -23,7 +28,7 @@ type channelMonitorV2GroupAuthorizer interface {
 }
 
 func NewChannelMonitorV2Handler(svc *service.ChannelMonitorV2Service, apiKeyService *service.APIKeyService) *ChannelMonitorV2Handler {
-	return &ChannelMonitorV2Handler{service: svc, apiKeyService: apiKeyService}
+	return &ChannelMonitorV2Handler{service: svc, publicGroupLister: svc, apiKeyService: apiKeyService}
 }
 
 // channelMonitorV2IsAdmin is true when the request already passed admin auth
@@ -206,28 +211,48 @@ func (h *ChannelMonitorV2Handler) users(c *gin.Context, admin bool) {
 }
 
 func (h *ChannelMonitorV2Handler) scopeFilter(c *gin.Context, filter *service.ChannelMonitorV2Filter, admin bool) bool {
-	if admin {
-		return true
-	}
-	if h.apiKeyService == nil {
-		response.Error(c, http.StatusInternalServerError, "channel monitor group authorization unavailable")
+	if h.service == nil {
+		response.Error(c, http.StatusInternalServerError, "channel monitor service unavailable")
 		return false
 	}
-	subject, ok := middleware.GetAuthSubjectFromContext(c)
-	if !ok || subject.UserID <= 0 {
-		response.Unauthorized(c, "user not found in context")
+	if h.publicGroupLister == nil {
+		response.Error(c, http.StatusInternalServerError, "channel monitor group list unavailable")
 		return false
 	}
-	groups, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
+	publicGroupIDs, err := h.publicGroupLister.ListPublicActiveGroupIDs(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return false
 	}
-	filter.RestrictGroups = true
-	filter.AllowedGroupIDs = make([]int64, 0, len(groups))
-	for i := range groups {
-		filter.AllowedGroupIDs = append(filter.AllowedGroupIDs, groups[i].ID)
+	allowedGroupIDs := publicGroupIDs
+	if !admin {
+		if h.apiKeyService == nil {
+			response.Error(c, http.StatusInternalServerError, "channel monitor group authorization unavailable")
+			return false
+		}
+		subject, ok := middleware.GetAuthSubjectFromContext(c)
+		if !ok || subject.UserID <= 0 {
+			response.Unauthorized(c, "user not found in context")
+			return false
+		}
+		groups, err := h.apiKeyService.GetAvailableGroups(c.Request.Context(), subject.UserID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return false
+		}
+		visible := make(map[int64]struct{}, len(groups))
+		for i := range groups {
+			visible[groups[i].ID] = struct{}{}
+		}
+		allowedGroupIDs = make([]int64, 0, len(publicGroupIDs))
+		for _, id := range publicGroupIDs {
+			if _, ok := visible[id]; ok {
+				allowedGroupIDs = append(allowedGroupIDs, id)
+			}
+		}
 	}
+	filter.RestrictGroups = true
+	filter.AllowedGroupIDs = allowedGroupIDs
 	return true
 }
 

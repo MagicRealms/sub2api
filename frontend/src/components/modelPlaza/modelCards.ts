@@ -1,6 +1,11 @@
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
 import { BILLING_MODE_IMAGE, BILLING_MODE_VIDEO } from '@/constants/channel'
 import { resolveIntervalPrices } from '@/utils/pricing'
+import { platformLabel } from '@/utils/platformColors'
+
+export function modelPlazaPlatformLabel(platform: string): string {
+  return platform === 'sharellm' ? '聚合站' : platformLabel(platform)
+}
 
 export interface PlazaModelVariant {
   group: ModelPlazaGroup
