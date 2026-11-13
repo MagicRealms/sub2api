@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 func scopedAdminAccountDTO(a *service.Account, p adminaccess.Policy) gin.H {
@@ -160,6 +162,10 @@ func (h *AccountHandler) ScopedAdminKeyAccounts(c *gin.Context) {
 	}
 	if path == base+"/bulk-update" && c.Request.Method == "POST" {
 		h.scopedAdminBulkUpdate(c, api)
+		return
+	}
+	if path == base+"/models/sync-upstream/batch" && c.Request.Method == "POST" {
+		h.scopedAdminBulkSyncUpstreamModels(c, api, principal)
 		return
 	}
 
@@ -316,6 +322,120 @@ func (h *AccountHandler) scopedAdminBulkUpdate(c *gin.Context, api service.Scope
 		result.Results = append(result.Results, item)
 	}
 	response.Success(c, result)
+}
+
+func (h *AccountHandler) scopedAdminBulkSyncUpstreamModels(c *gin.Context, api service.ScopedAdminAccounts, principal *adminaccess.Principal) {
+	var req struct {
+		AccountIDs []int64 `json:"account_ids"`
+	}
+	if c.ShouldBindJSON(&req) != nil || len(req.AccountIDs) == 0 || len(req.AccountIDs) > 100 {
+		response.Error(c, 400, "请明确指定 1 至 100 个账户 ID")
+		return
+	}
+	if h.accountTestService == nil {
+		response.Error(c, 503, "上游模型同步服务暂不可用")
+		return
+	}
+	uniqueIDs := make([]int64, 0, len(req.AccountIDs))
+	for _, id := range req.AccountIDs {
+		if id <= 0 {
+			response.Error(c, 400, "账户 ID 无效")
+			return
+		}
+		if !slices.Contains(uniqueIDs, id) {
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
+
+	results := make([]bulkUpstreamModelSyncResult, len(uniqueIDs))
+	g, gctx := errgroup.WithContext(c.Request.Context())
+	g.SetLimit(3)
+	for index, id := range uniqueIDs {
+		index, id := index, id
+		g.Go(func() error {
+			result := bulkUpstreamModelSyncResult{AccountID: id}
+			account, err := h.adminService.GetAccount(gctx, id)
+			if err != nil || account == nil || !principal.Policy.AllowsAccount("accounts.models.write", adminaccess.Account{
+				ID: id, GroupIDs: accountGroupIDs(account), Type: accountType(account), Platform: accountPlatform(account),
+			}) {
+				result.Status = "skipped"
+				result.Error = "Account is unavailable or outside this key's model-write scope"
+				results[index] = result
+				return nil
+			}
+			result.AccountName = account.Name
+			catalog, syncErr := h.accountTestService.SyncUpstreamModelCatalog(gctx, account)
+			if syncErr != nil {
+				result.Status = "failed"
+				result.Error = "Failed to sync upstream models"
+				var typedErr *service.UpstreamModelSyncError
+				if errors.As(syncErr, &typedErr) {
+					result.Error = typedErr.SafeMessage()
+					if typedErr.Kind == service.UpstreamModelSyncErrorUnsupported {
+						result.Status = "skipped"
+					}
+				}
+				results[index] = result
+				return nil
+			}
+			if catalog == nil || !catalog.LiveListAvailable {
+				result.Status = "skipped"
+				result.Error = "No live upstream model catalog was available; existing restrictions were kept"
+				results[index] = result
+				return nil
+			}
+			mapping := make(map[string]any, len(catalog.Models))
+			for _, modelID := range catalog.Models {
+				modelID = strings.TrimSpace(modelID)
+				if modelID != "" && !strings.Contains(modelID, "*") {
+					mapping[modelID] = modelID
+				}
+			}
+			if len(mapping) == 0 {
+				result.Status = "failed"
+				result.Error = "Upstream returned no usable models; existing restrictions were kept"
+				results[index] = result
+				return nil
+			}
+
+			body, _ := json.Marshal(map[string]any{"credentials": map[string]any{"model_mapping": mapping}})
+			fields := map[string]json.RawMessage{}
+			if json.Unmarshal(body, &fields) != nil {
+				result.Status = "failed"
+				result.Error = "Failed to prepare model restrictions"
+				results[index] = result
+				return nil
+			}
+			updated, updateErr := api.ScopedAdminWrite(gctx, id, "", fields, nil)
+			if updateErr != nil {
+				result.Status = "failed"
+				_, result.Error = scopedAdminAccountErrorDetails(updateErr)
+				results[index] = result
+				return nil
+			}
+			h.invalidateScopedAccountToken(gctx, updated)
+			result.Status = "synced"
+			result.ModelCount = len(mapping)
+			results[index] = result
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		response.Error(c, 503, "上游模型同步未完成")
+		return
+	}
+	synced, failed, skipped := 0, 0, 0
+	for _, result := range results {
+		switch result.Status {
+		case "synced":
+			synced++
+		case "failed":
+			failed++
+		default:
+			skipped++
+		}
+	}
+	response.Success(c, gin.H{"total": len(results), "synced": synced, "failed": failed, "skipped": skipped, "results": results})
 }
 
 // 凭证写入必须在数据库提交成功后清理令牌缓存，回滚不能发布旧状态。

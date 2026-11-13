@@ -52,22 +52,35 @@
         <button @click="$emit('toggle-schedulable', false)" class="btn btn-warning btn-sm">{{ t('admin.accounts.bulkActions.disableScheduling') }}</button>
         <button @click="$emit('edit-selected')" class="btn btn-primary btn-sm">{{ t('admin.accounts.bulkActions.edit') }}</button>
       </template>
-      <button @click="$emit('edit-filtered')" class="btn btn-primary btn-sm">
-        {{ t('admin.accounts.bulkEdit.submit') }}
-      </button>
+      <div class="flex flex-wrap justify-end gap-2">
+        <button
+          data-testid="bulk-sync-upstream-models"
+          :disabled="syncingUpstreamModels || selectedIds.length === 0"
+          @click="$emit('sync-upstream-models')"
+          class="btn btn-secondary btn-sm"
+        >
+          <Icon name="sync" size="sm" :class="syncingUpstreamModels ? 'animate-spin' : ''" />
+          {{ syncingUpstreamModels ? t('admin.accounts.bulkActions.syncModelsLoading') : t('admin.accounts.bulkActions.syncModels') }}
+        </button>
+        <button @click="$emit('edit-filtered')" class="btn btn-primary btn-sm">
+          {{ t('admin.accounts.bulkEdit.submit') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import Icon from '@/components/icons/Icon.vue'
 
-defineProps<{
+withDefaults(defineProps<{
   selectedIds: number[]
   totalResults: number
   selectingAll: boolean
   allResultsSelected: boolean
-}>()
+  syncingUpstreamModels?: boolean
+}>(), { syncingUpstreamModels: false })
 
 defineEmits([
   'delete',
@@ -79,7 +92,8 @@ defineEmits([
   'toggle-schedulable',
   'reset-status',
   'refresh-token',
-  'probe-upstream-billing'
+  'probe-upstream-billing',
+  'sync-upstream-models'
 ])
 
 const { t } = useI18n()

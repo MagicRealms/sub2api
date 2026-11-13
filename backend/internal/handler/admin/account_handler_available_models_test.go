@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -44,6 +45,28 @@ type syncUpstreamHTTPUpstream struct {
 	err       error
 }
 
+type bulkSyncModelsAdminService struct {
+	*stubAdminService
+	account    service.Account
+	updateCall *service.UpdateAccountInput
+}
+
+func (s *bulkSyncModelsAdminService) GetAccountsByIDs(_ context.Context, ids []int64) ([]*service.Account, error) {
+	accounts := make([]*service.Account, 0, len(ids))
+	for _, id := range ids {
+		if id == s.account.ID {
+			account := s.account
+			accounts = append(accounts, &account)
+		}
+	}
+	return accounts, nil
+}
+
+func (s *bulkSyncModelsAdminService) UpdateAccount(_ context.Context, _ int64, input *service.UpdateAccountInput) (*service.Account, error) {
+	s.updateCall = input
+	return &s.account, nil
+}
+
 func (u *syncUpstreamHTTPUpstream) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
 	if u.err != nil {
 		return nil, u.err
@@ -75,8 +98,109 @@ func setupSyncUpstreamModelsRouter(adminSvc service.AdminService, upstream servi
 	)
 	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, accountTestSvc, nil, nil, nil, nil, nil)
 	router.POST("/api/v1/admin/accounts/:id/models/sync-upstream", handler.SyncUpstreamModels)
+	router.POST("/api/v1/admin/accounts/models/sync-upstream/batch", handler.BulkSyncUpstreamModels)
 	router.POST("/api/v1/admin/accounts/models/sync-upstream-preview", handler.SyncUpstreamModelsPreview)
 	return router
+}
+
+func TestAccountHandlerBulkSyncUpstreamModelsReplacesWhitelistWithLiveCatalog(t *testing.T) {
+	svc := &bulkSyncModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID: 48, Name: "custom-openai", Platform: service.PlatformOpenAI,
+			Type: service.AccountTypeAPIKey, Status: service.StatusActive,
+			Credentials: map[string]any{
+				"api_key":       "key",
+				"base_url":      "https://provider.example/v1",
+				"model_mapping": map[string]any{"old-model": "old-model"},
+			},
+		},
+	}
+	upstream := &syncUpstreamHTTPUpstream{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"new-model-a"},{"id":"new-model-b"}]}`)),
+	}}
+	router := setupSyncUpstreamModelsRouter(svc, upstream)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/models/sync-upstream/batch", strings.NewReader(`{"account_ids":[48]}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp struct {
+		Data struct {
+			Synced  int                           `json:"synced"`
+			Results []bulkUpstreamModelSyncResult `json:"results"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.Equal(t, 1, resp.Data.Synced)
+	require.Len(t, resp.Data.Results, 1)
+	require.Equal(t, "synced", resp.Data.Results[0].Status)
+	require.NotNil(t, svc.updateCall)
+	require.Equal(t, map[string]any{
+		"model_mapping": map[string]any{
+			"new-model-a": "new-model-a",
+			"new-model-b": "new-model-b",
+		},
+	}, svc.updateCall.Credentials)
+}
+
+func TestAccountHandlerBulkSyncUpstreamModelsKeepsWhitelistWhenCatalogIsEmpty(t *testing.T) {
+	svc := &bulkSyncModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID: 49, Name: "empty-openai", Platform: service.PlatformOpenAI,
+			Type: service.AccountTypeAPIKey, Status: service.StatusActive,
+			Credentials: map[string]any{
+				"api_key":       "key",
+				"base_url":      "https://provider.example/v1",
+				"model_mapping": map[string]any{"keep-model": "keep-model"},
+			},
+		},
+	}
+	upstream := &syncUpstreamHTTPUpstream{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+	}}
+	router := setupSyncUpstreamModelsRouter(svc, upstream)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/models/sync-upstream/batch", strings.NewReader(`{"account_ids":[49]}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Nil(t, svc.updateCall)
+	require.Contains(t, rec.Body.String(), "Upstream returned no supported models")
+}
+
+func TestAccountHandlerBulkSyncUpstreamModelsKeepsWhitelistWhenUpstreamFails(t *testing.T) {
+	svc := &bulkSyncModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID: 50, Name: "failed-openai", Platform: service.PlatformOpenAI,
+			Type: service.AccountTypeAPIKey, Status: service.StatusActive,
+			Credentials: map[string]any{
+				"api_key":       "key",
+				"base_url":      "https://provider.example/v1",
+				"model_mapping": map[string]any{"keep-model": "keep-model"},
+			},
+		},
+	}
+	router := setupSyncUpstreamModelsRouter(svc, &syncUpstreamHTTPUpstream{err: errors.New("upstream unavailable")})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/models/sync-upstream/batch", strings.NewReader(`{"account_ids":[50]}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Nil(t, svc.updateCall)
+	require.Contains(t, rec.Body.String(), "Failed to request upstream model list")
 }
 
 func TestAccountHandlerGetAvailableModels_GrokUsesXAIModels(t *testing.T) {

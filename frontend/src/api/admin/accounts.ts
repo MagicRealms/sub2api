@@ -616,6 +616,22 @@ export interface SyncUpstreamModelsResult {
   grok_model_diagnostics?: GrokModelDiagnostics
 }
 
+export interface BulkSyncUpstreamModelsResult {
+  total: number
+  synced: number
+  failed: number
+  skipped: number
+  results: Array<{
+    account_id: number
+    account_name?: string
+    status: 'synced' | 'failed' | 'skipped'
+    model_count?: number
+    error?: string
+  }>
+}
+
+export const MAX_BULK_UPSTREAM_MODEL_SYNC_ACCOUNTS = 100
+
 export interface UpstreamModelSyncWarning {
   code: string
   message: string
@@ -641,6 +657,14 @@ export interface UpstreamModelMetadata {
  */
 export async function syncUpstreamModels(id: number): Promise<SyncUpstreamModelsResult> {
   const { data } = await apiClient.post<SyncUpstreamModelsResult>(`/admin/accounts/${id}/models/sync-upstream`)
+  return data
+}
+
+export async function bulkSyncUpstreamModels(accountIds: number[]): Promise<BulkSyncUpstreamModelsResult> {
+  const { data } = await apiClient.post<BulkSyncUpstreamModelsResult>(
+    '/admin/accounts/models/sync-upstream/batch',
+    { account_ids: accountIds }
+  )
   return data
 }
 
@@ -1135,6 +1159,7 @@ export async function refreshOpenCodeGoUsage(id: number): Promise<OpenCodeGoUsag
 }
 
 export const accountsAPI = {
+  MAX_BULK_UPSTREAM_MODEL_SYNC_ACCOUNTS,
   list,
   listWithEtag,
   getUpstreamBillingRatesWithEtag,
@@ -1164,6 +1189,7 @@ export const accountsAPI = {
   setSchedulable,
   getAvailableModels,
   syncUpstreamModels,
+  bulkSyncUpstreamModels,
   syncUpstreamModelsPreview,
   generateAuthUrl,
   exchangeCode,

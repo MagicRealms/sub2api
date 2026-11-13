@@ -530,6 +530,13 @@ export default {
         resetStatus: 'Reset Status',
         refreshToken: 'Refresh Token',
         probeUpstreamBilling: 'Probe Upstream Rate',
+        syncModels: 'Sync Upstream Models',
+        syncModelsLoading: 'Syncing models…',
+        confirmSyncModels: 'Fetch upstream models for {count} selected account(s) and replace their existing restrictions. Accounts with failed or empty results will keep their current settings. Continue?',
+        syncModelsSuccess: 'Model sync complete: updated {synced} account(s), skipped {skipped}',
+        syncModelsPartial: 'Model sync partially completed: updated {synced}, failed {failed}, skipped {skipped}. Failed accounts kept their existing settings.',
+        syncModelsFailed: 'Failed to sync upstream models',
+        syncModelsLimit: 'You can sync at most {count} accounts at once. Reduce the selection and retry.',
         resetStatusSuccess: 'Successfully reset {count} account(s) status',
         refreshTokenSuccess: 'Successfully refreshed {count} account(s) token',
         partialSuccess: 'Partially completed: {success} succeeded, {failed} failed'

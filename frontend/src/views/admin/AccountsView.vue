@@ -174,10 +174,12 @@
           :total-results="pagination.total"
           :selecting-all="selectingAllResults"
           :all-results-selected="allResultsSelected"
+          :syncing-upstream-models="syncingUpstreamModels"
           @delete="handleBulkDelete"
           @reset-status="handleBulkResetStatus"
           @refresh-token="handleBulkRefreshToken"
           @probe-upstream-billing="handleBulkProbeUpstreamBilling"
+          @sync-upstream-models="handleBulkSyncUpstreamModels"
           @edit-selected="openBulkEditSelected"
           @edit-filtered="openBulkEditFiltered"
           @clear="clearSelection"
@@ -618,6 +620,7 @@ const menuAnchor = ref<HTMLElement | null>(null)
 const menu = reactive<{show:boolean, acc:Account|null, anchorRect:DOMRect|null}>({ show: false, acc: null, anchorRect: null })
 const exportingData = ref(false)
 const probingUpstreamBilling = reactive(new Set<number>())
+const syncingUpstreamModels = ref(false)
 const upstreamBillingProbeGloballyEnabled = ref<boolean | undefined>(undefined)
 const upstreamBillingNow = ref(Date.now())
 const upstreamBillingRateETag = ref<string | null>(null)
@@ -1952,6 +1955,43 @@ const handleBulkProbeUpstreamBilling = async () => {
     appStore.showError(extractApiErrorMessage(error, t('admin.accounts.upstreamBilling.probeFailed')))
   } finally {
     accountIDs.forEach(id => probingUpstreamBilling.delete(id))
+  }
+}
+
+const handleBulkSyncUpstreamModels = async () => {
+  const accountIds = [...selIds.value]
+  if (accountIds.length === 0 || syncingUpstreamModels.value) return
+  if (accountIds.length > adminAPI.accounts.MAX_BULK_UPSTREAM_MODEL_SYNC_ACCOUNTS) {
+    appStore.showError(t('admin.accounts.bulkActions.syncModelsLimit', {
+      count: adminAPI.accounts.MAX_BULK_UPSTREAM_MODEL_SYNC_ACCOUNTS
+    }))
+    return
+  }
+  if (!confirm(t('admin.accounts.bulkActions.confirmSyncModels', { count: accountIds.length }))) return
+
+  syncingUpstreamModels.value = true
+  try {
+    const result = await adminAPI.accounts.bulkSyncUpstreamModels(accountIds)
+    if (result.failed > 0) {
+      appStore.showWarning(t('admin.accounts.bulkActions.syncModelsPartial', {
+        synced: result.synced,
+        failed: result.failed,
+        skipped: result.skipped
+      }))
+      const failedIds = result.results.filter(item => item.status === 'failed').map(item => item.account_id)
+      setSelectedIds(failedIds)
+    } else {
+      appStore.showSuccess(t('admin.accounts.bulkActions.syncModelsSuccess', {
+        synced: result.synced,
+        skipped: result.skipped
+      }))
+      clearSelection()
+    }
+    await reload()
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.bulkActions.syncModelsFailed')))
+  } finally {
+    syncingUpstreamModels.value = false
   }
 }
 const updateSchedulableInList = (accountIds: number[], schedulable: boolean) => {

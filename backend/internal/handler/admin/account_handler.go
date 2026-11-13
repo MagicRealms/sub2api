@@ -3103,6 +3103,146 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 	response.Success(c, catalog)
 }
 
+type bulkUpstreamModelSyncResult struct {
+	AccountID   int64  `json:"account_id"`
+	AccountName string `json:"account_name,omitempty"`
+	Status      string `json:"status"`
+	ModelCount  int    `json:"model_count,omitempty"`
+	Error       string `json:"error,omitempty"`
+}
+
+// BulkSyncUpstreamModels replaces each selected account's model restriction with
+// the live model IDs returned by that account's upstream.
+// POST /api/v1/admin/accounts/models/sync-upstream/batch
+func (h *AccountHandler) BulkSyncUpstreamModels(c *gin.Context) {
+	var req struct {
+		AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	accountIDs := normalizeInt64IDList(req.AccountIDs)
+	if len(accountIDs) == 0 {
+		response.BadRequest(c, "account_ids is required")
+		return
+	}
+	const maxBulkUpstreamModelSyncAccounts = 100
+	if len(accountIDs) > maxBulkUpstreamModelSyncAccounts {
+		response.BadRequest(c, "at most 100 accounts can be synced at once")
+		return
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "Account test service is not configured")
+		return
+	}
+
+	ctx := c.Request.Context()
+	accounts, err := h.adminService.GetAccountsByIDs(ctx, accountIDs)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	accountsByID := make(map[int64]*service.Account, len(accounts))
+	for _, account := range accounts {
+		if account != nil {
+			accountsByID[account.ID] = account
+		}
+	}
+
+	results := make([]bulkUpstreamModelSyncResult, len(accountIDs))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(3)
+	for index, accountID := range accountIDs {
+		index, accountID := index, accountID
+		account := accountsByID[accountID]
+		if account == nil {
+			results[index] = bulkUpstreamModelSyncResult{AccountID: accountID, Status: "failed", Error: "Account not found"}
+			continue
+		}
+		g.Go(func() error {
+			result := bulkUpstreamModelSyncResult{
+				AccountID:   account.ID,
+				AccountName: account.Name,
+			}
+			catalog, syncErr := h.accountTestService.SyncUpstreamModelCatalog(gctx, account)
+			if syncErr != nil {
+				result.Status = "failed"
+				var typedErr *service.UpstreamModelSyncError
+				if errors.As(syncErr, &typedErr) {
+					result.Error = typedErr.SafeMessage()
+					if typedErr.Kind == service.UpstreamModelSyncErrorUnsupported {
+						result.Status = "skipped"
+					}
+				} else {
+					result.Error = "Failed to sync upstream models"
+				}
+				results[index] = result
+				return nil
+			}
+			if catalog == nil || !catalog.LiveListAvailable {
+				result.Status = "skipped"
+				result.Error = "No live upstream model catalog was available; existing restrictions were kept"
+				results[index] = result
+				return nil
+			}
+
+			mapping := make(map[string]any, len(catalog.Models))
+			for _, modelID := range catalog.Models {
+				modelID = strings.TrimSpace(modelID)
+				if modelID == "" || strings.Contains(modelID, "*") {
+					continue
+				}
+				mapping[modelID] = modelID
+			}
+			if len(mapping) == 0 {
+				result.Status = "failed"
+				result.Error = "Upstream returned no usable models; existing restrictions were kept"
+				results[index] = result
+				return nil
+			}
+
+			_, updateErr := h.adminService.UpdateAccount(gctx, account.ID, &service.UpdateAccountInput{
+				Credentials: map[string]any{"model_mapping": mapping},
+			})
+			if updateErr != nil {
+				result.Status = "failed"
+				result.Error = "Failed to save model restrictions"
+				results[index] = result
+				return nil
+			}
+			result.Status = "synced"
+			result.ModelCount = len(mapping)
+			results[index] = result
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	synced, failed, skipped := 0, 0, 0
+	for _, result := range results {
+		switch result.Status {
+		case "synced":
+			synced++
+		case "skipped":
+			skipped++
+		default:
+			failed++
+		}
+	}
+	response.Success(c, gin.H{
+		"total":   len(results),
+		"synced":  synced,
+		"failed":  failed,
+		"skipped": skipped,
+		"results": results,
+	})
+}
+
 // SyncUpstreamModelsPreview handles syncing live supported models using provided credentials (no account ID needed).
 // POST /api/v1/admin/accounts/models/sync-upstream-preview
 func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
