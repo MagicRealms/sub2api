@@ -66,6 +66,7 @@ type ChannelMonitorV2Aggregator struct {
 	unsub         func()
 	ctx           context.Context
 	cancel        context.CancelFunc
+	probeService  *ChannelMonitorService
 }
 
 func NewChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.DB, settings channelMonitorRuntimeReader) *ChannelMonitorV2Aggregator {
@@ -132,6 +133,15 @@ func (s *ChannelMonitorV2Aggregator) Stop() {
 		}
 		close(s.stopCh)
 	})
+}
+
+// SetProbeService wires the existing local gateway probe executor after all
+// HTTP routes have been built. Keeping this optional preserves read-only/test
+// deployments that only aggregate passive facts.
+func (s *ChannelMonitorV2Aggregator) SetProbeService(monitor *ChannelMonitorService) {
+	if s != nil {
+		s.probeService = monitor
+	}
 }
 
 // kick wakes the aggregation loop so mode flips take effect without waiting
@@ -229,6 +239,7 @@ func (s *ChannelMonitorV2Aggregator) runOnce() {
 	if release != nil {
 		defer release()
 	}
+	s.runHourlyProbe(ctx)
 
 	now := time.Now().UTC().Truncate(time.Minute)
 	if err := s.ensureCursor(ctx, now); err != nil {
@@ -302,6 +313,42 @@ func (s *ChannelMonitorV2Aggregator) runOnce() {
 		return
 	}
 	s.recordBackfillSuccess(start, time.Since(started), now)
+}
+
+func (s *ChannelMonitorV2Aggregator) runHourlyProbe(parent context.Context) {
+	if s == nil || s.probeService == nil {
+		return
+	}
+	probeRepo, ok := s.repo.(ChannelMonitorV2ProbeRepository)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(parent, 50*time.Second)
+	defer cancel()
+	job, err := probeRepo.ClaimDueProbe(ctx, time.Now().UTC())
+	if err != nil || job == nil {
+		if err != nil {
+			logger.LegacyPrintf("service.channel_monitor_v2", "[ChannelMonitorV2] probe claim failed: %v", err)
+		}
+		return
+	}
+	result := s.probeService.RunV2LocalProbe(ctx, job.APIKeyID, job.GroupID, job.Model)
+	if result == nil {
+		return
+	}
+	var latency *int64
+	if result.LatencyMs != nil {
+		value := int64(*result.LatencyMs)
+		latency = &value
+	}
+	if err := probeRepo.StoreProbeResult(ctx, ChannelMonitorV2ProbeResult{
+		CheckedAt: result.CheckedAt,
+		Status:    result.Status,
+		LatencyMs: latency,
+		Message:   truncateMessage(sanitizeErrorMessage(result.Message)),
+	}); err != nil {
+		logger.LegacyPrintf("service.channel_monitor_v2", "[ChannelMonitorV2] probe result save failed: %v", err)
+	}
 }
 
 // channelMonitorV2MaxChunkForDepth returns the hard ceiling for a historical

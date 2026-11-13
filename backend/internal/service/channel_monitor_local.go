@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,6 +42,132 @@ func (s *ChannelMonitorService) localProbeKeys() *APIKeyService {
 		return cfg.keys
 	}
 	return nil
+}
+
+func (s *ChannelMonitorService) localProbeGroup(ctx context.Context, keyID, groupID int64) (*APIKey, *Group, error) {
+	keys := s.localProbeKeys()
+	if keys == nil {
+		return nil, nil, localProbeInvalid("local gateway is not ready")
+	}
+	key, err := keys.GetByID(ctx, keyID)
+	if err != nil || key == nil {
+		return nil, nil, localProbeInvalid("selected local API key is unavailable")
+	}
+	groups, err := keys.OrderedRouteGroups(ctx, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, group := range groups {
+		if group.ID == groupID {
+			return key, group, nil
+		}
+	}
+	return nil, nil, localProbeInvalid("selected group is no longer authorized for this API key")
+}
+
+// ListLocalProbeModels reads the selected group's model catalog through the
+// normal in-process gateway. It never invokes model generation or billing.
+func (s *ChannelMonitorService) ListLocalProbeModels(ctx context.Context, keyID, groupID int64) ([]string, error) {
+	key, group, err := s.localProbeGroup(ctx, keyID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if key.User == nil || !key.User.IsAdmin() || !key.User.IsActive() || !key.IsActive() ||
+		(key.ExpiresAt != nil && time.Now().After(*key.ExpiresAt)) || group.IsExclusive || !group.IsActive() {
+		return nil, localProbeInvalid("select an active administrator key and public active group")
+	}
+	provider := group.Platform
+	if provider == "composite" {
+		provider = MonitorProviderOpenAI
+	}
+	if _, _, ok := providerAdapterFor(provider, ""); !ok {
+		return nil, localProbeInvalid("selected group does not support an active V2 probe adapter")
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, monitorRequestTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, "http://localhost/v1/models", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.doLocalProbe(req, keyID, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("model catalog HTTP %d", resp.StatusCode)
+	}
+	var data struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, monitorResponseMaxBytes)).Decode(&data); err != nil {
+		return nil, fmt.Errorf("decode model catalog: %w", err)
+	}
+	models := make([]string, 0, len(data.Data))
+	for _, item := range data.Data {
+		if strings.TrimSpace(item.ID) != "" {
+			models = append(models, strings.TrimSpace(item.ID))
+		}
+	}
+	slices.Sort(models)
+	return models, nil
+}
+
+func (s *ChannelMonitorService) ValidateV2Probe(ctx context.Context, actorID, keyID, groupID int64, model string) error {
+	key, group, err := s.localProbeGroup(ctx, keyID, groupID)
+	if err != nil {
+		return err
+	}
+	if actorID <= 0 || key.UserID != actorID || key.User == nil || !key.User.IsAdmin() || !key.User.IsActive() || !key.IsActive() {
+		return localProbeInvalid("select an active API key owned by this administrator")
+	}
+	if group.IsExclusive || !group.IsActive() {
+		return localProbeInvalid("select a public active group")
+	}
+	models, err := s.ListLocalProbeModels(ctx, keyID, groupID)
+	if err != nil {
+		return err
+	}
+	for _, available := range models {
+		if available == strings.TrimSpace(model) {
+			return nil
+		}
+	}
+	return localProbeInvalid("selected model is not listed by the selected group")
+}
+
+// RunV2LocalProbe executes one short challenge against exactly one selected
+// group. Composite groups use the OpenAI-compatible adapter; the gateway still
+// resolves the model's actual platform internally.
+func (s *ChannelMonitorService) RunV2LocalProbe(ctx context.Context, keyID, groupID int64, model string) *CheckResult {
+	started := time.Now()
+	result := &CheckResult{Model: model, Status: MonitorStatusError, CheckedAt: started}
+	key, group, err := s.localProbeGroup(ctx, keyID, groupID)
+	if err != nil {
+		result.Message = sanitizeErrorMessage(err.Error())
+		return result
+	}
+	if key.User == nil || !key.User.IsAdmin() || !key.User.IsActive() || !key.IsActive() ||
+		(key.ExpiresAt != nil && time.Now().After(*key.ExpiresAt)) || group.IsExclusive || !group.IsActive() {
+		result.Message = "selected API key or group is not active/public"
+		return result
+	}
+	provider := group.Platform
+	if provider == "composite" {
+		provider = MonitorProviderOpenAI
+	}
+	if _, _, ok := providerAdapterFor(provider, ""); !ok {
+		result.Message = "selected group does not support an active V2 probe adapter"
+		return result
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, monitorRequestTimeout)
+	defer cancel()
+	opts := &CheckOptions{LocalRequest: func(req *http.Request) (*http.Response, error) {
+		return s.doLocalProbe(req, keyID, groupID)
+	}}
+	return runCheckForModel(checkCtx, provider, "", "", model, opts)
 }
 func positiveMonitorID(id *int64) *int64 {
 	if id == nil || *id <= 0 {

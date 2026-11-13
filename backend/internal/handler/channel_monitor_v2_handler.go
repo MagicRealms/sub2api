@@ -47,6 +47,30 @@ func (h *ChannelMonitorV2Handler) GetConfig(c *gin.Context) {
 	response.Success(c, cfg)
 }
 
+func (h *ChannelMonitorV2Handler) ProbeModels(c *gin.Context) {
+	keyID, err := strconv.ParseInt(strings.TrimSpace(c.Query("api_key_id")), 10, 64)
+	if err != nil || keyID <= 0 {
+		response.BadRequest(c, "api_key_id must be a positive integer")
+		return
+	}
+	groupID, err := strconv.ParseInt(strings.TrimSpace(c.Query("group_id")), 10, 64)
+	if err != nil || groupID <= 0 {
+		response.BadRequest(c, "group_id must be a positive integer")
+		return
+	}
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 {
+		response.Unauthorized(c, "user not found in context")
+		return
+	}
+	models, err := h.service.ListProbeModels(c.Request.Context(), subject.UserID, keyID, groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"models": models})
+}
+
 func (h *ChannelMonitorV2Handler) UpdateConfig(c *gin.Context) {
 	var input service.ChannelMonitorV2Config
 	if err := c.ShouldBindJSON(&input); err != nil {

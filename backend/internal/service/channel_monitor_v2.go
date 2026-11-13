@@ -36,6 +36,24 @@ type ChannelMonitorV2PlatformConfig struct {
 	Models   []string `json:"models"`
 }
 
+const ChannelMonitorV2ProbeIntervalSeconds = 3600
+
+// ChannelMonitorV2Probe is the optional low-token active probe for one public
+// group. Runtime fields are returned for status display but are preserved by
+// the service when an administrator saves the operator configuration.
+type ChannelMonitorV2Probe struct {
+	Enabled         bool       `json:"enabled"`
+	APIKeyID        *int64     `json:"api_key_id,omitempty"`
+	GroupID         *int64     `json:"group_id,omitempty"`
+	Model           string     `json:"model"`
+	IntervalSeconds int        `json:"interval_seconds"`
+	NextRunAt       *time.Time `json:"next_run_at,omitempty"`
+	LastCheckedAt   *time.Time `json:"last_checked_at,omitempty"`
+	Status          string     `json:"status,omitempty"`
+	LatencyMs       *int64     `json:"latency_ms,omitempty"`
+	Message         string     `json:"message,omitempty"`
+}
+
 type ChannelMonitorV2Config struct {
 	Version                int                              `json:"version"`
 	Enabled                bool                             `json:"enabled"`
@@ -46,9 +64,10 @@ type ChannelMonitorV2Config struct {
 	// IgnoredErrorCategories are excluded from error_rate / health scoring.
 	// They still appear in the error breakdown with ignored=true (greyed in UI).
 	// Unknown categories always roll into "other" via the taxonomy classifier.
-	IgnoredErrorCategories []string  `json:"ignored_error_categories"`
-	UpdatedAt              time.Time `json:"updated_at"`
-	UpdatedBy              *int64    `json:"updated_by,omitempty"`
+	IgnoredErrorCategories []string              `json:"ignored_error_categories"`
+	UpdatedAt              time.Time             `json:"updated_at"`
+	UpdatedBy              *int64                `json:"updated_by,omitempty"`
+	Probe                  ChannelMonitorV2Probe `json:"probe"`
 }
 
 // ChannelMonitorV2ErrorCategories is the ordered, versioned taxonomy used by the
@@ -316,6 +335,26 @@ type ChannelMonitorV2Repository interface {
 	RecomputeRange(ctx context.Context, start, end time.Time) error
 }
 
+type ChannelMonitorV2ProbeJob struct {
+	APIKeyID int64
+	GroupID  int64
+	Model    string
+}
+
+type ChannelMonitorV2ProbeResult struct {
+	CheckedAt time.Time
+	Status    string
+	LatencyMs *int64
+	Message   string
+}
+
+// Optional repository capability. Keeping it separate preserves lightweight
+// repository stubs and makes old/read-only deployments fail closed.
+type ChannelMonitorV2ProbeRepository interface {
+	ClaimDueProbe(ctx context.Context, now time.Time) (*ChannelMonitorV2ProbeJob, error)
+	StoreProbeResult(ctx context.Context, result ChannelMonitorV2ProbeResult) error
+}
+
 // ChannelMonitorV2BootstrapProductWindow is the longest UI range that must be
 // filled on first upgrade before the bootstrap banner disappears (30d).
 const ChannelMonitorV2BootstrapProductWindow = 30 * 24 * time.Hour
@@ -383,6 +422,7 @@ type ChannelMonitorV2Service struct {
 	repo     ChannelMonitorV2Repository
 	settings channelMonitorRuntimeReader
 	now      func() time.Time
+	probe    *ChannelMonitorService
 }
 
 func NewChannelMonitorV2Service(repo ChannelMonitorV2Repository) *ChannelMonitorV2Service {
@@ -399,6 +439,27 @@ func (s *ChannelMonitorV2Service) SetRuntimeReader(r channelMonitorRuntimeReader
 		return
 	}
 	s.settings = r
+}
+
+func (s *ChannelMonitorV2Service) SetProbeService(monitor *ChannelMonitorService) {
+	if s != nil {
+		s.probe = monitor
+	}
+}
+
+func (s *ChannelMonitorV2Service) ListProbeModels(ctx context.Context, actorID, keyID, groupID int64) ([]string, error) {
+	if s == nil || s.probe == nil {
+		return nil, fmt.Errorf("channel monitor v2 probe is unavailable")
+	}
+	keys := s.probe.localProbeKeys()
+	if keys == nil {
+		return nil, fmt.Errorf("channel monitor v2 probe is unavailable")
+	}
+	key, err := keys.GetByID(ctx, keyID)
+	if err != nil || key == nil || key.UserID != actorID {
+		return nil, fmt.Errorf("selected API key is not owned by this administrator")
+	}
+	return s.probe.ListLocalProbeModels(ctx, keyID, groupID)
 }
 
 func (s *ChannelMonitorV2Service) hideThroughputForViewer(ctx context.Context, admin bool) bool {
@@ -441,8 +502,39 @@ func (s *ChannelMonitorV2Service) getEnabledConfig(ctx context.Context) (*Channe
 }
 
 func (s *ChannelMonitorV2Service) UpdateConfig(ctx context.Context, cfg ChannelMonitorV2Config, expectedVersion int, actorID int64) (*ChannelMonitorV2Config, error) {
+	// Status/timing fields belong to the scheduler. Never let an admin form
+	// overwrite them while saving the probe selection.
+	current, err := s.repo.GetConfig(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if current != nil {
+		probeTargetChanged := cfg.Probe.Enabled != current.Probe.Enabled ||
+			!sameMonitorID(cfg.Probe.APIKeyID, current.Probe.APIKeyID) ||
+			!sameMonitorID(cfg.Probe.GroupID, current.Probe.GroupID) || cfg.Probe.Model != current.Probe.Model
+		cfg.Probe.NextRunAt = current.Probe.NextRunAt
+		cfg.Probe.LastCheckedAt = current.Probe.LastCheckedAt
+		cfg.Probe.Status = current.Probe.Status
+		cfg.Probe.LatencyMs = current.Probe.LatencyMs
+		cfg.Probe.Message = current.Probe.Message
+		if cfg.Probe.Enabled && probeTargetChanged {
+			now := s.now().UTC()
+			cfg.Probe.NextRunAt = &now
+		}
+		if !cfg.Probe.Enabled {
+			cfg.Probe.NextRunAt = nil
+		}
+	}
 	if err := normalizeChannelMonitorV2Config(&cfg); err != nil {
 		return nil, err
+	}
+	if cfg.Probe.Enabled {
+		if s.probe == nil {
+			return nil, fmt.Errorf("channel monitor v2 probe is unavailable")
+		}
+		if err := s.probe.ValidateV2Probe(ctx, actorID, *cfg.Probe.APIKeyID, *cfg.Probe.GroupID, cfg.Probe.Model); err != nil {
+			return nil, fmt.Errorf("%w: %s", ErrChannelMonitorV2InvalidConfig, err.Error())
+		}
 	}
 	cfg.UpdatedBy = &actorID
 	return s.repo.UpdateConfig(ctx, cfg, expectedVersion)
@@ -633,6 +725,9 @@ func redactChannelMonitorV2PublicConfig(cfg *ChannelMonitorV2Config) {
 	cfg.GroupIDs = nil
 	cfg.IgnoredErrorCategories = nil
 	cfg.UpdatedBy = nil
+	cfg.Probe.APIKeyID = nil
+	cfg.Probe.GroupID = nil
+	cfg.Probe.Message = ""
 	for i := range cfg.Platforms {
 		cfg.Platforms[i].Models = nil
 	}
@@ -769,6 +864,31 @@ func normalizeChannelMonitorV2Config(cfg *ChannelMonitorV2Config) error {
 	}
 	cfg.IgnoredErrorCategories = normalizeChannelMonitorV2IgnoredCategories(cfg.IgnoredErrorCategories)
 	cfg.HealthThresholds = NormalizeChannelMonitorV2HealthThresholds(cfg.HealthThresholds)
+	if cfg.Probe.IntervalSeconds == 0 {
+		cfg.Probe.IntervalSeconds = ChannelMonitorV2ProbeIntervalSeconds
+	}
+	if cfg.Probe.IntervalSeconds != ChannelMonitorV2ProbeIntervalSeconds {
+		return fmt.Errorf("%w: probe interval must be 3600 seconds", ErrChannelMonitorV2InvalidConfig)
+	}
+	cfg.Probe.Model = strings.TrimSpace(cfg.Probe.Model)
+	if cfg.Probe.Enabled {
+		if cfg.Probe.APIKeyID == nil || *cfg.Probe.APIKeyID <= 0 || cfg.Probe.GroupID == nil || *cfg.Probe.GroupID <= 0 || cfg.Probe.Model == "" {
+			return fmt.Errorf("%w: probe requires an API key, group and model", ErrChannelMonitorV2InvalidConfig)
+		}
+		if len(cfg.GroupIDs) > 0 {
+			found := false
+			for _, groupID := range cfg.GroupIDs {
+				if groupID == *cfg.Probe.GroupID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.GroupIDs = append(cfg.GroupIDs, *cfg.Probe.GroupID)
+				sort.Slice(cfg.GroupIDs, func(i, j int) bool { return cfg.GroupIDs[i] < cfg.GroupIDs[j] })
+			}
+		}
+	}
 	seen := make(map[string]struct{}, len(cfg.Platforms))
 	for i := range cfg.Platforms {
 		p := &cfg.Platforms[i]

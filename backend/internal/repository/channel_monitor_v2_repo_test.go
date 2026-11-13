@@ -39,6 +39,37 @@ func TestListPublicActiveChannelMonitorGroupsExcludesExclusiveAndInactiveGroups(
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestChannelMonitorV2ProbeClaimAdvancesHourlyDeadlineAtomically(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(`UPDATE channel_monitor_v2_config\s+SET probe_next_run_at = \$1 \+ INTERVAL '3600 seconds'`).
+		WithArgs(now).
+		WillReturnRows(sqlmock.NewRows([]string{"probe_api_key_id", "probe_group_id", "probe_model"}).AddRow(12, 34, "gpt-6.1"))
+	job, err := (&channelMonitorV2Repository{db: db}).ClaimDueProbe(context.Background(), now)
+	require.NoError(t, err)
+	require.Equal(t, &service.ChannelMonitorV2ProbeJob{APIKeyID: 12, GroupID: 34, Model: "gpt-6.1"}, job)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestChannelMonitorV2ProbeResultStoredSeparatelyFromPassiveMetrics(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	checkedAt := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	latency := int64(850)
+	mock.ExpectExec(`UPDATE channel_monitor_v2_config\s+SET probe_last_checked_at = \$1, probe_status = \$2, probe_latency_ms = \$3, probe_message = \$4`).
+		WithArgs(checkedAt, "operational", latency, "").WillReturnResult(sqlmock.NewResult(0, 1))
+	err = (&channelMonitorV2Repository{db: db}).StoreProbeResult(context.Background(), service.ChannelMonitorV2ProbeResult{
+		CheckedAt: checkedAt, Status: "operational", LatencyMs: &latency,
+	})
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestChannelMonitorV2DateBinOriginIsUTC(t *testing.T) {
 	require.Equal(t, "TIMESTAMPTZ '1970-01-01 00:00:00+00'", channelMonitorV2DateBinOrigin)
 	require.Equal(t, "date_bin($1::interval,m.bucket_start,TIMESTAMPTZ '1970-01-01 00:00:00+00')", channelMonitorV2DateBinExpr("m.bucket_start"))

@@ -179,6 +179,20 @@ func TestChannelMonitorV2ConfigValidation(t *testing.T) {
 	require.Equal(t, 300, cfg.RefreshIntervalSeconds)
 	require.Equal(t, "anthropic", cfg.Platforms[0].Platform)
 	require.Equal(t, []int64{1, 3}, cfg.GroupIDs)
+	require.Equal(t, ChannelMonitorV2ProbeIntervalSeconds, cfg.Probe.IntervalSeconds)
+
+	cfg.Probe.Enabled = true
+	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
+	keyID, groupID := int64(1), int64(3)
+	cfg.Probe.APIKeyID, cfg.Probe.GroupID, cfg.Probe.Model = &keyID, &groupID, "gpt-6.1"
+	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
+	probeOnlyGroup := int64(9)
+	cfg.Probe.GroupID = &probeOnlyGroup
+	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
+	require.Equal(t, []int64{1, 3, 9}, cfg.GroupIDs)
+	cfg.Probe.IntervalSeconds = 1800
+	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
+	cfg.Probe = ChannelMonitorV2Probe{IntervalSeconds: ChannelMonitorV2ProbeIntervalSeconds}
 
 	cfg.RefreshIntervalSeconds = 120
 	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)

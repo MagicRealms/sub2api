@@ -26,12 +26,18 @@ func (r *channelMonitorV2Repository) GetConfig(ctx context.Context) (*service.Ch
 		SELECT version, enabled, refresh_interval_seconds, platforms, group_ids,
 		       COALESCE(ignored_error_categories, '{}'),
 		       COALESCE(health_thresholds, '{}'::jsonb),
-		       updated_at, updated_by
+		       updated_at, updated_by,
+		       probe_enabled, probe_api_key_id, probe_group_id, probe_model,
+		       probe_next_run_at, probe_last_checked_at, probe_status,
+		       probe_latency_ms, COALESCE(probe_message, '')
 		FROM channel_monitor_v2_config WHERE id = 1`).Scan(
 		&cfg.Version, &cfg.Enabled, &cfg.RefreshIntervalSeconds, &platforms,
 		pq.Array(&cfg.GroupIDs), pq.Array(&cfg.IgnoredErrorCategories),
 		&thresholds,
 		&cfg.UpdatedAt, &cfg.UpdatedBy,
+		&cfg.Probe.Enabled, &cfg.Probe.APIKeyID, &cfg.Probe.GroupID, &cfg.Probe.Model,
+		&cfg.Probe.NextRunAt, &cfg.Probe.LastCheckedAt, &cfg.Probe.Status,
+		&cfg.Probe.LatencyMs, &cfg.Probe.Message,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get channel monitor v2 config: %w", err)
@@ -47,6 +53,7 @@ func (r *channelMonitorV2Repository) GetConfig(ctx context.Context) (*service.Ch
 		_ = json.Unmarshal(thresholds, &cfg.HealthThresholds)
 	}
 	cfg.HealthThresholds = service.NormalizeChannelMonitorV2HealthThresholds(cfg.HealthThresholds)
+	cfg.Probe.IntervalSeconds = service.ChannelMonitorV2ProbeIntervalSeconds
 	return &cfg, nil
 }
 
@@ -90,18 +97,29 @@ func (r *channelMonitorV2Repository) UpdateConfig(ctx context.Context, cfg servi
 		UPDATE channel_monitor_v2_config
 		SET version = version + 1, enabled = $1, refresh_interval_seconds = $2,
 		    platforms = $3, group_ids = $4, ignored_error_categories = $5,
-		    health_thresholds = $6, updated_by = $7, updated_at = NOW()
+		    health_thresholds = $6, updated_by = $7, updated_at = NOW(),
+		    probe_enabled = $9, probe_api_key_id = $10, probe_group_id = $11,
+		    probe_model = $12,
+		    probe_next_run_at = CASE WHEN $9 THEN COALESCE($13, probe_next_run_at, NOW()) ELSE NULL END
 		WHERE id = 1 AND version = $8
 		RETURNING version, enabled, refresh_interval_seconds, platforms, group_ids,
 		          COALESCE(ignored_error_categories, '{}'),
 		          COALESCE(health_thresholds, '{}'::jsonb),
-		          updated_at, updated_by`,
+		          updated_at, updated_by,
+		          probe_enabled, probe_api_key_id, probe_group_id, probe_model,
+		          probe_next_run_at, probe_last_checked_at, probe_status,
+		          probe_latency_ms, COALESCE(probe_message, '')`,
 		cfg.Enabled, cfg.RefreshIntervalSeconds, platforms, pq.Array(cfg.GroupIDs),
 		pq.Array(cfg.IgnoredErrorCategories), thresholds, cfg.UpdatedBy, expectedVersion,
+		cfg.Probe.Enabled, cfg.Probe.APIKeyID, cfg.Probe.GroupID, cfg.Probe.Model,
+		cfg.Probe.NextRunAt,
 	).Scan(&updated.Version, &updated.Enabled, &updated.RefreshIntervalSeconds, &raw,
 		pq.Array(&updated.GroupIDs), pq.Array(&updated.IgnoredErrorCategories),
 		&rawThresholds,
-		&updated.UpdatedAt, &updated.UpdatedBy)
+		&updated.UpdatedAt, &updated.UpdatedBy,
+		&updated.Probe.Enabled, &updated.Probe.APIKeyID, &updated.Probe.GroupID, &updated.Probe.Model,
+		&updated.Probe.NextRunAt, &updated.Probe.LastCheckedAt, &updated.Probe.Status,
+		&updated.Probe.LatencyMs, &updated.Probe.Message)
 	if err == sql.ErrNoRows {
 		return nil, service.ErrChannelMonitorV2ConfigConflict
 	}
@@ -117,7 +135,38 @@ func (r *channelMonitorV2Repository) UpdateConfig(ctx context.Context, cfg servi
 	updated.HealthThresholds = service.DefaultChannelMonitorV2HealthThresholds()
 	_ = json.Unmarshal(rawThresholds, &updated.HealthThresholds)
 	updated.HealthThresholds = service.NormalizeChannelMonitorV2HealthThresholds(updated.HealthThresholds)
+	updated.Probe.IntervalSeconds = service.ChannelMonitorV2ProbeIntervalSeconds
 	return &updated, nil
+}
+
+func (r *channelMonitorV2Repository) ClaimDueProbe(ctx context.Context, now time.Time) (*service.ChannelMonitorV2ProbeJob, error) {
+	var job service.ChannelMonitorV2ProbeJob
+	err := r.db.QueryRowContext(ctx, `
+		UPDATE channel_monitor_v2_config
+		SET probe_next_run_at = $1 + INTERVAL '3600 seconds'
+		WHERE id = 1 AND enabled = TRUE AND probe_enabled = TRUE
+		  AND probe_api_key_id IS NOT NULL AND probe_group_id IS NOT NULL
+		  AND NULLIF(TRIM(probe_model), '') IS NOT NULL
+		  AND (probe_next_run_at IS NULL OR probe_next_run_at <= $1)
+		RETURNING probe_api_key_id, probe_group_id, probe_model`, now.UTC()).Scan(&job.APIKeyID, &job.GroupID, &job.Model)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("claim channel monitor v2 probe: %w", err)
+	}
+	return &job, nil
+}
+
+func (r *channelMonitorV2Repository) StoreProbeResult(ctx context.Context, result service.ChannelMonitorV2ProbeResult) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE channel_monitor_v2_config
+		SET probe_last_checked_at = $1, probe_status = $2, probe_latency_ms = $3, probe_message = $4
+		WHERE id = 1`, result.CheckedAt.UTC(), result.Status, result.LatencyMs, result.Message)
+	if err != nil {
+		return fmt.Errorf("store channel monitor v2 probe result: %w", err)
+	}
+	return nil
 }
 
 type channelMonitorV2Fact struct {

@@ -121,6 +121,20 @@ export interface MonitorConfig {
   }
   /** Categories excluded from error_rate / health; still listed in error breakdown. */
   ignored_error_categories?: string[]
+  probe: MonitorProbe
+}
+
+export interface MonitorProbe {
+  enabled: boolean
+  api_key_id?: number | null
+  group_id?: number | null
+  model: string
+  interval_seconds: number
+  next_run_at?: string | null
+  last_checked_at?: string | null
+  status?: string
+  latency_ms?: number | null
+  message?: string
 }
 
 /** Ordered taxonomy mirrored from backend ChannelMonitorV2ErrorCategories. */
@@ -179,6 +193,14 @@ export interface MonitorMatrixResponse {
 export interface MonitorGroupCard extends MonitorMatrixRow {
   has_traffic: boolean
   has_cache_samples: boolean
+  probe?: {
+    enabled: boolean
+    model?: string
+    status?: string
+    latency_ms?: number | null
+    last_checked_at?: string | null
+    message?: string
+  }
 }
 
 export interface MonitorGroupCardsResponse {
@@ -284,4 +306,10 @@ export async function getConfig() {
 export async function updateConfig(config: MonitorConfig) {
   const { data } = await apiClient.put<MonitorConfig>('/admin/channel-monitor-v2/config', config)
   return data
+}
+export async function getProbeModels(apiKeyId: number, groupId: number) {
+  const { data } = await apiClient.get<{ models: string[] }>('/admin/channel-monitor-v2/probe/models', {
+    params: { api_key_id: apiKeyId, group_id: groupId }
+  })
+  return data.models || []
 }

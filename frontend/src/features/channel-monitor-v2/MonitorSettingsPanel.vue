@@ -84,6 +84,44 @@
       </div>
 
       <div class="card overflow-hidden !rounded-3xl !border-0 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700">
+        <div class="card-header flex flex-wrap items-center justify-between gap-3 !py-3">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('channelMonitorV2.settings.probeTitle') }}</h3>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">{{ t('channelMonitorV2.settings.probeHint') }}</p>
+          </div>
+          <Toggle v-model="draft.probe.enabled" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 px-5 py-4 md:grid-cols-3">
+          <label class="block">
+            <span class="input-label">{{ t('channelMonitorV2.settings.probeKey') }}</span>
+            <select v-model="draft.probe.api_key_id" class="input" :disabled="saving" @change="onProbeKeyChange">
+              <option :value="null">{{ t('channelMonitorV2.settings.probeKeyPlaceholder') }}</option>
+              <option v-for="key in adminKeys" :key="key.id" :value="key.id">{{ key.name || `#${key.id}` }} · #{{ key.id }}</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="input-label">{{ t('channelMonitorV2.settings.probeGroup') }}</span>
+            <select v-model="draft.probe.group_id" class="input" :disabled="saving || !probeKey" @change="onProbeGroupChange">
+              <option :value="null">{{ t('channelMonitorV2.settings.probeGroupPlaceholder') }}</option>
+              <option v-for="group in probeGroups" :key="group.id" :value="group.id">{{ group.name }} · {{ platformLabel(group.platform) }}</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="input-label">{{ t('channelMonitorV2.settings.probeModel') }}</span>
+            <select v-model="draft.probe.model" class="input" :disabled="saving || probeModelsLoading || !draft.probe.group_id">
+              <option value="">{{ probeModelsLoading ? t('channelMonitorV2.settings.probeModelsLoading') : t('channelMonitorV2.settings.probeModelPlaceholder') }}</option>
+              <option v-for="model in probeModels" :key="model" :value="model">{{ model }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-dark-700 dark:text-dark-400">
+          {{ t('channelMonitorV2.settings.probeSchedule', { interval: 60 }) }}
+          <span v-if="draft.probe.last_checked_at" class="ml-2">· {{ t('channelMonitorV2.settings.probeLastRun', { time: probeTime(draft.probe.last_checked_at) }) }}</span>
+          <span v-if="draft.probe.status" class="ml-2 font-medium" :class="draft.probe.status === 'operational' ? 'text-emerald-600' : 'text-amber-600'">{{ draft.probe.status }}</span>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden !rounded-3xl !border-0 shadow-sm ring-1 ring-gray-900/5 dark:!bg-dark-800 dark:ring-dark-700">
         <div class="card-header !py-3">
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('channelMonitorV2.settings.platformsTitle') }}</h3>
           <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
@@ -290,12 +328,13 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { getChannelMonitorMode, isChannelMonitorV2Mode } from '@/utils/featureFlags'
 import {
   getConfig,
+  getProbeModels,
   updateConfig,
   MONITOR_ERROR_CATEGORIES,
   type MonitorConfig,
 } from '@/api/channelMonitorV2'
 import { adminAPI } from '@/api/admin'
-import type { AdminGroup } from '@/types'
+import type { AdminGroup, ApiKey } from '@/types'
 
 const { t, te } = useI18n()
 const appStore = useAppStore()
@@ -304,7 +343,17 @@ const saving = ref(false)
 const draft = ref<MonitorConfig | null>(null)
 const original = ref('')
 const groups = ref<AdminGroup[]>([])
+const adminKeys = ref<ApiKey[]>([])
+const probeModels = ref<string[]>([])
+const probeModelsLoading = ref(false)
 const visibleGroups = computed(() => groups.value.filter((group) => group.status === 'active' && !group.is_exclusive))
+const probeKey = computed(() => adminKeys.value.find((key) => key.id === draft.value?.probe?.api_key_id))
+const probeGroups = computed(() => {
+  const key = probeKey.value
+  if (!key) return []
+  const ids = new Set((key.group_ids?.length ? key.group_ids : key.group_id ? [key.group_id] : []).map(Number))
+  return visibleGroups.value.filter((group) => ids.has(group.id))
+})
 const selectedPlatform = ref('')
 const availablePlatforms = computed(() =>
   CONCRETE_PLATFORM_OPTIONS.filter(
@@ -406,6 +455,37 @@ function toggleIgnoredCategory(category: string) {
   draft.value.ignored_error_categories = [...current].sort()
 }
 
+async function loadProbeModels() {
+  if (!draft.value?.probe?.api_key_id || !draft.value.probe.group_id) {
+    probeModels.value = []
+    return
+  }
+  probeModelsLoading.value = true
+  try {
+    if (typeof getProbeModels !== 'function') return
+    probeModels.value = await getProbeModels(draft.value.probe.api_key_id, draft.value.probe.group_id)
+    if (draft.value.probe.model && !probeModels.value.includes(draft.value.probe.model)) draft.value.probe.model = ''
+  } catch (error) {
+    probeModels.value = []
+    appStore.showError(extractApiErrorMessage(error, t('channelMonitorV2.settings.probeModelsFailed')))
+  } finally {
+    probeModelsLoading.value = false
+  }
+}
+
+function onProbeKeyChange() {
+  if (!draft.value) return
+  draft.value.probe.group_id = null
+  draft.value.probe.model = ''
+  probeModels.value = []
+}
+
+function onProbeGroupChange() {
+  if (!draft.value) return
+  draft.value.probe.model = ''
+  void loadProbeModels()
+}
+
 function categoryLabel(category: string) {
   const key = `channelMonitorV2.errorCategories.${category}`
   return te(key) ? t(key) : category
@@ -429,10 +509,22 @@ function platformLabel(value: string) {
   )[value] || value
 }
 
+function probeTime(value: string) {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date)
+}
+
 function normalizeConfig(value: MonitorConfig): MonitorConfig {
   const ignored = value.ignored_error_categories
   return {
     ...value,
+    probe: value.probe
+      ? { ...value.probe }
+      : { enabled: false, model: '', interval_seconds: 3600 },
     health_thresholds: { ...defaultThresholds, ...(value.health_thresholds || {}) },
     // Preserve explicit empty arrays from the server (operator cleared all).
     ignored_error_categories: [
@@ -444,15 +536,28 @@ function normalizeConfig(value: MonitorConfig): MonitorConfig {
 async function load() {
   loading.value = true
   try {
-    const [value, groupRows] = await Promise.all([getConfig(), adminAPI.groups.getAllIncludingInactive()])
+    const [value, groupRows] = await Promise.all([
+      getConfig(),
+      adminAPI.groups.getAllIncludingInactive(),
+    ])
     groups.value = groupRows
+    try {
+      const keyLister = (adminAPI as typeof adminAPI & { apiKeys?: { list: (page: number, size: number, filters: { status: string }) => Promise<{ items: ApiKey[] }> } }).apiKeys?.list
+      if (keyLister) {
+        const keyPage = await keyLister(1, 100, { status: 'active' })
+        adminKeys.value = keyPage.items || []
+      }
+    } catch {
+      adminKeys.value = []
+    }
     const visibleGroupIDs = new Set(groupRows.filter((group) => group.status === 'active' && !group.is_exclusive).map((group) => group.id))
-    const normalized = normalizeConfig({
+	const normalized = normalizeConfig({
       ...value,
       group_ids: value.group_ids.filter((id) => visibleGroupIDs.has(id)),
-    })
-    draft.value = structuredClone(normalized)
+	})
+	draft.value = structuredClone(normalized)
     original.value = JSON.stringify(normalized)
+    await loadProbeModels()
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('channelMonitorV2.settings.loadFailed')))
   } finally {
@@ -464,10 +569,10 @@ async function save() {
   if (!draft.value) return
   saving.value = true
   try {
-    const payload = normalizeConfig(draft.value)
+	const payload = normalizeConfig(draft.value)
     const value = await updateConfig(payload)
-    const normalized = normalizeConfig(value)
-    draft.value = structuredClone(normalized)
+	const normalized = normalizeConfig(value)
+	draft.value = structuredClone(normalized)
     original.value = JSON.stringify(normalized)
     appStore.showSuccess(t('channelMonitorV2.settings.saveSuccess'))
   } catch (error) {

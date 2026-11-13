@@ -26,6 +26,10 @@
           <span class="min-w-0 truncate font-mono text-xs text-gray-700 dark:text-gray-300" :title="modelLabel(card)">{{ modelLabel(card) }}</span>
           <span v-if="card.has_cache_samples" class="ml-auto shrink-0 text-[10px] text-primary-600 dark:text-primary-300">{{ t('channelMonitorV2.cards.bestCache') }}</span>
         </div>
+        <div v-if="card.probe" class="mt-2 flex items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/70 px-2.5 py-1.5 text-[11px] dark:border-primary-900/40 dark:bg-primary-900/20">
+          <span class="truncate text-primary-700 dark:text-primary-200" :title="card.probe.message || undefined">{{ t('channelMonitorV2.cards.hourlyProbe', { model: card.probe.model || '—' }) }}</span>
+          <span class="shrink-0 font-semibold" :class="probeClass(card.probe.status)">{{ probeLabel(card.probe.status) }}<template v-if="card.probe.latency_ms != null"> · {{ card.probe.latency_ms }}ms</template></span>
+        </div>
         <dl class="mt-4 grid grid-cols-3 gap-2">
           <div class="rounded-2xl border border-gray-100 bg-gray-50/60 px-2.5 py-3 dark:border-dark-700 dark:bg-dark-900/30">
             <dt class="min-h-7 text-[10px] leading-[14px] text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.metrics.successRate') }}</dt>
@@ -111,6 +115,18 @@ function providerName(platform: string) {
 function statusLabel(card: MonitorGroupCard) {
   if (!card.has_traffic) return t('channelMonitorV2.cards.noTraffic')
   return t(`channelMonitorV2.cards.${healthModeState(card.health, props.healthMode)}`)
+}
+function probeClass(status?: string) {
+  if (status === 'operational') return 'text-emerald-600 dark:text-emerald-300'
+  if (status === 'degraded') return 'text-amber-600 dark:text-amber-300'
+  if (status) return 'text-rose-600 dark:text-rose-300'
+  return 'text-gray-500 dark:text-gray-400'
+}
+function probeLabel(status?: string) {
+  if (status === 'operational') return t('channelMonitorV2.cards.probeOperational')
+  if (status === 'degraded') return t('channelMonitorV2.cards.probeDegraded')
+  if (status) return t('channelMonitorV2.cards.probeFailed')
+  return t('channelMonitorV2.cards.probePending')
 }
 function time(value: string | number) {
   const date = new Date(value)

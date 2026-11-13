@@ -18,29 +18,30 @@ cache=$(cd "$cache" && pwd)
 artifact="$cache/artifacts/$commit"
 go_version=$(awk '$1 == "go" {print $2; exit}' backend/go.mod)
 
-# Run stages sequentially with hard limits, leaving capacity for the live API.
-docker run --rm --cpus 1.5 --memory 3072m --memory-swap 3584m \
-  -e NODE_OPTIONS=--max-old-space-size=2560 \
-  -e VITEST_MAX_THREADS=2 -e VITEST_MIN_THREADS=1 \
-  -e VITEST_MAX_FORKS=2 -e VITEST_MIN_FORKS=1 \
+# Keep substantial headroom for the live API and host networking under load.
+# Build stages stay sequential, low-priority, single-worker, and capped at one CPU.
+docker run --rm --cpus 1 --cpu-shares 128 --memory 3072m --memory-swap 3072m \
+  -e NODE_OPTIONS=--max-old-space-size=2200 \
+  -e VITEST_MAX_THREADS=1 -e VITEST_MIN_THREADS=1 \
+  -e VITEST_MAX_FORKS=1 -e VITEST_MIN_FORKS=1 \
   -v "$repo:/app" -w /app/frontend node:24-alpine \
-  sh -ec 'corepack enable; corepack prepare pnpm@9.15.9 --activate; pnpm install --frozen-lockfile; pnpm exec vitest run src/components/common/__tests__/VersionBadge.spec.ts src/stores/__tests__/app.spec.ts; pnpm run build'
+  sh -ec 'corepack enable; corepack prepare pnpm@9.15.9 --activate; pnpm install --frozen-lockfile --network-concurrency=2 --child-concurrency=1 --prefer-offline; nice -n 10 pnpm exec vitest run --maxWorkers=1 --minWorkers=1 src/components/common/__tests__/VersionBadge.spec.ts src/stores/__tests__/app.spec.ts; nice -n 10 pnpm run build'
 
-go_args=(--rm --cpus 2 --memory 3072m --memory-swap 5120m
-  -e GOMAXPROCS=2 -e GOMEMLIMIT=1536MiB -e CGO_ENABLED=0
+go_args=(--rm --cpus 1 --cpu-shares 128 --memory 2304m --memory-swap 2304m
+  -e GOMAXPROCS=1 -e GOMEMLIMIT=1400MiB -e CGO_ENABLED=0
   -v "$repo:/src" -v "$cache/gomod:/go/pkg/mod"
   -v "$cache/gobuild:/root/.cache/go-build" -w /src/backend)
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
-  go test -tags=unit -p 1 -timeout 10m ./internal/repository -run 'TestHTTPUpstream|TestOpenAIHTTP2|TestDecompressResponseBody|TestOpsCurrentRatesRespectMonitoringWindow'
+  nice -n 10 go test -tags=unit -p 1 -timeout 10m ./internal/repository -run 'TestHTTPUpstream|TestOpenAIHTTP2|TestDecompressResponseBody|TestOpsCurrentRatesRespectMonitoringWindow'
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
-  go test -tags=unit -p 1 ./internal/config -run TestOpsMonitoringStartAt
+  nice -n 10 go test -tags=unit -p 1 ./internal/config -run TestOpsMonitoringStartAt
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
-  go test -tags=unit -p 1 -timeout 2m internal/service/update_service.go \
+  nice -n 10 go test -tags=unit -p 1 -timeout 2m internal/service/update_service.go \
   internal/service/update_service_test.go internal/service/update_service_managed_test.go
 docker run "${go_args[@]}" "golang:$go_version-alpine" \
-  go test -tags=unit -p 1 internal/service/ops_monitoring_window.go internal/service/ops_monitoring_window_test.go
+  nice -n 10 go test -tags=unit -p 1 internal/service/ops_monitoring_window.go internal/service/ops_monitoring_window_test.go
 docker run "${go_args[@]}" -v "$artifact:/out" "golang:$go_version-alpine" \
-  go build -p 1 -tags embed \
+  nice -n 10 go build -p 1 -tags embed \
   -ldflags "-s -w -X main.Version=$version -X main.Commit=$commit -X main.Date=$(date -u +%FT%TZ) -X main.BuildType=source" \
   -o /out/sub2api ./cmd/server
 
