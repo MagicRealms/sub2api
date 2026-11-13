@@ -837,7 +837,7 @@ func TestGetOpenAIFormatBaseURL_ProtocolAware(t *testing.T) {
 	require.Equal(t, "https://ds-relay.example.com", ccAccount.GetOpenAIFormatBaseURL())
 }
 
-// TestBuildUpstreamModelsRequest_AnthropicProtocol 模型同步使用协议感知 base。
+// TestBuildUpstreamModelsRequest_AnthropicProtocol 模型同步跟随账号配置的 Anthropic base。
 func TestBuildUpstreamModelsRequest_AnthropicProtocol(t *testing.T) {
 	t.Parallel()
 	svc := &AccountTestService{cfg: &config.Config{}}
@@ -851,7 +851,24 @@ func TestBuildUpstreamModelsRequest_AnthropicProtocol(t *testing.T) {
 	}
 	req, err := svc.buildUpstreamModelsRequest(context.Background(), account)
 	require.NoError(t, err)
-	require.Equal(t, "https://open.bigmodel.cn/api/paas/v4/models", req.URL.String())
+	require.Equal(t, "https://open.bigmodel.cn/api/anthropic/v1/models", req.URL.String())
+	require.Equal(t, "sk-test", req.Header.Get("x-api-key"))
+	require.Equal(t, "2023-06-01", req.Header.Get("anthropic-version"))
+	require.Empty(t, req.Header.Get("Authorization"))
+
+	shareLLMAccount := &Account{
+		ID: 2, Platform: PlatformZhipu, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":      "sk-sharellm-test",
+			"api_protocol": APIProtocolAnthropic,
+			"base_url":     "https://sharellm.net",
+		},
+	}
+	shareLLMReq, err := svc.buildUpstreamModelsRequest(context.Background(), shareLLMAccount)
+	require.NoError(t, err)
+	require.Equal(t, "https://sharellm.net/v1/models", shareLLMReq.URL.String())
+	require.Equal(t, "sk-sharellm-test", shareLLMReq.Header.Get("x-api-key"))
+	require.NotContains(t, shareLLMReq.URL.Host, "bigmodel.cn")
 }
 
 // TestBuildOpenAIResponsesURLForPlatform deepseek 官方端点为 /responses（无 /v1）。

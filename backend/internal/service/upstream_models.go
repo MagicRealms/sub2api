@@ -1006,6 +1006,8 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
+	case account.IsMultiProtocolAPIKey() && account.IsAnthropicProtocol():
+		return s.buildCNAnthropicProtocolUpstreamModelsRequest(ctx, account)
 	case account.IsOpenAI() || account.IsMultiProtocolAPIKey():
 		// 多协议 API Key 供应商（国产厂商与聚合平台）复用 OpenAI /v1/models 探测。
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
@@ -1018,6 +1020,38 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 			fmt.Sprintf("Unsupported platform for upstream model sync: %s", account.Platform), nil,
 		)
 	}
+}
+
+func (s *AccountTestService) buildCNAnthropicProtocolUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
+	if account.Type != AccountTypeAPIKey {
+		return nil, newUpstreamModelSyncUnsupportedError(
+			fmt.Sprintf("Unsupported Anthropic-protocol account type for upstream model sync: %s", account.Type), nil,
+		)
+	}
+	apiKey := strings.TrimSpace(account.GetOpenAIProtocolAPIKey())
+	if apiKey == "" {
+		return nil, newUpstreamModelSyncConfigError("No API key is available for Anthropic-protocol model sync", nil)
+	}
+
+	// Model discovery must follow the same configured Anthropic base URL as
+	// requests sent through this account; never replace a custom relay with the
+	// provider's OpenAI-compatible default endpoint.
+	baseURL, err := s.validateUpstreamBaseURL(account.GetAnthropicProtocolBaseURL())
+	if err != nil {
+		return nil, newUpstreamModelSyncConfigError("Invalid Anthropic protocol base URL", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, buildV1ModelsURL(baseURL), nil)
+	if err != nil {
+		return nil, newUpstreamModelSyncConfigError("Invalid Anthropic-protocol model list URL", err)
+	}
+	for key, value := range claude.DefaultHeaders() {
+		req.Header.Set(key, value)
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("anthropic-version", "2023-06-01")
+	setAnthropicAPIKeyAuthHeader(req.Header, account, apiKey, baseURL)
+	account.ApplyHeaderOverrides(req.Header)
+	return req, nil
 }
 
 func (s *AccountTestService) buildGrokUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
