@@ -58,7 +58,7 @@ const legacyZenRules = [
 ]
 
 function legacyIsMultiProtocol(platform: string): boolean {
-  return ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(platform)
+  return ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'sharellm', 'command_code', 'cline'].includes(platform)
 }
 
 function legacySupportsResponses(platform: string): boolean {
@@ -66,7 +66,7 @@ function legacySupportsResponses(platform: string): boolean {
 }
 
 function legacyHeaderOverride(platform: string, type: string): boolean {
-  if (['anthropic', 'openai', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(platform)) {
+  if (['anthropic', 'openai', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'sharellm', 'command_code', 'cline'].includes(platform)) {
     return type === 'apikey'
   }
   if (platform === 'grok') return type === 'apikey' || type === 'oauth'
@@ -86,6 +86,8 @@ function legacyDefaultCNBaseUrl(platform: string, mode: string, protocol: CnApiP
         return 'https://api.minimaxi.com/anthropic'
       case 'opencode_go':
         return mode === 'zen' ? legacyOpenCode.zenAnthropic : legacyOpenCode.goAnthropic
+      case 'sharellm':
+        return 'https://sharellm.net'
       default:
         return ''
     }
@@ -101,6 +103,8 @@ function legacyDefaultCNBaseUrl(platform: string, mode: string, protocol: CnApiP
       return 'https://api.minimaxi.com/v1'
     case 'opencode_go':
       return mode === 'zen' ? legacyOpenCode.zenBase : legacyOpenCode.goBase
+    case 'sharellm':
+      return 'https://sharellm.net/v1'
     default:
       return ''
   }
@@ -120,7 +124,8 @@ const legacyModes: Record<string, string[]> = {
   zhipu: ['payg', 'coding'],
   deepseek: ['payg'],
   minimax: ['payg', 'coding'],
-  opencode_go: ['go', 'zen']
+  opencode_go: ['go', 'zen'],
+  sharellm: ['payg']
 }
 
 const probePlatforms = [
@@ -184,6 +189,10 @@ describe('credentialsBuilder derives multi-protocol data from the platform catal
     expect(providerAccountModes('opencode_go')).toEqual(['go', 'zen'])
     expect(providerAccountModes('deepseek')).toEqual(['payg'])
     expect(providerNativeProtocols('zhipu', 'coding')).toEqual(['chat_completions', 'anthropic'])
+    expect(providerRoutesByModel('sharellm')).toBe(true)
+    expect(providerAccountModes('sharellm')).toEqual(['payg'])
+    expect(providerNativeProtocols('sharellm', 'payg')).toEqual(['chat_completions', 'anthropic'])
+    expect(providerHasModelCatalog('sharellm')).toBe(false)
     expect(resolveProviderAccountMode('kimi', 'coding')).toBe('coding')
     expect(resolveProviderAccountMode('deepseek', 'coding')).toBe('payg')
     expect(resolveProviderAccountMode('opencode_go', undefined)).toBe('go')

@@ -679,7 +679,35 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     const labels = (testid: string) =>
       wrapper.get(`[data-testid="${testid}"]`).findAll('button').map(button => button.text().trim())
     expect(labels('platform-row-cn')).toEqual(['Kimi', 'Zhipu GLM', 'DeepSeek', 'MiniMax'])
-    expect(labels('platform-row-aggregators')).toEqual(['OpenCode', 'Command Code', 'Cline'])
+    expect(labels('platform-row-aggregators')).toEqual(['OpenCode', 'ShareLLM 聚合', 'Command Code', 'Cline'])
+  })
+
+  it('creates a ShareLLM aggregate account with editable protocol routing defaults', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-sharellm"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('sharellm')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-sharellm')
+
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    const payload = createAccountMock.mock.calls[0]?.[0]
+    expect(payload?.platform).toBe('sharellm')
+    expect(payload?.type).toBe('apikey')
+    expect(payload?.credentials).toMatchObject({
+      api_key: 'sk-sharellm',
+      account_mode: 'payg',
+      api_protocol: 'adaptive',
+      base_url: 'https://sharellm.net/v1',
+      api_base_urls: {
+        chat_completions: 'https://sharellm.net/v1',
+        anthropic: 'https://sharellm.net',
+      },
+      protocol_rules: [
+        { pattern: 'claude-*', protocol: 'anthropic' },
+        { pattern: 'anthropic/*', protocol: 'anthropic' },
+      ],
+    })
   })
 
   it('creates a Cline account without an account type and with only the Chat Completions endpoint', async () => {

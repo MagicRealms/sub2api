@@ -294,18 +294,27 @@ const setAutoSyncInterval = (intervalHours: string) => {
 }
 
 const availableOptions = computed(() => {
+  let options: typeof allModels
   if (normalizedPlatforms.value.length === 0) {
-    return allModels
+    options = [...allModels]
+  } else {
+    const allowedModels = new Set<string>()
+    for (const platform of normalizedPlatforms.value) {
+      for (const model of getModelsByPlatform(platform)) {
+        allowedModels.add(model)
+      }
+    }
+
+    options = allModels.filter(model => allowedModels.has(model.value))
   }
 
-  const allowedModels = new Set<string>()
-  for (const platform of normalizedPlatforms.value) {
-    for (const model of getModelsByPlatform(platform)) {
-      allowedModels.add(model)
+  const included = new Set(options.map(model => model.value))
+  for (const model of props.modelValue) {
+    if (!included.has(model)) {
+      options.push({ value: model, label: model })
     }
   }
-
-  return allModels.filter(model => allowedModels.has(model.value))
+  return options
 })
 
 const filteredModels = computed(() => {

@@ -110,9 +110,9 @@ func TestProviderProfile_ProfilesMatchMultiProtocolPlatforms(t *testing.T) {
 
 	for _, platform := range []string{
 		PlatformAnthropic, PlatformOpenAI, PlatformGemini, PlatformAntigravity, PlatformGrok,
-		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformComposite, "",
+		PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformShareLLM, PlatformComposite, "",
 	} {
-		want := IsCNProvider(platform) || platform == PlatformOpenCodeGo
+		want := IsCNProvider(platform) || platform == PlatformOpenCodeGo || platform == PlatformShareLLM
 		require.Equal(t, want, IsMultiProtocolAPIKeyProvider(platform), platform)
 		require.Equal(t, want, LookupProviderProfile(platform) != nil, platform)
 	}
@@ -185,4 +185,35 @@ func TestProviderProfile_OpenCodeProtocolRulesByMode(t *testing.T) {
 	require.Equal(t, DefaultOpenCodeGoProtocolRules(), openCode.Endpoints("").ProtocolRules)
 	require.Equal(t, DefaultOpenCodeZenProtocolRules(), openCode.Endpoints(AccountModeZen).ProtocolRules)
 	require.Empty(t, LookupProviderProfile(PlatformKimi).Endpoints(AccountModeCoding).ProtocolRules)
+}
+
+func TestProviderProfile_ShareLLMDefaultsAndProtocolRules(t *testing.T) {
+	t.Parallel()
+
+	profile := LookupProviderProfile(PlatformShareLLM)
+	require.NotNil(t, profile)
+	require.Equal(t, ProviderRoutingByModel, profile.Routing)
+	require.Equal(t, DefaultShareLLMBaseURL, profile.DefaultBaseURL(AccountModePayG, APIProtocolChatCompletions))
+	require.Empty(t, profile.DefaultBaseURL(AccountModePayG, APIProtocolResponses))
+	require.Equal(t, DefaultShareLLMAnthropicBaseURL, profile.DefaultBaseURL(AccountModePayG, APIProtocolAnthropic))
+	require.Equal(t, []ProtocolRule{
+		{Pattern: "claude-*", Protocol: APIProtocolAnthropic},
+		{Pattern: "anthropic/*", Protocol: APIProtocolAnthropic},
+	}, profile.Endpoints(AccountModePayG).ProtocolRules)
+
+	account := &Account{
+		Platform: PlatformShareLLM,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":      "sk-test",
+			"account_mode": AccountModePayG,
+			"api_protocol": APIProtocolAdaptive,
+		},
+	}
+	require.True(t, account.IsMultiProtocolAPIKey())
+	require.True(t, account.routesByModel())
+	require.False(t, account.SupportsNativeCNResponses())
+	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "claude-sonnet-4-6", nil))
+	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolAnthropic, "deepseek-v4-flash", nil))
+	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1", nil))
 }

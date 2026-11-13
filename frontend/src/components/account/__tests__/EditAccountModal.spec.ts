@@ -654,6 +654,45 @@ describe('EditAccountModal', () => {
       expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.api_base_urls).not.toHaveProperty('responses')
     })
 
+    it('edits ShareLLM aggregate accounts using their profile endpoints and routing rules', async () => {
+      const account = buildAccount()
+      account.platform = 'sharellm'
+      account.credentials = {
+        api_key: 'sk-sharellm',
+        account_mode: 'payg',
+        api_protocol: 'adaptive',
+        base_url: 'https://sharellm.net/v1',
+        api_base_urls: {
+          chat_completions: 'https://sharellm.net/v1',
+          anthropic: 'https://sharellm.net'
+        },
+        protocol_rules: [
+          { pattern: 'claude-*', protocol: 'anthropic' },
+          { pattern: 'anthropic/*', protocol: 'anthropic' }
+        ]
+      }
+      updateAccountMock.mockReset().mockResolvedValue(account)
+      checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+
+      const wrapper = mountModal(account)
+      await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+      expect(updateAccountMock).toHaveBeenCalledTimes(1)
+      expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
+        account_mode: 'payg',
+        api_protocol: 'adaptive',
+        base_url: 'https://sharellm.net/v1',
+        api_base_urls: {
+          chat_completions: 'https://sharellm.net/v1',
+          anthropic: 'https://sharellm.net'
+        },
+        protocol_rules: [
+          { pattern: 'claude-*', protocol: 'anthropic' },
+          { pattern: 'anthropic/*', protocol: 'anthropic' }
+        ]
+      })
+    })
+
     it('offers the provider modes and keeps customised endpoints when switching mode', async () => {
       const wrapper = mountModal(commandCodeAccount())
       const modeButtons = wrapper.get('[data-testid="edit-generic-account-mode"]').findAll('button')

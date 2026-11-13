@@ -191,6 +191,23 @@ var providerProfiles = map[string]*ProviderProfile{
 			},
 		},
 	},
+	PlatformShareLLM: {
+		Platform:    PlatformShareLLM,
+		DefaultMode: AccountModePayG,
+		Routing:     ProviderRoutingByModel,
+		Modes: map[string]ProviderEndpoints{
+			AccountModePayG: {
+				BaseURLs: map[string]string{
+					APIProtocolChatCompletions: DefaultShareLLMBaseURL,
+					APIProtocolAnthropic:       DefaultShareLLMAnthropicBaseURL,
+				},
+				ProtocolRules: []ProtocolRule{
+					{Pattern: "claude-*", Protocol: APIProtocolAnthropic},
+					{Pattern: "anthropic/*", Protocol: APIProtocolAnthropic},
+				},
+			},
+		},
+	},
 	PlatformCommandCode: {
 		Platform:         PlatformCommandCode,
 		DefaultMode:      AccountModePayG,

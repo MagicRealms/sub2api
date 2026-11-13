@@ -871,6 +871,33 @@ func TestBuildUpstreamModelsRequest_AnthropicProtocol(t *testing.T) {
 	require.NotContains(t, shareLLMReq.URL.Host, "bigmodel.cn")
 }
 
+func TestShareLLMUpstreamModelSyncUsesOpenAICompatibleCatalog(t *testing.T) {
+	t.Parallel()
+
+	svc := &AccountTestService{cfg: &config.Config{}}
+	account := &Account{
+		ID:       3,
+		Platform: PlatformShareLLM,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":      "sk-sharellm-test",
+			"account_mode": AccountModePayG,
+			"api_protocol": APIProtocolAdaptive,
+			"api_base_urls": map[string]any{
+				APIProtocolChatCompletions: "https://sharellm.net/v1",
+				APIProtocolAnthropic:       "https://sharellm.net",
+				APIProtocolResponses:       "https://sharellm.net/v1",
+			},
+		},
+	}
+
+	req, err := svc.buildUpstreamModelsRequest(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, "https://sharellm.net/v1/models", req.URL.String())
+	require.Equal(t, "Bearer sk-sharellm-test", req.Header.Get("Authorization"))
+	require.Empty(t, req.Header.Get("x-api-key"))
+}
+
 // TestBuildOpenAIResponsesURLForPlatform deepseek 官方端点为 /responses（无 /v1）。
 func TestBuildOpenAIResponsesURLForPlatform(t *testing.T) {
 	t.Parallel()

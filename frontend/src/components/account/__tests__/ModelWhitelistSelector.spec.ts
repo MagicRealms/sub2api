@@ -114,7 +114,7 @@ describe('ModelWhitelistSelector', () => {
     resetPlatformCatalog()
   })
 
-  it.each(['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'])(
+  it.each(['anthropic', 'openai', 'gemini', 'antigravity', 'grok', 'kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'sharellm', 'command_code', 'cline'])(
     'supports upstream sync for %s saved accounts and creation previews',
     (platform) => {
       const wrappers = [
@@ -146,6 +146,7 @@ describe('ModelWhitelistSelector', () => {
 
   it('shows the saved-account auto-sync schedule and emits changes', async () => {
     const wrapper = mountSelector({
+      platform: 'sharellm',
       accountId: 46,
       autoSyncConfig: { enabled: false, intervalHours: '1' }
     })
@@ -239,6 +240,17 @@ describe('ModelWhitelistSelector', () => {
 
     expect(wrapper.emitted('update:modelValue')).toEqual([[['gpt-5.6-sol']]])
     expect(copyToClipboard).not.toHaveBeenCalled()
+  })
+
+  it('keeps dynamically synced ShareLLM models available in the selector', async () => {
+    const wrapper = mountSelector({
+      platform: 'sharellm',
+      modelValue: ['claude-sonnet-4-6', 'deepseek-v4-flash']
+    })
+    await wrapper.get('div.cursor-pointer').trigger('click')
+
+    expect(findModelRow(wrapper, 'claude-sonnet-4-6').exists()).toBe(true)
+    expect(findModelRow(wrapper, 'deepseek-v4-flash').exists()).toBe(true)
   })
 
   it('warns when model IDs sync but capability metadata is incomplete', async () => {

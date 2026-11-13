@@ -50,6 +50,7 @@ const (
 	PlatformDeepseek    = domain.PlatformDeepseek
 	PlatformMiniMax     = domain.PlatformMiniMax
 	PlatformOpenCodeGo  = domain.PlatformOpenCodeGo
+	PlatformShareLLM    = domain.PlatformShareLLM
 	PlatformTypeSafe    = domain.PlatformTypeSafe
 	PlatformCommandCode = domain.PlatformCommandCode
 	PlatformCline       = domain.PlatformCline
@@ -85,6 +86,9 @@ const (
 	DefaultDeepseekBaseURL    = "https://api.deepseek.com"
 	// MiniMax 按量付费与 Coding/Token Plan 共用推理域名，靠 API Key 区分套餐。
 	DefaultMiniMaxBaseURL = "https://api.minimaxi.com/v1"
+	// ShareLLM uses /v1 for OpenAI-compatible APIs and the host root for Anthropic Messages.
+	DefaultShareLLMBaseURL          = "https://sharellm.net/v1"
+	DefaultShareLLMAnthropicBaseURL = "https://sharellm.net"
 	// OpenCode Go：Chat Completions / Responses / models 共用 /v1 基址。
 	DefaultOpenCodeGoBaseURL = "https://opencode.ai/zen/go/v1"
 	// OpenCode Zen：按量付费网关，模型列表为 /zen/v1/models。

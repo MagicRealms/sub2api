@@ -220,6 +220,35 @@
       }
     },
     {
+      "id": "sharellm",
+      "display_name": "ShareLLM 聚合",
+      "gateway": "openai",
+      "cn_provider": false,
+      "multi_protocol": {
+        "default_mode": "payg",
+        "routing": "by_model",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://sharellm.net",
+              "chat_completions": "https://sharellm.net/v1"
+            },
+            "protocol_rules": [
+              {
+                "pattern": "claude-*",
+                "protocol": "anthropic"
+              },
+              {
+                "pattern": "anthropic/*",
+                "protocol": "anthropic"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "id": "typesafe",
       "display_name": "TypeSafe / Jev",
       "gateway": "anthropic",
@@ -291,6 +320,7 @@
     "deepseek",
     "minimax",
     "opencode_go",
+    "sharellm",
     "typesafe",
     "command_code",
     "cline"
