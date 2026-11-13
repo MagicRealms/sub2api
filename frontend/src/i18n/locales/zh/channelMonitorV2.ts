@@ -38,7 +38,7 @@ export default {
       bestCache: '缓存优选', noSamples: '暂无模型样本', noTraffic: '暂无数据',
       healthy: '正常', warning: '需关注', critical: '异常', unknown: '无数据',
       window: '近 {range} · 北京时间', historyLabel: '历史状态',
-      historyHint: '绿 / 黄 / 红分别表示正常 / 需关注 / 异常；灰色表示无有效请求或该维度无测量值。按实际样本与配置阈值判定，低样本标注仅供参考。合并区间保留最差状态，悬停或点击查看采样点。',
+      historyHint: '只显示有实际请求的采样时段；绿 / 黄 / 红分别表示正常 / 需关注 / 异常，灰色仅表示该采样点缺少当前维度的有效测量值。按实际样本与配置阈值判定，低样本标注仅供参考。合并区间保留最差状态，悬停或点击查看采样点。',
       limited: '少量样本',
       limitedHint: '样本量尚未达到配置的统计门槛，颜色反映当前观察值，仅供参考。',
       sampleAt: '采样点 {time}',

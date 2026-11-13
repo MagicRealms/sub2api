@@ -38,7 +38,7 @@ export default {
       bestCache: 'Top cache', noSamples: 'No model samples', noTraffic: 'No data',
       healthy: 'Healthy', warning: 'Attention', critical: 'Critical', unknown: 'No data',
       window: 'Last {range} · Beijing time', historyLabel: 'History',
-      historyHint: 'Green / yellow / red mean healthy / attention / critical. Gray means no eligible requests or no measurement for this dimension. Colors use observed samples and configured thresholds; limited samples are marked. Each display interval retains its worst state. Hover or tap for details.',
+      historyHint: 'Only sampled periods with actual requests are shown. Green / yellow / red mean healthy / attention / critical; gray only means this metric has no valid measurement for that sample. Colors use observed samples and configured thresholds; limited samples are marked. Each display interval retains its worst state. Hover or tap for details.',
       limited: 'Limited samples',
       limitedHint: 'The configured statistical sample minimum has not been reached. Colors describe current observations and are indicative only.',
       sampleAt: 'Sample at {time}',
