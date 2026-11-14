@@ -16,13 +16,13 @@ function render(cards: MonitorGroupCard[]) {
   return mount(MonitorGroupCards, { props: { cards, coverage, healthMode: 'overall', rangeLabel: '90分钟' }, global: { plugins: [createI18n({ legacy: false, locale: 'zh', messages: { zh: messages } })], stubs: { FloatingPanel: true } } })
 }
 describe('MonitorGroupCards observed health', () => {
-  it('renders seven cells and carries sampled red/yellow/green observations through idle slots', () => {
+  it('renders twelve cells from real observations and retained state', () => {
     const wrapper = render([card(6)])
-    expect(wrapper.findAll('.group-history .health-healthy')).toHaveLength(2)
-    expect(wrapper.findAll('.group-history .health-warning')).toHaveLength(2)
-    expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(3)
+    expect(wrapper.findAll('.group-history .health-healthy')).toHaveLength(10)
+    expect(wrapper.findAll('.group-history .health-warning')).toHaveLength(1)
+    expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(1)
     expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(0)
-    expect(wrapper.findAll('.group-history button')).toHaveLength(7)
+    expect(wrapper.findAll('.group-history button')).toHaveLength(12)
     expect(wrapper.text()).toContain('少量样本')
   })
   it('keeps an observed sample unknown when its selected metric is unavailable', async () => {
@@ -30,8 +30,8 @@ describe('MonitorGroupCards observed health', () => {
     data.buckets[0]!.health.ttft = 'unknown'
     const wrapper = render([data])
     await wrapper.setProps({ healthMode: 'ttft' })
-    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(2)
-    expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(3)
+    expect(wrapper.findAll('.group-history .health-unknown')).toHaveLength(10)
+    expect(wrapper.findAll('.group-history .health-critical')).toHaveLength(1)
   })
   it('uses the group platform brand marks and colors, independent of health or order', async () => {
     const a = card(6), b = card(16)
@@ -56,6 +56,25 @@ describe('MonitorGroupCards observed health', () => {
     const wrapper = render([data])
     expect(wrapper.findAll('dd').map(x => x.text())).toEqual(['—', '—', '—'])
     expect(wrapper.find('header .status-dot').classes()).toContain('health-unknown')
-    expect(wrapper.findAll('.group-history button')).toHaveLength(7)
+    expect(wrapper.findAll('.group-history button')).toHaveLength(12)
+  })
+  it('uses probe observations in cells without an extra probe row or invented metrics', async () => {
+    const data = card(6)
+    data.has_traffic = false; data.has_cache_samples = false; data.buckets = []
+    data.probe_history = [{ checked_at: '2026-11-08T00:00:00Z', status: 'operational', model: 'probe-model', latency_ms: 500 }]
+    const wrapper = render([data])
+    expect(wrapper.findAll('.group-history .health-healthy')).toHaveLength(12)
+    expect(wrapper.findAll('dd').map(x => x.text())).toEqual(['—', '—', '—'])
+    expect(wrapper.text()).not.toContain('探针 · probe-model')
+    expect(wrapper.find('.group-history button').attributes('aria-label')).toContain('探针 · probe-model')
+    await wrapper.setProps({ cards: [{ ...data, probe_history: [...data.probe_history, { checked_at: '2026-11-08T01:00:00Z', status: 'degraded', model: 'probe-model' }] }] })
+    expect(wrapper.findAll('.group-history .health-warning')).toHaveLength(1)
+  })
+  it('keeps existing request history when a refresh has no new traffic', async () => {
+    const data = card(6)
+    const wrapper = render([data])
+    const colors = wrapper.findAll('.group-history button').map(cell => cell.classes())
+    await wrapper.setProps({ cards: [{ ...data, buckets: [], has_traffic: false }], coverage: { ...coverage, requested_start: '2026-11-08T03:00:00Z', requested_end: '2026-11-08T04:30:00Z' } })
+    expect(wrapper.findAll('.group-history button').map(cell => cell.classes())).toEqual(colors)
   })
 })

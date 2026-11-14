@@ -45,12 +45,12 @@ func TestChannelMonitorV2ProbeClaimAdvancesConfigurableDeadlineAtomically(t *tes
 	defer db.Close()
 
 	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(`(?s)WITH due.*UPDATE channel_monitor_v2_config.*make_interval.*SELECT probe_api_key_id, probe_group_id, probe_model`).
+	mock.ExpectQuery(`(?s)WITH due.*FOR UPDATE OF t SKIP LOCKED LIMIT 1.*UPDATE channel_monitor_v2_probe_targets.*make_interval.*SELECT id, api_key_id, group_id, model`).
 		WithArgs(now).
-		WillReturnRows(sqlmock.NewRows([]string{"probe_api_key_id", "probe_group_id", "probe_model"}).AddRow(12, 34, "gpt-6.1"))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "api_key_id", "group_id", "model", "paused"}).AddRow(5, 12, 34, "gpt-6.1", false))
 	job, err := (&channelMonitorV2Repository{db: db}).ClaimDueProbe(context.Background(), now)
 	require.NoError(t, err)
-	require.Equal(t, &service.ChannelMonitorV2ProbeJob{APIKeyID: 12, GroupID: 34, Model: "gpt-6.1"}, job)
+	require.Equal(t, &service.ChannelMonitorV2ProbeJob{TargetID: 5, APIKeyID: 12, GroupID: 34, Model: "gpt-6.1"}, job)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -61,11 +61,38 @@ func TestChannelMonitorV2ProbeResultStoredSeparatelyFromPassiveMetrics(t *testin
 
 	checkedAt := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
 	latency := int64(850)
-	mock.ExpectExec(`UPDATE channel_monitor_v2_config\s+SET probe_last_checked_at = \$1, probe_status = \$2, probe_latency_ms = \$3, probe_message = \$4`).
-		WithArgs(checkedAt, "operational", latency, "").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)UPDATE channel_monitor_v2_probe_targets.*WHERE id = \$5 AND api_key_id = \$6 AND model = \$7.*RETURNING group_id, model`).
+		WithArgs(checkedAt, "operational", latency, "", int64(5), int64(12), "gpt-6.1").
+		WillReturnRows(sqlmock.NewRows([]string{"group_id", "model"}).AddRow(34, "gpt-6.1"))
+	mock.ExpectExec(`INSERT INTO channel_monitor_v2_probe_history`).WithArgs(int64(34), "gpt-6.1", checkedAt, "operational", latency).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`(?s)DELETE FROM channel_monitor_v2_probe_history.*LIMIT 12`).WithArgs(int64(34)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 	err = (&channelMonitorV2Repository{db: db}).StoreProbeResult(context.Background(), service.ChannelMonitorV2ProbeResult{
-		CheckedAt: checkedAt, Status: "operational", LatencyMs: &latency,
+		TargetID: 5, APIKeyID: 12, Model: "gpt-6.1", CheckedAt: checkedAt, Status: "operational", LatencyMs: &latency,
 	})
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestChannelMonitorV2ProbeHistoryEmptyViewerScopeDoesNotQuery(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	history, err := (&channelMonitorV2Repository{db: db}).ListProbeHistory(context.Background(), service.ChannelMonitorV2Filter{RestrictGroups: true}, service.ChannelMonitorV2Config{})
+	require.NoError(t, err)
+	require.Empty(t, history)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestChannelMonitorV2ProbeResultIgnoresRemovedOrChangedTarget(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	mock.ExpectBegin()
+	mock.ExpectQuery(`(?s)UPDATE channel_monitor_v2_probe_targets.*WHERE id = \$5 AND api_key_id = \$6 AND model = \$7`).WillReturnRows(sqlmock.NewRows([]string{"group_id", "model"}))
+	mock.ExpectRollback()
+	err = (&channelMonitorV2Repository{db: db}).StoreProbeResult(context.Background(), service.ChannelMonitorV2ProbeResult{TargetID: 5, APIKeyID: 12, Model: "removed"})
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

@@ -3,11 +3,34 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+type channelMonitorV2UnreadyProbeRepo struct {
+	channelMonitorV2RepoStub
+	claims int
+}
+
+func (r *channelMonitorV2UnreadyProbeRepo) ClaimDueProbe(context.Context, time.Time) (*ChannelMonitorV2ProbeJob, error) {
+	r.claims++
+	return nil, nil
+}
+
+func (r *channelMonitorV2UnreadyProbeRepo) StoreProbeResult(context.Context, ChannelMonitorV2ProbeResult) error {
+	return nil
+}
+
+func TestChannelMonitorV2ProbeWaitsForLocalGatewayBeforeClaiming(t *testing.T) {
+	repo := &channelMonitorV2UnreadyProbeRepo{}
+	s := NewChannelMonitorV2Aggregator(repo, nil, nil)
+	s.SetProbeService(&ChannelMonitorService{})
+	require.False(t, s.runDueProbe(context.Background()))
+	require.Zero(t, repo.claims, "startup must not consume the next probe deadline before the gateway is ready")
+}
 
 func TestChannelMonitorV2MaxChunkForDepth(t *testing.T) {
 	now := time.Date(2026, 8, 8, 12, 0, 0, 0, time.UTC)

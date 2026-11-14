@@ -185,12 +185,16 @@ func TestChannelMonitorV2ConfigValidation(t *testing.T) {
 	cfg.Probe.Enabled = true
 	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
 	keyID, groupID := int64(1), int64(3)
-	cfg.Probe.APIKeyID, cfg.Probe.GroupID, cfg.Probe.Model = &keyID, &groupID, "gpt-6.1"
+	cfg.Probe.APIKeyID = &keyID
+	cfg.Probe.Targets = []ChannelMonitorV2ProbeTarget{{GroupID: groupID, Model: "gpt-6.1"}}
 	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
 	probeOnlyGroup := int64(9)
-	cfg.Probe.GroupID = &probeOnlyGroup
+	cfg.Probe.Targets = append(cfg.Probe.Targets, ChannelMonitorV2ProbeTarget{GroupID: probeOnlyGroup, Model: "claude-sonnet"})
 	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
 	require.Equal(t, []int64{1, 3, 9}, cfg.GroupIDs)
+	cfg.Probe.Targets = append(cfg.Probe.Targets, cfg.Probe.Targets[0])
+	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
+	cfg.Probe.Targets = cfg.Probe.Targets[:2]
 	cfg.Probe.IntervalSeconds = 1800
 	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
 	cfg.Probe.IntervalSeconds = 15
@@ -550,6 +554,7 @@ func TestSnapshotRedactsPublicConfigPolicyFields(t *testing.T) {
 				GroupIDs:               []int64{1, 2},
 				IgnoredErrorCategories: []string{"timeout"},
 				UpdatedBy:              &updatedBy,
+				Probe:                  ChannelMonitorV2Probe{Enabled: true, APIKeyID: &updatedBy, Targets: []ChannelMonitorV2ProbeTarget{{GroupID: 1, Model: "private-config-model", Message: "operator-only"}}},
 			},
 			Metrics: ChannelMonitorV2Metric{RequestCount: 100, ErrorRate: 0.1, SuccessRate: 0.9, RPM: 5},
 		},
@@ -563,6 +568,8 @@ func TestSnapshotRedactsPublicConfigPolicyFields(t *testing.T) {
 	require.Empty(t, snap.Config.GroupIDs)
 	require.Empty(t, snap.Config.IgnoredErrorCategories)
 	require.Nil(t, snap.Config.UpdatedBy)
+	require.Nil(t, snap.Config.Probe.APIKeyID)
+	require.Empty(t, snap.Config.Probe.Targets)
 	require.Empty(t, snap.Config.Platforms[0].Models)
 	require.Equal(t, 300, snap.Config.RefreshIntervalSeconds)
 	require.Zero(t, snap.Metrics.RequestCount)

@@ -127,10 +127,14 @@ export interface MonitorConfig {
 export interface MonitorProbe {
   enabled: boolean
   api_key_id?: number | null
-  group_id?: number | null
-  model: string
+  targets: MonitorProbeTarget[]
   interval_seconds: number
   pause_after_traffic_seconds: number
+}
+
+export interface MonitorProbeTarget {
+  group_id: number
+  model: string
   next_run_at?: string | null
   suppressed_until?: string | null
   last_checked_at?: string | null
@@ -195,20 +199,20 @@ export interface MonitorMatrixResponse {
 export interface MonitorGroupCard extends MonitorMatrixRow {
   has_traffic: boolean
   has_cache_samples: boolean
-  probe?: {
-    enabled: boolean
-    model?: string
-    status?: string
-    latency_ms?: number | null
-    last_checked_at?: string | null
-    suppressed_until?: string | null
-    message?: string
-  }
+  probe_history?: MonitorProbeObservation[]
+}
+
+export interface MonitorProbeObservation {
+  checked_at: string
+  model: string
+  status: string
+  latency_ms?: number | null
 }
 
 export interface MonitorGroupCardsResponse {
   coverage: MonitorCoverage
   items: MonitorGroupCard[]
+  probe_history_by_group?: Record<string, MonitorProbeObservation[]>
 }
 
 export interface MonitorDimensions {

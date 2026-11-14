@@ -111,6 +111,7 @@ func (s *ChannelMonitorV2Aggregator) Start() {
 			}
 		}
 		go s.loop()
+		go s.probeLoop()
 	})
 }
 
@@ -239,8 +240,6 @@ func (s *ChannelMonitorV2Aggregator) runOnce() {
 	if release != nil {
 		defer release()
 	}
-	s.runHourlyProbe(ctx)
-
 	now := time.Now().UTC().Truncate(time.Minute)
 	if err := s.ensureCursor(ctx, now); err != nil {
 		logger.LegacyPrintf("service.channel_monitor_v2", "[ChannelMonitorV2] load watermark failed: %v", err)
@@ -315,13 +314,41 @@ func (s *ChannelMonitorV2Aggregator) runOnce() {
 	s.recordBackfillSuccess(start, time.Since(started), now)
 }
 
-func (s *ChannelMonitorV2Aggregator) runHourlyProbe(parent context.Context) {
-	if s == nil || s.probeService == nil {
-		return
+// Probe work uses its own serial loop. An upstream timeout cannot hold up the
+// passive aggregation cursor, and many selected groups do not wait one full
+// aggregation period each before being checked.
+func (s *ChannelMonitorV2Aggregator) probeLoop() {
+	for {
+		s.mu.Lock()
+		ctx := s.ctx
+		s.mu.Unlock()
+		if ctx == nil || ctx.Err() != nil {
+			return
+		}
+		if s.passiveAggregationAllowed(ctx) {
+			for i := 0; i < 64 && ctx.Err() == nil; i++ {
+				if !s.passiveAggregationAllowed(ctx) || !s.runDueProbe(ctx) {
+					break
+				}
+			}
+		}
+		timer := time.NewTimer(time.Minute)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func (s *ChannelMonitorV2Aggregator) runDueProbe(parent context.Context) bool {
+	if s == nil || s.probeService == nil || s.probeService.localProbeKeys() == nil {
+		return false
 	}
 	probeRepo, ok := s.repo.(ChannelMonitorV2ProbeRepository)
 	if !ok {
-		return
+		return false
 	}
 	ctx, cancel := context.WithTimeout(parent, 50*time.Second)
 	defer cancel()
@@ -330,11 +357,14 @@ func (s *ChannelMonitorV2Aggregator) runHourlyProbe(parent context.Context) {
 		if err != nil {
 			logger.LegacyPrintf("service.channel_monitor_v2", "[ChannelMonitorV2] probe claim failed: %v", err)
 		}
-		return
+		return false
+	}
+	if job.Paused {
+		return true
 	}
 	result := s.probeService.RunV2LocalProbe(ctx, job.APIKeyID, job.GroupID, job.Model)
 	if result == nil {
-		return
+		return true
 	}
 	var latency *int64
 	if result.LatencyMs != nil {
@@ -342,6 +372,9 @@ func (s *ChannelMonitorV2Aggregator) runHourlyProbe(parent context.Context) {
 		latency = &value
 	}
 	if err := probeRepo.StoreProbeResult(ctx, ChannelMonitorV2ProbeResult{
+		TargetID:  job.TargetID,
+		APIKeyID:  job.APIKeyID,
+		Model:     job.Model,
 		CheckedAt: result.CheckedAt,
 		Status:    result.Status,
 		LatencyMs: latency,
@@ -349,6 +382,7 @@ func (s *ChannelMonitorV2Aggregator) runHourlyProbe(parent context.Context) {
 	}); err != nil {
 		logger.LegacyPrintf("service.channel_monitor_v2", "[ChannelMonitorV2] probe result save failed: %v", err)
 	}
+	return true
 }
 
 // channelMonitorV2MaxChunkForDepth returns the hard ceiling for a historical

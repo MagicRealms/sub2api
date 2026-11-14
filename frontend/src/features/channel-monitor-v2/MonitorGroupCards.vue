@@ -18,18 +18,13 @@
             <span v-if="card.health.sample_limited" class="ml-1.5 text-[10px] text-gray-400" :title="t('channelMonitorV2.cards.limitedHint')">{{ t('channelMonitorV2.cards.limited') }}</span>
           </div>
           <span class="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-gray-600 dark:text-gray-300">
-            <i class="status-dot" :class="cellClass(card.health, card.has_traffic)" />{{ statusLabel(card) }}
+            <i class="status-dot" :class="`health-${groupHistoryState(slots[slots.length - 1]!, healthMode)}`" />{{ statusLabel(slots) }}
           </span>
         </header>
         <div class="mt-3 flex min-w-0 items-center gap-1.5 rounded-lg bg-gray-50 px-2.5 py-1.5 dark:bg-dark-900/50" :title="t('channelMonitorV2.cards.selectionHint')">
           <Icon name="cube" size="sm" class="shrink-0 text-gray-400" />
           <span class="min-w-0 truncate font-mono text-xs text-gray-700 dark:text-gray-300" :title="modelLabel(card)">{{ modelLabel(card) }}</span>
           <span v-if="card.has_cache_samples" class="ml-auto shrink-0 text-[10px] text-primary-600 dark:text-primary-300">{{ t('channelMonitorV2.cards.bestCache') }}</span>
-        </div>
-        <div v-if="card.probe" class="mt-2 flex items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/70 px-2.5 py-1.5 text-[11px] dark:border-primary-900/40 dark:bg-primary-900/20">
-          <span class="truncate text-primary-700 dark:text-primary-200" :title="card.probe.message || undefined">{{ t('channelMonitorV2.cards.probe', { model: card.probe.model || '—' }) }}</span>
-          <span class="shrink-0 font-semibold" :class="probeClass(card.probe.status)">{{ probeLabel(card.probe.status) }}<template v-if="card.probe.latency_ms != null"> · {{ card.probe.latency_ms }}ms</template></span>
-          <span v-if="card.probe.status === 'paused_traffic' && card.probe.suppressed_until" class="shrink-0 text-[10px] text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.cards.probePausedUntil', { time: time(card.probe.suppressed_until) }) }}</span>
         </div>
         <dl class="mt-4 grid grid-cols-3 gap-2">
           <div class="rounded-2xl border border-gray-100 bg-gray-50/60 px-2.5 py-3 dark:border-dark-700 dark:bg-dark-900/30">
@@ -54,10 +49,10 @@
             <span v-for="state in ['healthy', 'warning', 'critical', 'unknown']" :key="state" class="inline-flex items-center gap-1"><i class="status-dot" :class="`health-${state}`" />{{ t(`channelMonitorV2.cards.${state}`) }}</span>
           </div>
           <div class="group-history flex h-5 items-stretch gap-[3px]" :aria-label="t('channelMonitorV2.cards.historyHint')">
-            <button v-for="slot in slots" :key="slot.start" type="button" class="min-w-0 flex-1 rounded-full transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" :class="slot.bucket ? cellClass(slot.bucket.health, true) : 'health-unknown'" :aria-label="slotLabel(slot)" @mouseenter="showTooltip($event, slot)" @mouseleave="closeTooltip" @focus="showTooltip($event, slot)" @blur="closeTooltip" @click="showTooltip($event, slot)" />
+            <button v-for="(slot, index) in slots" :key="index" type="button" class="min-w-0 flex-1 rounded-md transition-opacity hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500" :class="`health-${groupHistoryState(slot, healthMode)}`" :aria-label="slotLabel(slot)" @mouseenter="showTooltip($event, slot)" @mouseleave="closeTooltip" @focus="showTooltip($event, slot)" @blur="closeTooltip" @click="showTooltip($event, slot)" />
           </div>
           <div class="mt-1.5 flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
-            <span>{{ time(coverage.requested_start) }}</span><span>{{ time(coverage.requested_end || coverage.data_through) }}</span>
+            <span>{{ slots[0]?.start ? time(slots[0].start) : '—' }}</span><span>{{ slots[slots.length - 1]?.start ? time(slots[slots.length - 1]!.start) : '—' }}</span>
           </div>
         </div>
       </article>
@@ -66,8 +61,15 @@
     <p class="mt-4 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">{{ t('channelMonitorV2.cards.historyHint') }}</p>
     <FloatingPanel :open="!!tooltipSlot" :anchor="tooltipAnchor" :min-width="220" :max-height="300" role="tooltip" class="group-history-tooltip rounded-2xl border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-700 shadow-xl dark:border-dark-600 dark:bg-dark-800 dark:text-gray-200" @close="closeTooltip">
       <template v-if="tooltipSlot">
-        <p class="font-semibold">{{ time(tooltipSlot.start) }} — {{ time(tooltipSlot.end) }}</p>
-        <template v-if="tooltipSlot.bucket">
+        <p v-if="tooltipSlot.start" class="font-semibold">{{ time(tooltipSlot.start) }}<template v-if="!tooltipSlot.probe"> — {{ time(tooltipSlot.end) }}</template></p>
+        <p v-if="tooltipSlot.carried" class="my-1 text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.cards.carriedHint') }}</p>
+        <template v-if="tooltipSlot.probe">
+          <p class="font-semibold" :class="groupHistoryState(tooltipSlot, healthMode) === 'healthy' ? 'text-emerald-600' : groupHistoryState(tooltipSlot, healthMode) === 'warning' ? 'text-amber-600' : 'text-rose-600'">{{ probeLabel(tooltipSlot.probe.status) }}</p>
+          <p class="mt-1 text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.cards.probe', { model: tooltipSlot.probe.model }) }}</p>
+          <p v-if="tooltipSlot.probe.latency_ms != null">{{ t('channelMonitorV2.cards.probeLatency', { value: formatMonitorMs(tooltipSlot.probe.latency_ms) }) }}</p>
+          <p class="mt-1 text-gray-400">{{ t('channelMonitorV2.cards.probeSampleHint') }}</p>
+        </template>
+        <template v-else-if="tooltipSlot.bucket">
           <p class="font-medium" :class="tooltipSlot.bucket.health.sample_limited ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500'">{{ t(`channelMonitorV2.cards.${healthModeState(tooltipSlot.bucket.health, healthMode)}`) }}</p>
           <p v-if="tooltipSlot.bucket.health.sample_limited" class="my-1 text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.cards.limitedHint') }}</p>
           <p class="mb-2 text-gray-400">{{ t('channelMonitorV2.cards.sampleAt', { time: time(tooltipSlot.bucket.bucket_start) }) }}</p>
@@ -84,31 +86,31 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { MonitorCoverage, MonitorGroupCard, MonitorHealth, MonitorMatrixBucket } from '@/api/channelMonitorV2'
+import type { MonitorCoverage, MonitorGroupCard, MonitorMatrixBucket } from '@/api/channelMonitorV2'
 import type { GroupPlatform } from '@/types'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import FloatingPanel from '@/components/common/FloatingPanel.vue'
 import { platformBadgeLightClass } from '@/utils/platformColors'
 import { formatLatencyPrivacy, formatMonitorMs, formatMonitorPercent, healthModeState, type HealthDisplayMode } from './monitorFormat'
-import { groupCardHistory, type GroupHistorySlot } from './groupCardHistory'
+import { groupCardHistory, groupHistoryState, type GroupHistorySlot } from './groupCardHistory'
 
-const props = defineProps<{ cards: MonitorGroupCard[]; coverage: MonitorCoverage; healthMode: HealthDisplayMode; rangeLabel: string }>()
+const props = defineProps<{ cards: MonitorGroupCard[]; coverage: MonitorCoverage; healthMode: HealthDisplayMode; rangeLabel: string; scopeKey?: string }>()
 const { t, locale } = useI18n()
-const retainedBuckets = ref(new Map<number, MonitorMatrixBucket>())
+const retainedBuckets = ref(new Map<number, MonitorMatrixBucket[]>())
+watch(() => props.scopeKey, () => { retainedBuckets.value = new Map() })
 watch(() => props.cards, cards => {
   const next = new Map(retainedBuckets.value)
   for (const card of cards) {
     if (card.group_id == null) continue
-    const latest = [...card.buckets]
-      .sort((a, b) => Date.parse(b.bucket_start) - Date.parse(a.bucket_start))[0]
-    if (latest) next.set(card.group_id, latest)
+    const merged = new Map([...(next.get(card.group_id) || []), ...card.buckets].map(bucket => [bucket.bucket_start, bucket]))
+    next.set(card.group_id, [...merged.values()].sort((a, b) => Date.parse(a.bucket_start) - Date.parse(b.bucket_start)).slice(-12))
   }
   retainedBuckets.value = next
 }, { immediate: true })
 const entries = computed(() => props.cards.map(card => ({
   card,
-  slots: groupCardHistory(card.buckets, props.coverage, props.healthMode, card.group_id == null ? undefined : retainedBuckets.value.get(card.group_id)),
+  slots: groupCardHistory(card.group_id == null ? card.buckets : retainedBuckets.value.get(card.group_id) || card.buckets, props.coverage, props.healthMode, undefined, card.probe_history),
 })))
 const tooltipSlot = ref<GroupHistorySlot | null>(null)
 const tooltipAnchor = ref<HTMLElement | null>(null)
@@ -118,7 +120,6 @@ function showTooltip(event: MouseEvent | FocusEvent, slot: GroupHistorySlot) {
   tooltipSlot.value = slot
 }
 watch(() => [props.cards, props.healthMode, props.coverage], closeTooltip)
-function cellClass(health: MonitorHealth, sampled: boolean) { return `health-${sampled ? healthModeState(health, props.healthMode) : 'unknown'}` }
 function modelLabel(card: MonitorGroupCard) {
   if (!card.has_traffic || !card.model) return t('channelMonitorV2.cards.noSamples')
   return card.model === '__other__' ? t('channelMonitorV2.otherModels') : card.model
@@ -127,16 +128,8 @@ function providerName(platform: string) {
   const names: Record<string,string> = { openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', grok: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek', zhipu: 'GLM', kiro: 'Kiro', antigravity: 'Antigravity' }
   return names[platform] || platform || '—'
 }
-function statusLabel(card: MonitorGroupCard) {
-  if (!card.has_traffic) return t('channelMonitorV2.cards.noTraffic')
-  return t(`channelMonitorV2.cards.${healthModeState(card.health, props.healthMode)}`)
-}
-function probeClass(status?: string) {
-  if (status === 'operational') return 'text-emerald-600 dark:text-emerald-300'
-  if (status === 'degraded') return 'text-amber-600 dark:text-amber-300'
-  if (status === 'paused_traffic') return 'text-sky-600 dark:text-sky-300'
-  if (status) return 'text-rose-600 dark:text-rose-300'
-  return 'text-gray-500 dark:text-gray-400'
+function statusLabel(slots: GroupHistorySlot[]) {
+  return t(`channelMonitorV2.cards.${groupHistoryState(slots[slots.length - 1]!, props.healthMode)}`)
 }
 function probeLabel(status?: string) {
   if (status === 'operational') return t('channelMonitorV2.cards.probeOperational')
@@ -151,7 +144,8 @@ function time(value: string | number) {
   return new Intl.DateTimeFormat(locale.value || 'zh-CN', { timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date)
 }
 function slotLabel(slot: GroupHistorySlot) {
-  return `${time(slot.start)} — ${time(slot.end)} · ${slot.bucket ? t('channelMonitorV2.cards.sampleAt', { time: time(slot.bucket.bucket_start) }) : t('channelMonitorV2.matrix.noTraffic')}`
+  if (!slot.bucket && !slot.probe) return t('channelMonitorV2.matrix.noTraffic')
+  return `${time(slot.start)} · ${slot.probe ? t('channelMonitorV2.cards.probe', { model: slot.probe.model }) : t('channelMonitorV2.cards.sampleAt', { time: time(slot.start) })} · ${t(`channelMonitorV2.cards.${groupHistoryState(slot, props.healthMode)}`)}${slot.carried ? ' · ' + t('channelMonitorV2.cards.carriedHint') : ''}`
 }
 </script>
 

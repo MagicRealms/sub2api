@@ -230,6 +230,7 @@
             :coverage="cards.coverage"
             :health-mode="healthMode"
             :range-label="rangeLabel"
+            :scope-key="JSON.stringify([filter.platforms, filter.groupIds, filter.models])"
           />
           <div v-else-if="loading" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
             <div v-for="index in 6" :key="index" class="h-64 animate-pulse rounded-3xl bg-gray-100 dark:bg-dark-700" />
@@ -395,7 +396,11 @@ const bootstrapPercent = computed(() => {
 })
 const rangeLabel = computed(() => t(`channelMonitorV2.ranges.${filter.value.range}`))
 const groupCards = computed<MonitorGroupCard[]>(() => {
-  const rows = [...(cards.value?.items || [])]
+  const history = cards.value?.probe_history_by_group || {}
+  const rows = (cards.value?.items || []).map(row => ({
+    ...row,
+    probe_history: row.group_id != null ? history[String(row.group_id)] || row.probe_history : row.probe_history,
+  }))
   const present = new Set(rows.map(row => row.group_id))
   // The scoped catalog also includes configured groups with no sampled platform.
   // Show them explicitly as empty instead of silently omitting the group.
@@ -406,6 +411,7 @@ const groupCards = computed<MonitorGroupCard[]>(() => {
     rows.push({
       platform: group.platform || '', group_id: group.id, group_name: group.name,
       has_traffic: false, has_cache_samples: false, buckets: [],
+      probe_history: history[String(group.id)],
       metrics: { success_requests: 0, error_requests: 0, request_count: 0, token_count: 0,
         rpm: 0, tpm: 0, error_rate: 0, cache_rate: 0, cache_rate_numerator: 0, cache_rate_denominator: 0,
         ttft: { sample_count: 0, p50_ms: null, p95_ms: null, avg_ms: null },

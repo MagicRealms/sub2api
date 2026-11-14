@@ -91,26 +91,12 @@
           </div>
           <Toggle v-model="draft.probe.enabled" />
         </div>
-        <div class="grid grid-cols-1 gap-4 px-5 py-4 md:grid-cols-5">
+        <div class="grid grid-cols-1 gap-4 px-5 py-4 md:grid-cols-3">
           <label class="block">
             <span class="input-label">{{ t('channelMonitorV2.settings.probeKey') }}</span>
             <select v-model="draft.probe.api_key_id" class="input" :disabled="saving" @change="onProbeKeyChange">
               <option :value="null">{{ t('channelMonitorV2.settings.probeKeyPlaceholder') }}</option>
               <option v-for="key in adminKeys" :key="key.id" :value="key.id">{{ key.name || `#${key.id}` }} · #{{ key.id }}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="input-label">{{ t('channelMonitorV2.settings.probeGroup') }}</span>
-            <select v-model="draft.probe.group_id" class="input" :disabled="saving || !probeKey" @change="onProbeGroupChange">
-              <option :value="null">{{ t('channelMonitorV2.settings.probeGroupPlaceholder') }}</option>
-              <option v-for="group in probeGroups" :key="group.id" :value="group.id">{{ group.name }} · {{ platformLabel(group.platform) }}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="input-label">{{ t('channelMonitorV2.settings.probeModel') }}</span>
-            <select v-model="draft.probe.model" class="input" :disabled="saving || probeModelsLoading || !draft.probe.group_id">
-              <option value="">{{ probeModelsLoading ? t('channelMonitorV2.settings.probeModelsLoading') : t('channelMonitorV2.settings.probeModelPlaceholder') }}</option>
-              <option v-for="model in probeModels" :key="model" :value="model">{{ model }}</option>
             </select>
           </label>
           <label class="block">
@@ -126,11 +112,31 @@
             </select>
           </label>
         </div>
+        <div class="border-t border-gray-100 px-5 py-3 dark:border-dark-700">
+          <p class="mb-3 text-xs text-gray-500 dark:text-dark-400">{{ t('channelMonitorV2.settings.probeGroupsHint') }}</p>
+          <div class="grid gap-3 lg:grid-cols-2">
+            <div v-for="group in probeGroups" :key="group.id" class="rounded-2xl border p-3 transition-colors" :class="probeTarget(group.id) ? 'border-primary-300 bg-primary-50/60 dark:border-primary-700 dark:bg-primary-900/15' : 'border-gray-200 dark:border-dark-600'" :data-probe-group="group.id">
+              <label class="flex cursor-pointer items-center gap-2.5">
+                <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500/40" :checked="!!probeTarget(group.id)" :disabled="saving" @change="toggleProbeGroup(group.id)" />
+                <span class="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{{ group.name }}</span>
+                <small class="text-xs text-gray-400">{{ platformLabel(group.platform) }}</small>
+              </label>
+              <template v-if="probeTarget(group.id)">
+                <label class="mt-3 block">
+                  <span class="sr-only">{{ t('channelMonitorV2.settings.probeModel') }} · {{ group.name }}</span>
+                  <Select :model-value="probeTarget(group.id)!.model" :options="(probeModels[group.id] || []).map(model => ({ value: model, label: model }))" :disabled="saving || !!probeModelsLoading[group.id]" :placeholder="probeModelsLoading[group.id] ? t('channelMonitorV2.settings.probeModelsLoading') : t('channelMonitorV2.settings.probeModelPlaceholder')" searchable @update:model-value="setProbeModel(group.id, $event)" />
+                </label>
+                <p v-if="probeTarget(group.id)!.last_checked_at" class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
+                  {{ probeStatusLabel(probeTarget(group.id)!.status || '') }} · {{ t('channelMonitorV2.settings.probeLastRun', { time: probeTime(probeTarget(group.id)!.last_checked_at!) }) }}
+                  <span v-if="probeTarget(group.id)!.suppressed_until"> · {{ t('channelMonitorV2.settings.probePausedUntil', { time: probeTime(probeTarget(group.id)!.suppressed_until!) }) }}</span>
+                </p>
+              </template>
+            </div>
+          </div>
+          <p v-if="!probeGroups.length" class="py-3 text-sm text-gray-400">{{ t('channelMonitorV2.settings.probeGroupPlaceholder') }}</p>
+        </div>
         <div class="border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-dark-700 dark:text-dark-400">
           {{ t('channelMonitorV2.settings.probeSchedule', { interval: durationLabel(draft.probe.interval_seconds), pause: durationLabel(draft.probe.pause_after_traffic_seconds) }) }}
-          <span v-if="draft.probe.last_checked_at" class="ml-2">· {{ t('channelMonitorV2.settings.probeLastRun', { time: probeTime(draft.probe.last_checked_at) }) }}</span>
-          <span v-if="draft.probe.status" class="ml-2 font-medium" :class="draft.probe.status === 'operational' ? 'text-emerald-600' : draft.probe.status === 'paused_traffic' ? 'text-sky-600' : 'text-amber-600'">{{ probeStatusLabel(draft.probe.status) }}</span>
-          <span v-if="draft.probe.status === 'paused_traffic' && draft.probe.suppressed_until" class="ml-2">· {{ t('channelMonitorV2.settings.probePausedUntil', { time: probeTime(draft.probe.suppressed_until) }) }}</span>
         </div>
       </div>
 
@@ -357,8 +363,8 @@ const draft = ref<MonitorConfig | null>(null)
 const original = ref('')
 const groups = ref<AdminGroup[]>([])
 const adminKeys = ref<ApiKey[]>([])
-const probeModels = ref<string[]>([])
-const probeModelsLoading = ref(false)
+const probeModels = ref<Record<number, string[]>>({})
+const probeModelsLoading = ref<Record<number, boolean>>({})
 const probeIntervalOptions = [1800, 3600, 5400, 7200, 10800, 14400, 18000]
 const probePauseOptions = [3600, 7200, 10800, 14400, 21600, 43200]
 const visibleGroups = computed(() => groups.value.filter((group) => group.status === 'active' && !group.is_exclusive))
@@ -470,35 +476,50 @@ function toggleIgnoredCategory(category: string) {
   draft.value.ignored_error_categories = [...current].sort()
 }
 
-async function loadProbeModels() {
-  if (!draft.value?.probe?.api_key_id || !draft.value.probe.group_id) {
-    probeModels.value = []
-    return
-  }
-  probeModelsLoading.value = true
+function probeTarget(groupID: number) {
+  return draft.value?.probe.targets.find(target => target.group_id === groupID)
+}
+
+function setProbeModel(groupID: number, model: string | number | boolean | null | undefined) {
+  const target = probeTarget(groupID)
+  if (target) target.model = String(model || '')
+}
+
+async function loadProbeModels(groupID: number) {
+  const keyID = draft.value?.probe.api_key_id
+  if (!keyID) return
+  probeModelsLoading.value[groupID] = true
   try {
     if (typeof getProbeModels !== 'function') return
-    probeModels.value = await getProbeModels(draft.value.probe.api_key_id, draft.value.probe.group_id)
-    if (draft.value.probe.model && !probeModels.value.includes(draft.value.probe.model)) draft.value.probe.model = ''
+    const models = await getProbeModels(keyID, groupID)
+    if (draft.value?.probe.api_key_id !== keyID || !probeTarget(groupID)) return
+    probeModels.value[groupID] = models
+    const target = probeTarget(groupID)
+    if (target?.model && !models.includes(target.model)) target.model = ''
   } catch (error) {
-    probeModels.value = []
+    if (draft.value?.probe.api_key_id !== keyID) return
+    probeModels.value[groupID] = []
     appStore.showError(extractApiErrorMessage(error, t('channelMonitorV2.settings.probeModelsFailed')))
   } finally {
-    probeModelsLoading.value = false
+    if (draft.value?.probe.api_key_id === keyID) probeModelsLoading.value[groupID] = false
   }
 }
 
 function onProbeKeyChange() {
   if (!draft.value) return
-  draft.value.probe.group_id = null
-  draft.value.probe.model = ''
-  probeModels.value = []
+  draft.value.probe.targets = []
+  probeModels.value = {}
+  probeModelsLoading.value = {}
 }
 
-function onProbeGroupChange() {
+function toggleProbeGroup(groupID: number) {
   if (!draft.value) return
-  draft.value.probe.model = ''
-  void loadProbeModels()
+  const index = draft.value.probe.targets.findIndex(target => target.group_id === groupID)
+  if (index >= 0) draft.value.probe.targets.splice(index, 1)
+  else {
+    draft.value.probe.targets.push({ group_id: groupID, model: '' })
+    void loadProbeModels(groupID)
+  }
 }
 
 function categoryLabel(category: string) {
@@ -553,10 +574,11 @@ function normalizeConfig(value: MonitorConfig): MonitorConfig {
     probe: value.probe
       ? {
           ...value.probe,
+          targets: value.probe.targets || [],
           interval_seconds: value.probe.interval_seconds || 3600,
           pause_after_traffic_seconds: value.probe.pause_after_traffic_seconds || 10800,
         }
-      : { enabled: false, model: '', interval_seconds: 3600, pause_after_traffic_seconds: 10800 },
+      : { enabled: false, targets: [], interval_seconds: 3600, pause_after_traffic_seconds: 10800 },
     health_thresholds: { ...defaultThresholds, ...(value.health_thresholds || {}) },
     // Preserve explicit empty arrays from the server (operator cleared all).
     ignored_error_categories: [
@@ -589,7 +611,7 @@ async function load() {
 	})
 	draft.value = structuredClone(normalized)
     original.value = JSON.stringify(normalized)
-    await loadProbeModels()
+    for (const target of normalized.probe.targets) await loadProbeModels(target.group_id)
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('channelMonitorV2.settings.loadFailed')))
   } finally {

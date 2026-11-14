@@ -63,26 +63,29 @@ var channelMonitorV2ProbePauseOptions = []int{
 	12 * 60 * 60,
 }
 
-// ChannelMonitorV2Probe is the optional low-token active probe for one public
-// group. Runtime fields are returned for status display but are preserved by
-// the service when an administrator saves the operator configuration.
+// ChannelMonitorV2Probe controls low-token probes across selected public groups.
 type ChannelMonitorV2Probe struct {
-	Enabled         bool   `json:"enabled"`
-	APIKeyID        *int64 `json:"api_key_id,omitempty"`
-	GroupID         *int64 `json:"group_id,omitempty"`
-	Model           string `json:"model"`
-	IntervalSeconds int    `json:"interval_seconds"`
+	Enabled         bool                          `json:"enabled"`
+	APIKeyID        *int64                        `json:"api_key_id,omitempty"`
+	Targets         []ChannelMonitorV2ProbeTarget `json:"targets"`
+	IntervalSeconds int                           `json:"interval_seconds"`
+	ResetSchedule   bool                          `json:"-"`
 	// PauseAfterTrafficSeconds suppresses an active probe after the selected
 	// public group has received a normal successful request. This keeps the
 	// probe from spending a second request when real traffic already proves the
 	// route works; the scheduler checks again after this cooldown.
-	PauseAfterTrafficSeconds int        `json:"pause_after_traffic_seconds"`
-	NextRunAt                *time.Time `json:"next_run_at,omitempty"`
-	SuppressedUntil          *time.Time `json:"suppressed_until,omitempty"`
-	LastCheckedAt            *time.Time `json:"last_checked_at,omitempty"`
-	Status                   string     `json:"status,omitempty"`
-	LatencyMs                *int64     `json:"latency_ms,omitempty"`
-	Message                  string     `json:"message,omitempty"`
+	PauseAfterTrafficSeconds int `json:"pause_after_traffic_seconds"`
+}
+
+type ChannelMonitorV2ProbeTarget struct {
+	GroupID         int64      `json:"group_id"`
+	Model           string     `json:"model"`
+	NextRunAt       *time.Time `json:"next_run_at,omitempty"`
+	SuppressedUntil *time.Time `json:"suppressed_until,omitempty"`
+	LastCheckedAt   *time.Time `json:"last_checked_at,omitempty"`
+	Status          string     `json:"status,omitempty"`
+	LatencyMs       *int64     `json:"latency_ms,omitempty"`
+	Message         string     `json:"message,omitempty"`
 }
 
 type ChannelMonitorV2Config struct {
@@ -367,12 +370,17 @@ type ChannelMonitorV2Repository interface {
 }
 
 type ChannelMonitorV2ProbeJob struct {
+	TargetID int64
 	APIKeyID int64
 	GroupID  int64
 	Model    string
+	Paused   bool
 }
 
 type ChannelMonitorV2ProbeResult struct {
+	TargetID  int64
+	APIKeyID  int64
+	Model     string
 	CheckedAt time.Time
 	Status    string
 	LatencyMs *int64
@@ -384,6 +392,17 @@ type ChannelMonitorV2ProbeResult struct {
 type ChannelMonitorV2ProbeRepository interface {
 	ClaimDueProbe(ctx context.Context, now time.Time) (*ChannelMonitorV2ProbeJob, error)
 	StoreProbeResult(ctx context.Context, result ChannelMonitorV2ProbeResult) error
+}
+
+type ChannelMonitorV2ProbeHistoryRepository interface {
+	ListProbeHistory(ctx context.Context, filter ChannelMonitorV2Filter, config ChannelMonitorV2Config) (map[int64][]ChannelMonitorV2ProbeObservation, error)
+}
+
+type ChannelMonitorV2ProbeObservation struct {
+	CheckedAt time.Time `json:"checked_at"`
+	Model     string    `json:"model"`
+	Status    string    `json:"status"`
+	LatencyMs *int64    `json:"latency_ms,omitempty"`
 }
 
 // ChannelMonitorV2BootstrapProductWindow is the longest UI range that must be
@@ -539,37 +558,35 @@ func (s *ChannelMonitorV2Service) UpdateConfig(ctx context.Context, cfg ChannelM
 	if err != nil {
 		return nil, err
 	}
-	if current != nil {
-		probeTargetChanged := cfg.Probe.Enabled != current.Probe.Enabled ||
-			!sameMonitorID(cfg.Probe.APIKeyID, current.Probe.APIKeyID) ||
-			!sameMonitorID(cfg.Probe.GroupID, current.Probe.GroupID) || cfg.Probe.Model != current.Probe.Model ||
-			cfg.Probe.IntervalSeconds != current.Probe.IntervalSeconds ||
-			cfg.Probe.PauseAfterTrafficSeconds != current.Probe.PauseAfterTrafficSeconds
-		cfg.Probe.NextRunAt = current.Probe.NextRunAt
-		cfg.Probe.LastCheckedAt = current.Probe.LastCheckedAt
-		cfg.Probe.Status = current.Probe.Status
-		cfg.Probe.LatencyMs = current.Probe.LatencyMs
-		cfg.Probe.Message = current.Probe.Message
-		cfg.Probe.SuppressedUntil = current.Probe.SuppressedUntil
-		if cfg.Probe.Enabled && probeTargetChanged {
-			now := s.now().UTC()
-			cfg.Probe.NextRunAt = &now
-			cfg.Probe.SuppressedUntil = nil
-		}
-		if !cfg.Probe.Enabled {
-			cfg.Probe.NextRunAt = nil
-			cfg.Probe.SuppressedUntil = nil
-		}
-	}
 	if err := normalizeChannelMonitorV2Config(&cfg); err != nil {
 		return nil, err
 	}
+	cfg.Probe.ResetSchedule = false
+	if current != nil {
+		cfg.Probe.ResetSchedule = cfg.Probe.Enabled != current.Probe.Enabled ||
+			cfg.Enabled != current.Enabled || !sameMonitorID(cfg.Probe.APIKeyID, current.Probe.APIKeyID) ||
+			cfg.Probe.IntervalSeconds != current.Probe.IntervalSeconds ||
+			cfg.Probe.PauseAfterTrafficSeconds != current.Probe.PauseAfterTrafficSeconds
+	}
 	if cfg.Probe.Enabled {
-		if s.probe == nil {
-			return nil, fmt.Errorf("channel monitor v2 probe is unavailable")
+		if s.probe == nil || cfg.Probe.APIKeyID == nil || len(cfg.Probe.Targets) == 0 {
+			return nil, fmt.Errorf("%w: probe requires an API key and at least one group/model", ErrChannelMonitorV2InvalidConfig)
 		}
-		if err := s.probe.ValidateV2Probe(ctx, actorID, *cfg.Probe.APIKeyID, *cfg.Probe.GroupID, cfg.Probe.Model); err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrChannelMonitorV2InvalidConfig, err.Error())
+		publicIDs, err := s.repo.ListPublicActiveGroupIDs(ctx)
+		if err != nil {
+			return nil, err
+		}
+		public := make(map[int64]struct{}, len(publicIDs))
+		for _, id := range publicIDs {
+			public[id] = struct{}{}
+		}
+		for _, target := range cfg.Probe.Targets {
+			if _, ok := public[target.GroupID]; !ok {
+				return nil, fmt.Errorf("%w: probe group %d is not a public active group", ErrChannelMonitorV2InvalidConfig, target.GroupID)
+			}
+			if err := s.probe.ValidateV2Probe(ctx, actorID, *cfg.Probe.APIKeyID, target.GroupID, target.Model); err != nil {
+				return nil, fmt.Errorf("%w: %s", ErrChannelMonitorV2InvalidConfig, err.Error())
+			}
 		}
 	}
 	cfg.UpdatedBy = &actorID
@@ -762,8 +779,7 @@ func redactChannelMonitorV2PublicConfig(cfg *ChannelMonitorV2Config) {
 	cfg.IgnoredErrorCategories = nil
 	cfg.UpdatedBy = nil
 	cfg.Probe.APIKeyID = nil
-	cfg.Probe.GroupID = nil
-	cfg.Probe.Message = ""
+	cfg.Probe.Targets = nil
 	for i := range cfg.Platforms {
 		cfg.Platforms[i].Models = nil
 	}
@@ -912,22 +928,39 @@ func normalizeChannelMonitorV2Config(cfg *ChannelMonitorV2Config) error {
 	if !containsInt(channelMonitorV2ProbePauseOptions, cfg.Probe.PauseAfterTrafficSeconds) {
 		return fmt.Errorf("%w: unsupported probe traffic pause %d seconds", ErrChannelMonitorV2InvalidConfig, cfg.Probe.PauseAfterTrafficSeconds)
 	}
-	cfg.Probe.Model = strings.TrimSpace(cfg.Probe.Model)
-	if cfg.Probe.Enabled {
-		if cfg.Probe.APIKeyID == nil || *cfg.Probe.APIKeyID <= 0 || cfg.Probe.GroupID == nil || *cfg.Probe.GroupID <= 0 || cfg.Probe.Model == "" {
-			return fmt.Errorf("%w: probe requires an API key, group and model", ErrChannelMonitorV2InvalidConfig)
+	cfg.Probe.Targets = append([]ChannelMonitorV2ProbeTarget(nil), cfg.Probe.Targets...)
+	seenProbeGroups := make(map[int64]struct{}, len(cfg.Probe.Targets))
+	for i := range cfg.Probe.Targets {
+		target := &cfg.Probe.Targets[i]
+		target.Model = strings.TrimSpace(target.Model)
+		if target.GroupID <= 0 || target.Model == "" {
+			return fmt.Errorf("%w: each probe target requires a positive group and model", ErrChannelMonitorV2InvalidConfig)
 		}
-		if len(cfg.GroupIDs) > 0 {
-			found := false
-			for _, groupID := range cfg.GroupIDs {
-				if groupID == *cfg.Probe.GroupID {
-					found = true
-					break
+		if _, exists := seenProbeGroups[target.GroupID]; exists {
+			return fmt.Errorf("%w: duplicate probe group %d", ErrChannelMonitorV2InvalidConfig, target.GroupID)
+		}
+		seenProbeGroups[target.GroupID] = struct{}{}
+	}
+	if len(cfg.Probe.Targets) > 0 && (cfg.Probe.APIKeyID == nil || *cfg.Probe.APIKeyID <= 0) {
+		return fmt.Errorf("%w: probe targets require an API key", ErrChannelMonitorV2InvalidConfig)
+	}
+	if cfg.Probe.Enabled {
+		if len(cfg.Probe.Targets) == 0 {
+			return fmt.Errorf("%w: probe requires at least one group/model", ErrChannelMonitorV2InvalidConfig)
+		}
+		for _, target := range cfg.Probe.Targets {
+			if len(cfg.GroupIDs) > 0 {
+				found := false
+				for _, groupID := range cfg.GroupIDs {
+					if groupID == target.GroupID {
+						found = true
+						break
+					}
 				}
-			}
-			if !found {
-				cfg.GroupIDs = append(cfg.GroupIDs, *cfg.Probe.GroupID)
-				sort.Slice(cfg.GroupIDs, func(i, j int) bool { return cfg.GroupIDs[i] < cfg.GroupIDs[j] })
+				if !found {
+					cfg.GroupIDs = append(cfg.GroupIDs, target.GroupID)
+					sort.Slice(cfg.GroupIDs, func(i, j int) bool { return cfg.GroupIDs[i] < cfg.GroupIDs[j] })
+				}
 			}
 		}
 	}

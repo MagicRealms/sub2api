@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"sort"
-	"time"
 )
 
 // Group cards use the same V2 facts, histograms, coverage and health thresholds.
@@ -11,24 +10,15 @@ import (
 // Presence flags survive volume redaction without exposing absolute counts.
 type ChannelMonitorV2GroupCard struct {
 	ChannelMonitorV2MatrixRow
-	HasTraffic      bool                          `json:"has_traffic"`
-	HasCacheSamples bool                          `json:"has_cache_samples"`
-	Probe           *ChannelMonitorV2ProbeSummary `json:"probe,omitempty"`
-}
-
-type ChannelMonitorV2ProbeSummary struct {
-	Enabled         bool       `json:"enabled"`
-	Model           string     `json:"model,omitempty"`
-	Status          string     `json:"status,omitempty"`
-	LatencyMs       *int64     `json:"latency_ms,omitempty"`
-	LastCheckedAt   *time.Time `json:"last_checked_at,omitempty"`
-	SuppressedUntil *time.Time `json:"suppressed_until,omitempty"`
-	Message         string     `json:"message,omitempty"`
+	HasTraffic      bool                               `json:"has_traffic"`
+	HasCacheSamples bool                               `json:"has_cache_samples"`
+	ProbeHistory    []ChannelMonitorV2ProbeObservation `json:"probe_history,omitempty"`
 }
 
 type ChannelMonitorV2GroupCards struct {
-	Coverage ChannelMonitorV2Coverage    `json:"coverage"`
-	Items    []ChannelMonitorV2GroupCard `json:"items"`
+	Coverage            ChannelMonitorV2Coverage                     `json:"coverage"`
+	Items               []ChannelMonitorV2GroupCard                  `json:"items"`
+	ProbeHistoryByGroup map[int64][]ChannelMonitorV2ProbeObservation `json:"probe_history_by_group,omitempty"`
 }
 
 func (s *ChannelMonitorV2Service) GroupCards(ctx context.Context, filter ChannelMonitorV2Filter, admin bool) (*ChannelMonitorV2GroupCards, error) {
@@ -44,14 +34,16 @@ func (s *ChannelMonitorV2Service) GroupCards(ctx context.Context, filter Channel
 		return nil, err
 	}
 	result := selectChannelMonitorV2GroupCards(matrix)
-	if cfg.Probe.Enabled && cfg.Probe.GroupID != nil {
-		for i := range result.Items {
-			if result.Items[i].GroupID != nil && *result.Items[i].GroupID == *cfg.Probe.GroupID {
-				result.Items[i].Probe = &ChannelMonitorV2ProbeSummary{
-					Enabled: true, Model: cfg.Probe.Model, Status: cfg.Probe.Status,
-					LatencyMs: cfg.Probe.LatencyMs, LastCheckedAt: cfg.Probe.LastCheckedAt,
-					SuppressedUntil: cfg.Probe.SuppressedUntil,
-					Message:         cfg.Probe.Message,
+	if historyRepo, ok := s.repo.(ChannelMonitorV2ProbeHistoryRepository); ok {
+		history, err := historyRepo.ListProbeHistory(ctx, filter, *cfg)
+		if err != nil {
+			return nil, err
+		}
+		if len(history) > 0 {
+			result.ProbeHistoryByGroup = history
+			for i := range result.Items {
+				if result.Items[i].GroupID != nil {
+					result.Items[i].ProbeHistory = history[*result.Items[i].GroupID]
 				}
 			}
 		}
@@ -67,9 +59,6 @@ func (s *ChannelMonitorV2Service) GroupCards(ctx context.Context, filter Channel
 	if !admin {
 		hideTP := s.hideThroughputForViewer(ctx, admin)
 		for i := range result.Items {
-			if result.Items[i].Probe != nil {
-				result.Items[i].Probe.Message = ""
-			}
 			redactChannelMonitorV2Metric(&result.Items[i].Metrics, hideTP)
 			for j := range result.Items[i].Buckets {
 				redactChannelMonitorV2Metric(&result.Items[i].Buckets[j].Metrics, hideTP)

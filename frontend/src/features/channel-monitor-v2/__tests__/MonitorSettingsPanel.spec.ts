@@ -9,15 +9,18 @@ const mocks = vi.hoisted(() => ({
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
   groups: vi.fn(),
+  keys: vi.fn(),
+  models: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
 }))
 vi.mock('@/api/channelMonitorV2', () => ({
   getConfig: mocks.getConfig,
   updateConfig: mocks.updateConfig,
+  getProbeModels: mocks.models,
   MONITOR_ERROR_CATEGORIES: ['authentication', 'network'],
 }))
-vi.mock('@/api/admin', () => ({ adminAPI: { groups: { getAllIncludingInactive: mocks.groups } } }))
+vi.mock('@/api/admin', () => ({ adminAPI: { groups: { getAllIncludingInactive: mocks.groups }, apiKeys: { list: mocks.keys } } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({
   cachedPublicSettings: { channel_monitor_enabled: true },
   showError: mocks.showError,
@@ -42,7 +45,7 @@ function config(): MonitorConfig {
     ],
     group_ids: [42],
     ignored_error_categories: [],
-    probe: { enabled: false, model: '', interval_seconds: 3600, pause_after_traffic_seconds: 10800 },
+    probe: { enabled: false, targets: [], interval_seconds: 3600, pause_after_traffic_seconds: 10800 },
     health_thresholds: {
       minimum_sample: 70, warning_error_rate: 0.1, critical_error_rate: 0.3,
       target_ttft_ms: 1500, warning_ttft_ms: 2000, critical_ttft_ms: 5000,
@@ -71,6 +74,8 @@ async function add(wrapper: Awaited<ReturnType<typeof panel>>, platform: string)
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.keys.mockResolvedValue({ items: [] })
+  mocks.models.mockResolvedValue([])
   mocks.groups.mockResolvedValue([
     { id: 42, name: 'Public', platform: 'openai', status: 'active', is_exclusive: false },
   ])
@@ -78,6 +83,33 @@ beforeEach(() => {
 })
 
 describe('MonitorSettingsPanel platform configuration', () => {
+  it('selects multiple authorized public groups with independent models', async () => {
+    mocks.groups.mockResolvedValue([
+      { id: 42, name: 'GPT', platform: 'openai', status: 'active', is_exclusive: false },
+      { id: 43, name: 'Claude', platform: 'anthropic', status: 'active', is_exclusive: false },
+      { id: 44, name: 'Private', platform: 'openai', status: 'active', is_exclusive: true },
+      { id: 45, name: 'Other key', platform: 'openai', status: 'active', is_exclusive: false },
+    ])
+    mocks.keys.mockResolvedValue({ items: [{ id: 9, name: 'Monitor', group_ids: [42, 43, 44] }] })
+    mocks.models.mockImplementation(async (_keyID, groupID) => groupID === 42 ? ['gpt-6.1'] : ['claude-sonnet'])
+    const wrapper = await panel({ ...config(), probe: { ...config().probe, api_key_id: 9, enabled: true } })
+    expect(wrapper.find('[data-probe-group="44"]').exists()).toBe(false)
+    expect(wrapper.find('[data-probe-group="45"]').exists()).toBe(false)
+    for (const groupID of [42, 43]) {
+      const row = wrapper.find(`[data-probe-group="${groupID}"]`)
+      await row.find('input[type="checkbox"]').setValue(true)
+      await flushPromises()
+      row.findComponent(Select).vm.$emit('update:modelValue', groupID === 42 ? 'gpt-6.1' : 'claude-sonnet')
+    }
+    await button(wrapper, 'save').trigger('click')
+    await flushPromises()
+    expect(mocks.updateConfig.mock.calls[0][0].probe.targets).toEqual([
+      { group_id: 42, model: 'gpt-6.1' }, { group_id: 43, model: 'claude-sonnet' },
+    ])
+    expect(mocks.models).toHaveBeenCalledWith(9, 42)
+    expect(mocks.models).toHaveBeenCalledWith(9, 43)
+    wrapper.unmount()
+  })
   it('adds a missing provider and saves its models without changing existing settings', async () => {
     const original = config()
     const wrapper = await panel(original)
