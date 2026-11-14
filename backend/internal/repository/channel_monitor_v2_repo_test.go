@@ -39,13 +39,13 @@ func TestListPublicActiveChannelMonitorGroupsExcludesExclusiveAndInactiveGroups(
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestChannelMonitorV2ProbeClaimAdvancesHourlyDeadlineAtomically(t *testing.T) {
+func TestChannelMonitorV2ProbeClaimAdvancesConfigurableDeadlineAtomically(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
 
 	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(`UPDATE channel_monitor_v2_config\s+SET probe_next_run_at = \$1 \+ INTERVAL '3600 seconds'`).
+	mock.ExpectQuery(`(?s)WITH due.*UPDATE channel_monitor_v2_config.*make_interval.*SELECT probe_api_key_id, probe_group_id, probe_model`).
 		WithArgs(now).
 		WillReturnRows(sqlmock.NewRows([]string{"probe_api_key_id", "probe_group_id", "probe_model"}).AddRow(12, 34, "gpt-6.1"))
 	job, err := (&channelMonitorV2Repository{db: db}).ClaimDueProbe(context.Background(), now)

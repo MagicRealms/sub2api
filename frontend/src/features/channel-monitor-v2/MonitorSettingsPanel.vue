@@ -91,7 +91,7 @@
           </div>
           <Toggle v-model="draft.probe.enabled" />
         </div>
-        <div class="grid grid-cols-1 gap-4 px-5 py-4 md:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 px-5 py-4 md:grid-cols-5">
           <label class="block">
             <span class="input-label">{{ t('channelMonitorV2.settings.probeKey') }}</span>
             <select v-model="draft.probe.api_key_id" class="input" :disabled="saving" @change="onProbeKeyChange">
@@ -113,11 +113,24 @@
               <option v-for="model in probeModels" :key="model" :value="model">{{ model }}</option>
             </select>
           </label>
+          <label class="block">
+            <span class="input-label">{{ t('channelMonitorV2.settings.probeInterval') }}</span>
+            <select v-model.number="draft.probe.interval_seconds" class="input" :disabled="saving">
+              <option v-for="option in probeIntervalOptions" :key="option" :value="option">{{ durationLabel(option) }}</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="input-label">{{ t('channelMonitorV2.settings.probePause') }}</span>
+            <select v-model.number="draft.probe.pause_after_traffic_seconds" class="input" :disabled="saving">
+              <option v-for="option in probePauseOptions" :key="option" :value="option">{{ durationLabel(option) }}</option>
+            </select>
+          </label>
         </div>
         <div class="border-t border-gray-100 px-5 py-3 text-xs text-gray-500 dark:border-dark-700 dark:text-dark-400">
-          {{ t('channelMonitorV2.settings.probeSchedule', { interval: 60 }) }}
+          {{ t('channelMonitorV2.settings.probeSchedule', { interval: durationLabel(draft.probe.interval_seconds), pause: durationLabel(draft.probe.pause_after_traffic_seconds) }) }}
           <span v-if="draft.probe.last_checked_at" class="ml-2">· {{ t('channelMonitorV2.settings.probeLastRun', { time: probeTime(draft.probe.last_checked_at) }) }}</span>
-          <span v-if="draft.probe.status" class="ml-2 font-medium" :class="draft.probe.status === 'operational' ? 'text-emerald-600' : 'text-amber-600'">{{ draft.probe.status }}</span>
+          <span v-if="draft.probe.status" class="ml-2 font-medium" :class="draft.probe.status === 'operational' ? 'text-emerald-600' : draft.probe.status === 'paused_traffic' ? 'text-sky-600' : 'text-amber-600'">{{ probeStatusLabel(draft.probe.status) }}</span>
+          <span v-if="draft.probe.status === 'paused_traffic' && draft.probe.suppressed_until" class="ml-2">· {{ t('channelMonitorV2.settings.probePausedUntil', { time: probeTime(draft.probe.suppressed_until) }) }}</span>
         </div>
       </div>
 
@@ -346,6 +359,8 @@ const groups = ref<AdminGroup[]>([])
 const adminKeys = ref<ApiKey[]>([])
 const probeModels = ref<string[]>([])
 const probeModelsLoading = ref(false)
+const probeIntervalOptions = [1800, 3600, 5400, 7200, 10800, 14400, 18000]
+const probePauseOptions = [3600, 7200, 10800, 14400, 21600, 43200]
 const visibleGroups = computed(() => groups.value.filter((group) => group.status === 'active' && !group.is_exclusive))
 const probeKey = computed(() => adminKeys.value.find((key) => key.id === draft.value?.probe?.api_key_id))
 const probeGroups = computed(() => {
@@ -518,13 +533,30 @@ function probeTime(value: string) {
   }).format(date)
 }
 
+function durationLabel(seconds: number) {
+  const hours = seconds / 3600
+  return t('channelMonitorV2.settings.durationHours', { hours: Number.isInteger(hours) ? hours : hours.toFixed(1) })
+}
+
+function probeStatusLabel(status: string) {
+  if (status === 'operational') return t('channelMonitorV2.cards.probeOperational')
+  if (status === 'degraded') return t('channelMonitorV2.cards.probeDegraded')
+  if (status === 'paused_traffic') return t('channelMonitorV2.cards.probePausedTraffic')
+  if (status) return t('channelMonitorV2.cards.probeFailed')
+  return t('channelMonitorV2.cards.probePending')
+}
+
 function normalizeConfig(value: MonitorConfig): MonitorConfig {
   const ignored = value.ignored_error_categories
   return {
     ...value,
     probe: value.probe
-      ? { ...value.probe }
-      : { enabled: false, model: '', interval_seconds: 3600 },
+      ? {
+          ...value.probe,
+          interval_seconds: value.probe.interval_seconds || 3600,
+          pause_after_traffic_seconds: value.probe.pause_after_traffic_seconds || 10800,
+        }
+      : { enabled: false, model: '', interval_seconds: 3600, pause_after_traffic_seconds: 10800 },
     health_thresholds: { ...defaultThresholds, ...(value.health_thresholds || {}) },
     // Preserve explicit empty arrays from the server (operator cleared all).
     ignored_error_categories: [

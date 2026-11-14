@@ -130,7 +130,9 @@ export interface MonitorProbe {
   group_id?: number | null
   model: string
   interval_seconds: number
+  pause_after_traffic_seconds: number
   next_run_at?: string | null
+  suppressed_until?: string | null
   last_checked_at?: string | null
   status?: string
   latency_ms?: number | null
@@ -199,6 +201,7 @@ export interface MonitorGroupCard extends MonitorMatrixRow {
     status?: string
     latency_ms?: number | null
     last_checked_at?: string | null
+    suppressed_until?: string | null
     message?: string
   }
 }

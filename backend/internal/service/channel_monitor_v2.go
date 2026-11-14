@@ -36,22 +36,53 @@ type ChannelMonitorV2PlatformConfig struct {
 	Models   []string `json:"models"`
 }
 
-const ChannelMonitorV2ProbeIntervalSeconds = 3600
+const (
+	// ChannelMonitorV2ProbeIntervalSeconds is the default probe cadence. The
+	// actual cadence is configurable, but remains limited to the supported
+	// operator choices below so a typo cannot create a tight polling loop.
+	ChannelMonitorV2ProbeIntervalSeconds       = 3600
+	ChannelMonitorV2ProbePauseAfterTrafficSecs = 3 * 3600
+)
+
+var channelMonitorV2ProbeIntervalOptions = []int{
+	30 * 60,
+	60 * 60,
+	90 * 60,
+	2 * 60 * 60,
+	3 * 60 * 60,
+	4 * 60 * 60,
+	5 * 60 * 60,
+}
+
+var channelMonitorV2ProbePauseOptions = []int{
+	60 * 60,
+	2 * 60 * 60,
+	3 * 60 * 60,
+	4 * 60 * 60,
+	6 * 60 * 60,
+	12 * 60 * 60,
+}
 
 // ChannelMonitorV2Probe is the optional low-token active probe for one public
 // group. Runtime fields are returned for status display but are preserved by
 // the service when an administrator saves the operator configuration.
 type ChannelMonitorV2Probe struct {
-	Enabled         bool       `json:"enabled"`
-	APIKeyID        *int64     `json:"api_key_id,omitempty"`
-	GroupID         *int64     `json:"group_id,omitempty"`
-	Model           string     `json:"model"`
-	IntervalSeconds int        `json:"interval_seconds"`
-	NextRunAt       *time.Time `json:"next_run_at,omitempty"`
-	LastCheckedAt   *time.Time `json:"last_checked_at,omitempty"`
-	Status          string     `json:"status,omitempty"`
-	LatencyMs       *int64     `json:"latency_ms,omitempty"`
-	Message         string     `json:"message,omitempty"`
+	Enabled         bool   `json:"enabled"`
+	APIKeyID        *int64 `json:"api_key_id,omitempty"`
+	GroupID         *int64 `json:"group_id,omitempty"`
+	Model           string `json:"model"`
+	IntervalSeconds int    `json:"interval_seconds"`
+	// PauseAfterTrafficSeconds suppresses an active probe after the selected
+	// public group has received a normal successful request. This keeps the
+	// probe from spending a second request when real traffic already proves the
+	// route works; the scheduler checks again after this cooldown.
+	PauseAfterTrafficSeconds int        `json:"pause_after_traffic_seconds"`
+	NextRunAt                *time.Time `json:"next_run_at,omitempty"`
+	SuppressedUntil          *time.Time `json:"suppressed_until,omitempty"`
+	LastCheckedAt            *time.Time `json:"last_checked_at,omitempty"`
+	Status                   string     `json:"status,omitempty"`
+	LatencyMs                *int64     `json:"latency_ms,omitempty"`
+	Message                  string     `json:"message,omitempty"`
 }
 
 type ChannelMonitorV2Config struct {
@@ -511,18 +542,23 @@ func (s *ChannelMonitorV2Service) UpdateConfig(ctx context.Context, cfg ChannelM
 	if current != nil {
 		probeTargetChanged := cfg.Probe.Enabled != current.Probe.Enabled ||
 			!sameMonitorID(cfg.Probe.APIKeyID, current.Probe.APIKeyID) ||
-			!sameMonitorID(cfg.Probe.GroupID, current.Probe.GroupID) || cfg.Probe.Model != current.Probe.Model
+			!sameMonitorID(cfg.Probe.GroupID, current.Probe.GroupID) || cfg.Probe.Model != current.Probe.Model ||
+			cfg.Probe.IntervalSeconds != current.Probe.IntervalSeconds ||
+			cfg.Probe.PauseAfterTrafficSeconds != current.Probe.PauseAfterTrafficSeconds
 		cfg.Probe.NextRunAt = current.Probe.NextRunAt
 		cfg.Probe.LastCheckedAt = current.Probe.LastCheckedAt
 		cfg.Probe.Status = current.Probe.Status
 		cfg.Probe.LatencyMs = current.Probe.LatencyMs
 		cfg.Probe.Message = current.Probe.Message
+		cfg.Probe.SuppressedUntil = current.Probe.SuppressedUntil
 		if cfg.Probe.Enabled && probeTargetChanged {
 			now := s.now().UTC()
 			cfg.Probe.NextRunAt = &now
+			cfg.Probe.SuppressedUntil = nil
 		}
 		if !cfg.Probe.Enabled {
 			cfg.Probe.NextRunAt = nil
+			cfg.Probe.SuppressedUntil = nil
 		}
 	}
 	if err := normalizeChannelMonitorV2Config(&cfg); err != nil {
@@ -867,8 +903,14 @@ func normalizeChannelMonitorV2Config(cfg *ChannelMonitorV2Config) error {
 	if cfg.Probe.IntervalSeconds == 0 {
 		cfg.Probe.IntervalSeconds = ChannelMonitorV2ProbeIntervalSeconds
 	}
-	if cfg.Probe.IntervalSeconds != ChannelMonitorV2ProbeIntervalSeconds {
-		return fmt.Errorf("%w: probe interval must be 3600 seconds", ErrChannelMonitorV2InvalidConfig)
+	if !containsInt(channelMonitorV2ProbeIntervalOptions, cfg.Probe.IntervalSeconds) {
+		return fmt.Errorf("%w: unsupported probe interval %d seconds", ErrChannelMonitorV2InvalidConfig, cfg.Probe.IntervalSeconds)
+	}
+	if cfg.Probe.PauseAfterTrafficSeconds == 0 {
+		cfg.Probe.PauseAfterTrafficSeconds = ChannelMonitorV2ProbePauseAfterTrafficSecs
+	}
+	if !containsInt(channelMonitorV2ProbePauseOptions, cfg.Probe.PauseAfterTrafficSeconds) {
+		return fmt.Errorf("%w: unsupported probe traffic pause %d seconds", ErrChannelMonitorV2InvalidConfig, cfg.Probe.PauseAfterTrafficSeconds)
 	}
 	cfg.Probe.Model = strings.TrimSpace(cfg.Probe.Model)
 	if cfg.Probe.Enabled {
@@ -904,6 +946,15 @@ func normalizeChannelMonitorV2Config(cfg *ChannelMonitorV2Config) error {
 	}
 	sort.Slice(cfg.Platforms, func(i, j int) bool { return cfg.Platforms[i].Platform < cfg.Platforms[j].Platform })
 	return nil
+}
+
+func containsInt(values []int, target int) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 // DefaultChannelMonitorV2IgnoredErrorCategories are factory defaults for

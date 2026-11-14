@@ -27,8 +27,9 @@
           <span v-if="card.has_cache_samples" class="ml-auto shrink-0 text-[10px] text-primary-600 dark:text-primary-300">{{ t('channelMonitorV2.cards.bestCache') }}</span>
         </div>
         <div v-if="card.probe" class="mt-2 flex items-center justify-between gap-2 rounded-lg border border-primary-100 bg-primary-50/70 px-2.5 py-1.5 text-[11px] dark:border-primary-900/40 dark:bg-primary-900/20">
-          <span class="truncate text-primary-700 dark:text-primary-200" :title="card.probe.message || undefined">{{ t('channelMonitorV2.cards.hourlyProbe', { model: card.probe.model || '—' }) }}</span>
+          <span class="truncate text-primary-700 dark:text-primary-200" :title="card.probe.message || undefined">{{ t('channelMonitorV2.cards.probe', { model: card.probe.model || '—' }) }}</span>
           <span class="shrink-0 font-semibold" :class="probeClass(card.probe.status)">{{ probeLabel(card.probe.status) }}<template v-if="card.probe.latency_ms != null"> · {{ card.probe.latency_ms }}ms</template></span>
+          <span v-if="card.probe.status === 'paused_traffic' && card.probe.suppressed_until" class="shrink-0 text-[10px] text-gray-500 dark:text-gray-400">{{ t('channelMonitorV2.cards.probePausedUntil', { time: time(card.probe.suppressed_until) }) }}</span>
         </div>
         <dl class="mt-4 grid grid-cols-3 gap-2">
           <div class="rounded-2xl border border-gray-100 bg-gray-50/60 px-2.5 py-3 dark:border-dark-700 dark:bg-dark-900/30">
@@ -83,7 +84,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { MonitorCoverage, MonitorGroupCard, MonitorHealth } from '@/api/channelMonitorV2'
+import type { MonitorCoverage, MonitorGroupCard, MonitorHealth, MonitorMatrixBucket } from '@/api/channelMonitorV2'
 import type { GroupPlatform } from '@/types'
 import Icon from '@/components/icons/Icon.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
@@ -94,7 +95,21 @@ import { groupCardHistory, type GroupHistorySlot } from './groupCardHistory'
 
 const props = defineProps<{ cards: MonitorGroupCard[]; coverage: MonitorCoverage; healthMode: HealthDisplayMode; rangeLabel: string }>()
 const { t, locale } = useI18n()
-const entries = computed(() => props.cards.map(card => ({ card, slots: groupCardHistory(card.buckets, props.coverage, props.healthMode) })))
+const retainedBuckets = ref(new Map<number, MonitorMatrixBucket>())
+watch(() => props.cards, cards => {
+  const next = new Map(retainedBuckets.value)
+  for (const card of cards) {
+    if (card.group_id == null) continue
+    const latest = [...card.buckets]
+      .sort((a, b) => Date.parse(b.bucket_start) - Date.parse(a.bucket_start))[0]
+    if (latest) next.set(card.group_id, latest)
+  }
+  retainedBuckets.value = next
+}, { immediate: true })
+const entries = computed(() => props.cards.map(card => ({
+  card,
+  slots: groupCardHistory(card.buckets, props.coverage, props.healthMode, card.group_id == null ? undefined : retainedBuckets.value.get(card.group_id)),
+})))
 const tooltipSlot = ref<GroupHistorySlot | null>(null)
 const tooltipAnchor = ref<HTMLElement | null>(null)
 function closeTooltip() { tooltipSlot.value = null; tooltipAnchor.value = null }
@@ -119,12 +134,14 @@ function statusLabel(card: MonitorGroupCard) {
 function probeClass(status?: string) {
   if (status === 'operational') return 'text-emerald-600 dark:text-emerald-300'
   if (status === 'degraded') return 'text-amber-600 dark:text-amber-300'
+  if (status === 'paused_traffic') return 'text-sky-600 dark:text-sky-300'
   if (status) return 'text-rose-600 dark:text-rose-300'
   return 'text-gray-500 dark:text-gray-400'
 }
 function probeLabel(status?: string) {
   if (status === 'operational') return t('channelMonitorV2.cards.probeOperational')
   if (status === 'degraded') return t('channelMonitorV2.cards.probeDegraded')
+  if (status === 'paused_traffic') return t('channelMonitorV2.cards.probePausedTraffic')
   if (status) return t('channelMonitorV2.cards.probeFailed')
   return t('channelMonitorV2.cards.probePending')
 }

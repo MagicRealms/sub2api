@@ -42,7 +42,7 @@ function config(): MonitorConfig {
     ],
     group_ids: [42],
     ignored_error_categories: [],
-    probe: { enabled: false, model: '', interval_seconds: 3600 },
+    probe: { enabled: false, model: '', interval_seconds: 3600, pause_after_traffic_seconds: 10800 },
     health_thresholds: {
       minimum_sample: 70, warning_error_rate: 0.1, critical_error_rate: 0.3,
       target_ttft_ms: 1500, warning_ttft_ms: 2000, critical_ttft_ms: 5000,

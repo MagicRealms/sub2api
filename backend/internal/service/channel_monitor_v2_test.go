@@ -180,6 +180,7 @@ func TestChannelMonitorV2ConfigValidation(t *testing.T) {
 	require.Equal(t, "anthropic", cfg.Platforms[0].Platform)
 	require.Equal(t, []int64{1, 3}, cfg.GroupIDs)
 	require.Equal(t, ChannelMonitorV2ProbeIntervalSeconds, cfg.Probe.IntervalSeconds)
+	require.Equal(t, ChannelMonitorV2ProbePauseAfterTrafficSecs, cfg.Probe.PauseAfterTrafficSeconds)
 
 	cfg.Probe.Enabled = true
 	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
@@ -191,6 +192,11 @@ func TestChannelMonitorV2ConfigValidation(t *testing.T) {
 	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
 	require.Equal(t, []int64{1, 3, 9}, cfg.GroupIDs)
 	cfg.Probe.IntervalSeconds = 1800
+	require.NoError(t, normalizeChannelMonitorV2Config(&cfg))
+	cfg.Probe.IntervalSeconds = 15
+	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
+	cfg.Probe.IntervalSeconds = ChannelMonitorV2ProbeIntervalSeconds
+	cfg.Probe.PauseAfterTrafficSeconds = 1800
 	require.ErrorIs(t, normalizeChannelMonitorV2Config(&cfg), ErrChannelMonitorV2InvalidConfig)
 	cfg.Probe = ChannelMonitorV2Probe{IntervalSeconds: ChannelMonitorV2ProbeIntervalSeconds}
 

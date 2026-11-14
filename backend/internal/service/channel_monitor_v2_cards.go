@@ -17,12 +17,13 @@ type ChannelMonitorV2GroupCard struct {
 }
 
 type ChannelMonitorV2ProbeSummary struct {
-	Enabled       bool       `json:"enabled"`
-	Model         string     `json:"model,omitempty"`
-	Status        string     `json:"status,omitempty"`
-	LatencyMs     *int64     `json:"latency_ms,omitempty"`
-	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
-	Message       string     `json:"message,omitempty"`
+	Enabled         bool       `json:"enabled"`
+	Model           string     `json:"model,omitempty"`
+	Status          string     `json:"status,omitempty"`
+	LatencyMs       *int64     `json:"latency_ms,omitempty"`
+	LastCheckedAt   *time.Time `json:"last_checked_at,omitempty"`
+	SuppressedUntil *time.Time `json:"suppressed_until,omitempty"`
+	Message         string     `json:"message,omitempty"`
 }
 
 type ChannelMonitorV2GroupCards struct {
@@ -49,7 +50,8 @@ func (s *ChannelMonitorV2Service) GroupCards(ctx context.Context, filter Channel
 				result.Items[i].Probe = &ChannelMonitorV2ProbeSummary{
 					Enabled: true, Model: cfg.Probe.Model, Status: cfg.Probe.Status,
 					LatencyMs: cfg.Probe.LatencyMs, LastCheckedAt: cfg.Probe.LastCheckedAt,
-					Message: cfg.Probe.Message,
+					SuppressedUntil: cfg.Probe.SuppressedUntil,
+					Message:         cfg.Probe.Message,
 				}
 			}
 		}

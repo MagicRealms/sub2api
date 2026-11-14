@@ -7,32 +7,38 @@ function bucket(minute: number, overall: number | null, cache: number | null): M
   return { bucket_start: new Date(Date.parse(coverage.requested_start) + minute*60000).toISOString(), metrics: { ttft: { p50_ms: minute*100 } }, health: { score: overall, cache_score: cache } } as MonitorMatrixBucket
 }
 describe('V2 group card history', () => {
-  it('skips idle intervals and selects the worst native sample without averaging P50', () => {
+  it('always renders seven cells and selects the worst sample without averaging P50', () => {
     const a = bucket(0,90,10), b = bucket(1,40,90), future = bucket(90,0,0)
     const slots = groupCardHistory([a,b,future], coverage, 'overall')
-    expect(slots).toHaveLength(1)
+    expect(slots).toHaveLength(7)
     expect(slots[0]?.bucket).toBe(b)
     expect(slots[0]?.bucket?.metrics.ttft.p50_ms).toBe(100)
     expect(groupCardHistory([a,b],coverage,'cache')[0]?.bucket).toBe(a)
   })
-  it('keeps observed unknown buckets but omits intervals with no samples', () => {
+  it('keeps observed unknown buckets and carries the last state over idle intervals', () => {
     const a = bucket(0,null,null)
     expect(groupCardHistory([a],coverage,'overall')[0]?.bucket).toBe(a)
-    expect(groupCardHistory([],coverage,'overall')).toEqual([])
+    expect(groupCardHistory([],coverage,'overall')).toHaveLength(7)
+    const carried = groupCardHistory([bucket(0,90,90)],coverage,'overall')
+    expect(carried.every((slot) => slot.bucket)).toBe(true)
+    const fallback = bucket(-60, 80, 80)
+    expect(groupCardHistory([], coverage, 'overall', fallback).every((slot) => slot.bucket === fallback)).toBe(true)
     expect(groupCardHistory([],{...coverage,requested_start:'invalid'},'overall')).toEqual([])
   })
-  it('bounds aggregation density for short and long ranges', () => {
+  it('keeps the same seven-cell density for short and long ranges', () => {
     const short = {...coverage,bucket_seconds:300}
     const long = {...coverage,requested_end:'2026-12-08T00:00:00Z'}
     const samples = Array.from({ length: 50 }, (_, minute) => bucket(minute, 80, 80))
-    expect(groupCardHistory(samples,short,'overall').length).toBeLessThanOrEqual(18)
-    expect(groupCardHistory(samples,long,'overall').length).toBeLessThanOrEqual(36)
+    expect(groupCardHistory(samples,short,'overall')).toHaveLength(7)
+    expect(groupCardHistory(samples,long,'overall')).toHaveLength(7)
   })
-  it('preserves sample order while collapsing long idle gaps', () => {
-    const samples = [bucket(0,90,90), bucket(8,80,80), bucket(89,70,70)]
+  it('keeps the latest observed state through long idle gaps', () => {
+    const samples = [bucket(0,90,90), bucket(30,80,80), bucket(89,70,70)]
     const slots = groupCardHistory(samples,coverage,'overall')
-    expect(slots).toHaveLength(3)
-    expect(slots.map((slot) => slot.bucket?.bucket_start)).toEqual(samples.map((sample) => sample.bucket_start))
+    expect(slots).toHaveLength(7)
+    expect(slots[0]?.bucket).toBe(samples[0])
+    expect(slots[2]?.bucket).toBe(samples[1])
+    expect(slots[6]?.bucket).toBe(samples[2])
   })
   it('retains a red observed state ahead of a lower-scored yellow bucket', () => {
     const red = bucket(0, 90, 90), yellow = bucket(1, 50, 50)

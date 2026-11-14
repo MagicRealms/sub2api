@@ -28,15 +28,17 @@ func (r *channelMonitorV2Repository) GetConfig(ctx context.Context) (*service.Ch
 		       COALESCE(health_thresholds, '{}'::jsonb),
 		       updated_at, updated_by,
 		       probe_enabled, probe_api_key_id, probe_group_id, probe_model,
-		       probe_next_run_at, probe_last_checked_at, probe_status,
-		       probe_latency_ms, COALESCE(probe_message, '')
+			   probe_interval_seconds, probe_pause_after_traffic_seconds,
+			   probe_next_run_at, probe_suppressed_until, probe_last_checked_at,
+			   probe_status, probe_latency_ms, COALESCE(probe_message, '')
 		FROM channel_monitor_v2_config WHERE id = 1`).Scan(
 		&cfg.Version, &cfg.Enabled, &cfg.RefreshIntervalSeconds, &platforms,
 		pq.Array(&cfg.GroupIDs), pq.Array(&cfg.IgnoredErrorCategories),
 		&thresholds,
 		&cfg.UpdatedAt, &cfg.UpdatedBy,
 		&cfg.Probe.Enabled, &cfg.Probe.APIKeyID, &cfg.Probe.GroupID, &cfg.Probe.Model,
-		&cfg.Probe.NextRunAt, &cfg.Probe.LastCheckedAt, &cfg.Probe.Status,
+		&cfg.Probe.IntervalSeconds, &cfg.Probe.PauseAfterTrafficSeconds,
+		&cfg.Probe.NextRunAt, &cfg.Probe.SuppressedUntil, &cfg.Probe.LastCheckedAt, &cfg.Probe.Status,
 		&cfg.Probe.LatencyMs, &cfg.Probe.Message,
 	)
 	if err != nil {
@@ -99,26 +101,32 @@ func (r *channelMonitorV2Repository) UpdateConfig(ctx context.Context, cfg servi
 		    platforms = $3, group_ids = $4, ignored_error_categories = $5,
 		    health_thresholds = $6, updated_by = $7, updated_at = NOW(),
 		    probe_enabled = $9, probe_api_key_id = $10, probe_group_id = $11,
-		    probe_model = $12,
-		    probe_next_run_at = CASE WHEN $9 THEN COALESCE($13, probe_next_run_at, NOW()) ELSE NULL END
+			probe_model = $12,
+			probe_interval_seconds = $13,
+			probe_pause_after_traffic_seconds = $14,
+			probe_next_run_at = CASE WHEN $9 THEN COALESCE($15, probe_next_run_at, NOW()) ELSE NULL END,
+			probe_suppressed_until = CASE WHEN $9 THEN $16 ELSE NULL END
 		WHERE id = 1 AND version = $8
 		RETURNING version, enabled, refresh_interval_seconds, platforms, group_ids,
 		          COALESCE(ignored_error_categories, '{}'),
 		          COALESCE(health_thresholds, '{}'::jsonb),
 		          updated_at, updated_by,
 		          probe_enabled, probe_api_key_id, probe_group_id, probe_model,
-		          probe_next_run_at, probe_last_checked_at, probe_status,
-		          probe_latency_ms, COALESCE(probe_message, '')`,
+		          probe_interval_seconds, probe_pause_after_traffic_seconds,
+		          probe_next_run_at, probe_suppressed_until, probe_last_checked_at,
+		          probe_status, probe_latency_ms, COALESCE(probe_message, '')`,
 		cfg.Enabled, cfg.RefreshIntervalSeconds, platforms, pq.Array(cfg.GroupIDs),
 		pq.Array(cfg.IgnoredErrorCategories), thresholds, cfg.UpdatedBy, expectedVersion,
 		cfg.Probe.Enabled, cfg.Probe.APIKeyID, cfg.Probe.GroupID, cfg.Probe.Model,
-		cfg.Probe.NextRunAt,
+		cfg.Probe.IntervalSeconds, cfg.Probe.PauseAfterTrafficSeconds,
+		cfg.Probe.NextRunAt, cfg.Probe.SuppressedUntil,
 	).Scan(&updated.Version, &updated.Enabled, &updated.RefreshIntervalSeconds, &raw,
 		pq.Array(&updated.GroupIDs), pq.Array(&updated.IgnoredErrorCategories),
 		&rawThresholds,
 		&updated.UpdatedAt, &updated.UpdatedBy,
 		&updated.Probe.Enabled, &updated.Probe.APIKeyID, &updated.Probe.GroupID, &updated.Probe.Model,
-		&updated.Probe.NextRunAt, &updated.Probe.LastCheckedAt, &updated.Probe.Status,
+		&updated.Probe.IntervalSeconds, &updated.Probe.PauseAfterTrafficSeconds,
+		&updated.Probe.NextRunAt, &updated.Probe.SuppressedUntil, &updated.Probe.LastCheckedAt, &updated.Probe.Status,
 		&updated.Probe.LatencyMs, &updated.Probe.Message)
 	if err == sql.ErrNoRows {
 		return nil, service.ErrChannelMonitorV2ConfigConflict
@@ -135,20 +143,57 @@ func (r *channelMonitorV2Repository) UpdateConfig(ctx context.Context, cfg servi
 	updated.HealthThresholds = service.DefaultChannelMonitorV2HealthThresholds()
 	_ = json.Unmarshal(rawThresholds, &updated.HealthThresholds)
 	updated.HealthThresholds = service.NormalizeChannelMonitorV2HealthThresholds(updated.HealthThresholds)
-	updated.Probe.IntervalSeconds = service.ChannelMonitorV2ProbeIntervalSeconds
+	if updated.Probe.IntervalSeconds == 0 {
+		updated.Probe.IntervalSeconds = service.ChannelMonitorV2ProbeIntervalSeconds
+	}
+	if updated.Probe.PauseAfterTrafficSeconds == 0 {
+		updated.Probe.PauseAfterTrafficSeconds = service.ChannelMonitorV2ProbePauseAfterTrafficSecs
+	}
 	return &updated, nil
 }
 
 func (r *channelMonitorV2Repository) ClaimDueProbe(ctx context.Context, now time.Time) (*service.ChannelMonitorV2ProbeJob, error) {
 	var job service.ChannelMonitorV2ProbeJob
 	err := r.db.QueryRowContext(ctx, `
-		UPDATE channel_monitor_v2_config
-		SET probe_next_run_at = $1 + INTERVAL '3600 seconds'
-		WHERE id = 1 AND enabled = TRUE AND probe_enabled = TRUE
-		  AND probe_api_key_id IS NOT NULL AND probe_group_id IS NOT NULL
-		  AND NULLIF(TRIM(probe_model), '') IS NOT NULL
-		  AND (probe_next_run_at IS NULL OR probe_next_run_at <= $1)
-		RETURNING probe_api_key_id, probe_group_id, probe_model`, now.UTC()).Scan(&job.APIKeyID, &job.GroupID, &job.Model)
+		WITH due AS (
+			SELECT c.id,
+			       EXISTS (
+				       SELECT 1
+				       FROM usage_logs ul
+				       WHERE ul.group_id = c.probe_group_id
+				         AND ul.api_key_id IS DISTINCT FROM c.probe_api_key_id
+				         AND ul.created_at >= $1::timestamptz - INTERVAL '15 minutes'
+				         AND ul.created_at < $1::timestamptz
+				         AND (ul.actual_cost > 0 OR ul.input_tokens > 0 OR ul.output_tokens > 0
+				              OR ul.cache_creation_tokens > 0 OR ul.cache_read_tokens > 0
+				              OR COALESCE(ul.first_token_ms, 0) > 0 OR COALESCE(ul.duration_ms, 0) > 0)
+				         AND COALESCE(ul.request_type, 0) NOT IN (4, 6)
+			       ) AS has_normal_traffic
+			FROM channel_monitor_v2_config c
+			WHERE c.id = 1 AND c.enabled = TRUE AND c.probe_enabled = TRUE
+			  AND c.probe_api_key_id IS NOT NULL AND c.probe_group_id IS NOT NULL
+			  AND NULLIF(TRIM(c.probe_model), '') IS NOT NULL
+			  AND (c.probe_next_run_at IS NULL OR c.probe_next_run_at <= $1::timestamptz)
+			  AND (c.probe_suppressed_until IS NULL OR c.probe_suppressed_until <= $1::timestamptz)
+			FOR UPDATE
+		), updated AS (
+			UPDATE channel_monitor_v2_config c
+			SET probe_next_run_at = $1::timestamptz + CASE WHEN due.has_normal_traffic
+					THEN make_interval(secs => c.probe_pause_after_traffic_seconds::double precision)
+					ELSE make_interval(secs => c.probe_interval_seconds::double precision)
+				END,
+				probe_suppressed_until = CASE WHEN due.has_normal_traffic
+					THEN $1::timestamptz + make_interval(secs => c.probe_pause_after_traffic_seconds::double precision)
+					ELSE NULL END,
+				probe_status = CASE WHEN due.has_normal_traffic THEN 'paused_traffic' ELSE c.probe_status END,
+				probe_message = CASE WHEN due.has_normal_traffic THEN '' ELSE c.probe_message END
+			FROM due
+			WHERE c.id = due.id
+			RETURNING c.probe_api_key_id, c.probe_group_id, c.probe_model, c.probe_suppressed_until
+		)
+		SELECT probe_api_key_id, probe_group_id, probe_model
+		FROM updated
+		WHERE probe_suppressed_until IS NULL`, now.UTC()).Scan(&job.APIKeyID, &job.GroupID, &job.Model)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
