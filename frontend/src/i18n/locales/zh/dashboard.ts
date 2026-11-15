@@ -110,6 +110,7 @@ export default {
       save: '保存分组',
       selectedGroups: '路由顺序',
       availableGroups: '可添加分组',
+      addGroup: '添加分组',
       addHint: '勾选后加入末尾',
       emptySelection: '至少选择一个分组，保存后密钥才能继续使用。',
       noMoreGroups: '没有其他可添加的分组',

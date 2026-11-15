@@ -22,12 +22,18 @@ const create = (ids: number[] = []) => mount(OrderedGroupSelector, {
 describe('ordered key group selection', () => {
   it('appends groups across providers in selection order', async () => {
     const wrapper = create([6])
-    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(2)
-    await wrapper.findAll('input[type="checkbox"]')[1]!.setValue(true)
+    expect(wrapper.findAll('[data-group-option]')).toHaveLength(2)
+    await wrapper.get('[data-group-id="20"]').trigger('click')
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[6, 20]])
     await wrapper.setProps({ modelValue: [6, 20] })
-    await wrapper.findAll('input[type="checkbox"]')[0]!.setValue(true)
+    await wrapper.get('[data-group-id="16"]').trigger('click')
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[6, 20, 16]])
+  })
+
+  it('searches available groups by name and description', async () => {
+    const wrapper = create()
+    await wrapper.get('[data-testid="available-group-search"]').setValue('claude')
+    expect(wrapper.findAll('[data-group-option]').map(button => button.attributes('data-group-id'))).toEqual(['20'])
   })
 
   it('reorders routes and shows their new priority numbers', async () => {
@@ -50,11 +56,11 @@ describe('ordered key group selection', () => {
 
   it('keeps selected routes out of the available list and shows the empty state', async () => {
     const wrapper = create([6, 16, 20])
-    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-group-option]')).toHaveLength(0)
     expect(wrapper.text()).toContain('keys.routing.noMoreGroups')
 
     await wrapper.setProps({ modelValue: [] })
     expect(wrapper.text()).toContain('keys.routing.emptySelection')
-    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(3)
+    expect(wrapper.findAll('[data-group-option]')).toHaveLength(3)
   })
 })

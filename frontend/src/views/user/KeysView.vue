@@ -151,33 +151,26 @@
               <button
                 :ref="(el) => setGroupButtonRef(row.id, el)"
                 @click="openGroupSelector(row)"
-                class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
-                :title="t('keys.clickToChangeGroup')"
+                class="sw-route-trigger group/dropdown -mx-2 -my-1"
+                :title="keyRouteTitle(row) || t('keys.clickToChangeGroup')"
+                :aria-label="`${keyRouteTitle(row) || t('keys.noGroup')}. ${t('keys.clickToChangeGroup')}`"
+                :aria-expanded="groupSelectorKeyId === row.id"
+                data-testid="key-route-trigger"
               >
-                <span v-if="keyRouteIDs(row).length" class="sw-route-chips" :title="keyRouteIDs(row).map((id, index) => `${index + 1}. ${groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)}`).join(' → ')">
-                  <span v-for="(id, index) in keyRouteIDs(row).slice(0, 2)" :key="id" class="sw-route-chip">
-                    <span class="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] font-bold text-white">{{ index + 1 }}</span>
-                    <GroupBadge class="max-w-[7rem]" :name="groupOptions.find(group => group.value === id)?.label ?? (row.group?.id === id ? row.group.name : `#${id}`)" :platform="groupOptions.find(group => group.value === id)?.platform ?? row.group?.platform" :rate-multiplier="groupOptions.find(group => group.value === id)?.rate" :user-rate-multiplier="userGroupRates[id]" />
-                  </span>
-                  <span v-if="keyRouteIDs(row).length > 2" class="sw-route-more">+{{ keyRouteIDs(row).length - 2 }}</span>
+                <span v-if="keyRouteIDs(row).length" class="sw-route-chain" data-testid="key-route-summary">
+                  <template v-for="(id, index) in keyRouteIDs(row).slice(0, 2)" :key="id">
+                    <Icon v-if="index > 0" name="chevronRight" size="xs" class="sw-route-arrow" aria-hidden="true" />
+                    <span class="sw-route-step" :class="index === 0 ? 'sw-route-step-primary' : 'sw-route-step-fallback'">
+                      <span class="sw-route-rank" :class="index === 0 ? 'sw-route-rank-primary' : 'sw-route-rank-fallback'">{{ index + 1 }}</span>
+                      <PlatformIcon :platform="keyRoutePlatform(row, id)" size="xs" />
+                      <span class="sw-route-label">{{ keyRouteLabel(row, id) }}</span>
+                      <span v-if="keyRouteRateLabel(row, id)" class="sw-route-rate">{{ keyRouteRateLabel(row, id) }}</span>
+                    </span>
+                  </template>
+                  <span v-if="keyRouteIDs(row).length > 2" class="sw-route-overflow">+{{ keyRouteIDs(row).length - 2 }}</span>
                 </span>
-                <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
-                  t('keys.noGroup')
-                }}</span>
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
-                <svg
-                  class="h-3.5 w-3.5 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  stroke-width="2"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9"
-                  />
-                </svg>
+                <span v-else class="sw-route-empty">{{ t('keys.noGroup') }}</span>
+                <Icon name="edit" size="xs" class="sw-route-edit" aria-hidden="true" />
               </button>
             </div>
           </template>
@@ -1124,19 +1117,9 @@
             {{ t('keys.routing.save') }}
           </button>
         </div>
-        <label class="relative block">
-          <Icon name="search" size="sm" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            v-model="groupSearchQuery"
-            type="text"
-            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none transition focus:border-primary-400 focus:bg-white focus:ring-2 focus:ring-primary-100 dark:border-dark-600 dark:bg-dark-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-500 dark:focus:bg-dark-700 dark:focus:ring-primary-900/40"
-            :placeholder="t('keys.searchGroup')"
-            @click.stop
-          />
-        </label>
       </div>
       <div class="max-h-[65vh] overflow-y-auto overscroll-contain p-3">
-        <OrderedGroupSelector v-model="routeDraft" :options="filteredGroupOptions" :all-options="groupOptions" :disabled="routeSaving" />
+        <OrderedGroupSelector v-model="routeDraft" :options="groupOptions" :all-options="groupOptions" :disabled="routeSaving" />
       </div>
     </FloatingPanel>
   </AppLayout>
@@ -1169,7 +1152,6 @@ import BulkEditKeysModal from '@/components/keys/BulkEditKeysModal.vue'
 import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
-	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import OrderedGroupSelector from '@/components/keys/OrderedGroupSelector.vue'
 	import type { ApiKey, Group, PublicSettings, UpdateApiKeyRequest } from '@/types'
 import type { Column } from '@/components/common/types'
@@ -1520,17 +1502,6 @@ watch([showCreateModal, createProviderOptions], ([isOpen, providers], [wasOpen])
   // Switching provider tabs keeps the ordered routes selected on other tabs.
 })
 
-// Group dropdown search
-const groupSearchQuery = ref('')
-const filteredGroupOptions = computed(() => {
-  const query = groupSearchQuery.value.trim().toLowerCase()
-  if (!query) return groupOptions.value
-  return groupOptions.value.filter((opt) => {
-    return opt.label.toLowerCase().includes(query) ||
-      (opt.description && opt.description.toLowerCase().includes(query))
-  })
-})
-
 const copyToClipboard = async (text: string, keyId: number) => {
   const success = await clipboardCopy(text, t('keys.copied'))
   if (success) {
@@ -1718,6 +1689,22 @@ const toggleKeyStatus = async (key: ApiKey) => {
 const routeDraft = ref<number[]>([])
 const routeSaving = ref(false)
 const keyRouteIDs = (key: ApiKey): number[] => key.group_ids?.length ? [...key.group_ids] : key.group_id ? [key.group_id] : []
+const keyRouteGroup = (key: ApiKey, id: number) =>
+  groups.value.find(group => group.id === id) ?? (key.group?.id === id ? key.group : undefined)
+const keyRouteLabel = (key: ApiKey, id: number) =>
+  groupOptions.value.find(group => group.value === id)?.label ?? keyRouteGroup(key, id)?.name ?? `#${id}`
+const keyRoutePlatform = (key: ApiKey, id: number) =>
+  groupOptions.value.find(group => group.value === id)?.platform ?? keyRouteGroup(key, id)?.platform
+const keyRouteRateLabel = (key: ApiKey, id: number) => {
+  const option = groupOptions.value.find(group => group.value === id)
+  const group = keyRouteGroup(key, id)
+  if ((option?.subscriptionType ?? group?.subscription_type) === 'subscription') return t('groups.subscription')
+  const rate = option?.userRate ?? option?.rate ?? group?.rate_multiplier
+  return rate == null ? '' : `${rate}x`
+}
+const keyRouteTitle = (key: ApiKey) => keyRouteIDs(key)
+  .map((id, index) => `${index + 1}. ${keyRouteLabel(key, id)}`)
+  .join(' → ')
 const selectedKeyRouteGroups = computed(() => {
   if (!selectedKey.value) return []
   const key = selectedKey.value
@@ -1734,7 +1721,6 @@ const openGroupSelector = (key: ApiKey) => {
     groupSelectorKeyId.value = null
   } else {
     groupSelectorKeyId.value = key.id
-    groupSearchQuery.value = ''
   }
 }
 

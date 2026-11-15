@@ -301,10 +301,29 @@ describe('user KeysView column settings', () => {
     expect(save.exists()).toBe(true)
     expect(save.element.closest('.sticky')).not.toBeNull()
 
-    await wrapper.get('[data-test="ordered-group-selector"] input[type="checkbox"]').setValue(true)
+    await wrapper.get('[data-test="ordered-group-selector"] [data-group-id="2"]').trigger('click')
     await save.trigger('click')
     await flushPromises()
     expect(updateKey).toHaveBeenCalledWith(1, { group_id: 1, group_ids: [1, 2] })
+    wrapper.unmount()
+  })
+
+  it('shows the first two key routes in priority order and summarizes the rest', async () => {
+    const key = { ...createApiKey(), group_id: 1, group_ids: [1, 2, 3] } as ApiKey
+    listKeys.mockResolvedValueOnce({ items: [key], total: 1, page: 1, page_size: 20, pages: 1 })
+    getAvailableGroups.mockResolvedValue([
+      { id: 1, name: 'Primary', platform: 'openai', rate_multiplier: 0.3 },
+      { id: 2, name: 'Backup', platform: 'anthropic', rate_multiplier: 0.5 },
+      { id: 3, name: 'Overflow', platform: 'gemini', rate_multiplier: 1 },
+    ])
+
+    const wrapper = await mountView()
+    const route = wrapper.get('[data-testid="key-route-trigger"]')
+    expect(route.attributes('title')).toBe('1. Primary → 2. Backup → 3. Overflow')
+    expect(route.text()).toContain('Primary')
+    expect(route.text()).toContain('Backup')
+    expect(route.text()).toContain('+1')
+    expect(route.text()).not.toContain('Overflow')
     wrapper.unmount()
   })
 

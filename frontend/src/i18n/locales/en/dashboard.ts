@@ -110,6 +110,7 @@ export default {
       save: 'Save groups',
       selectedGroups: 'Route order',
       availableGroups: 'Add a group',
+      addGroup: 'Add group',
       addHint: 'New groups are added last',
       emptySelection: 'Select at least one group so this key can continue to work.',
       noMoreGroups: 'No other groups available to add',
