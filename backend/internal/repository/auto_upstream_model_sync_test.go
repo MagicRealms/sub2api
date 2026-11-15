@@ -23,6 +23,7 @@ func TestListDueAutoUpstreamModelSync(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 
 	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	require.Contains(t, listDueAutoUpstreamModelSyncSQL, "<= $1::bigint -")
 	query := regexp.QuoteMeta(listDueAutoUpstreamModelSyncSQL)
 	mock.ExpectQuery(query).
 		WithArgs(now.UnixMilli()).

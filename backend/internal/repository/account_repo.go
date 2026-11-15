@@ -1093,7 +1093,7 @@ FROM accounts
 WHERE deleted_at IS NULL
 	AND extra ->> 'auto_sync_upstream_models_enabled' = 'true'
 	AND extra ->> 'auto_sync_upstream_models_interval_hours' IN ('0.5', '1', '1.5', '2', '3', '4', '5')
-	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $1 - (` + autoUpstreamModelSyncIntervalMSExpr + `)
+	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $1::bigint - (` + autoUpstreamModelSyncIntervalMSExpr + `)
 ORDER BY id
 LIMIT 100`
 
