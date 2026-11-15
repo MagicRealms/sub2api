@@ -192,13 +192,15 @@ var providerProfiles = map[string]*ProviderProfile{
 		},
 	},
 	PlatformShareLLM: {
-		Platform:    PlatformShareLLM,
-		DefaultMode: AccountModePayG,
-		Routing:     ProviderRoutingByModel,
+		Platform:     PlatformShareLLM,
+		DefaultMode:  AccountModePayG,
+		Routing:      ProviderRoutingByModel,
+		ModelCatalog: true,
 		Modes: map[string]ProviderEndpoints{
 			AccountModePayG: {
 				BaseURLs: map[string]string{
 					APIProtocolChatCompletions: DefaultShareLLMBaseURL,
+					APIProtocolResponses:       DefaultShareLLMBaseURL,
 					APIProtocolAnthropic:       DefaultShareLLMAnthropicBaseURL,
 				},
 				ProtocolRules: []ProtocolRule{

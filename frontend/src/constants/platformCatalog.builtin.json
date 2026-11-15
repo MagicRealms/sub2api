@@ -227,12 +227,14 @@
       "multi_protocol": {
         "default_mode": "payg",
         "routing": "by_model",
+        "model_catalog": true,
         "modes": [
           {
             "mode": "payg",
             "base_urls": {
               "anthropic": "https://sharellm.net",
-              "chat_completions": "https://sharellm.net/v1"
+              "chat_completions": "https://sharellm.net/v1",
+              "responses": "https://sharellm.net/v1"
             },
             "protocol_rules": [
               {

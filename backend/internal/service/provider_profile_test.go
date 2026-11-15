@@ -193,8 +193,9 @@ func TestProviderProfile_ShareLLMDefaultsAndProtocolRules(t *testing.T) {
 	profile := LookupProviderProfile(PlatformShareLLM)
 	require.NotNil(t, profile)
 	require.Equal(t, ProviderRoutingByModel, profile.Routing)
+	require.True(t, profile.ModelCatalog)
 	require.Equal(t, DefaultShareLLMBaseURL, profile.DefaultBaseURL(AccountModePayG, APIProtocolChatCompletions))
-	require.Empty(t, profile.DefaultBaseURL(AccountModePayG, APIProtocolResponses))
+	require.Equal(t, DefaultShareLLMBaseURL, profile.DefaultBaseURL(AccountModePayG, APIProtocolResponses))
 	require.Equal(t, DefaultShareLLMAnthropicBaseURL, profile.DefaultBaseURL(AccountModePayG, APIProtocolAnthropic))
 	require.Equal(t, []ProtocolRule{
 		{Pattern: "claude-*", Protocol: APIProtocolAnthropic},
@@ -212,7 +213,7 @@ func TestProviderProfile_ShareLLMDefaultsAndProtocolRules(t *testing.T) {
 	}
 	require.True(t, account.IsMultiProtocolAPIKey())
 	require.True(t, account.routesByModel())
-	require.False(t, account.SupportsNativeCNResponses())
+	require.True(t, account.SupportsNativeCNResponses())
 	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "claude-sonnet-4-6", nil))
 	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolAnthropic, "deepseek-v4-flash", nil))
 	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1", nil))

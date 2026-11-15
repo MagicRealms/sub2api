@@ -29,6 +29,14 @@ const commandCodeModelsSample = `{"object":"list","data":[
 	{"id":"no-endpoints"}
 ]}`
 
+const shareLLMModelsSample = `{"object":"list","data":[
+	{"id":"gpt-6.1-sol","supported_endpoint_types":["openai"]},
+	{"id":"claude-sonnet-4-6","supported_endpoint_types":["anthropic","openai"]},
+	{"id":"grok-4.7","supported_endpoint_types":["openai","openai-response"]},
+	{"id":"unknown-types","supported_endpoint_types":["custom"]},
+	{"id":"untyped-model"}
+]}`
+
 func TestParseModelProtocolCatalog(t *testing.T) {
 	models, err := parseModelProtocolCatalog([]byte(commandCodeModelsSample))
 	require.NoError(t, err)
@@ -42,6 +50,33 @@ func TestParseModelProtocolCatalog(t *testing.T) {
 
 	_, err = parseModelProtocolCatalog([]byte(`{"data":[{"id":"gpt-5"},{"id":"glm-5"}]}`))
 	require.Error(t, err, "a plain /models without supported_endpoints is not a protocol catalog")
+}
+
+func TestParseModelProtocolCatalogEndpointTypes(t *testing.T) {
+	models, err := parseModelProtocolCatalog([]byte(shareLLMModelsSample))
+	require.NoError(t, err)
+	require.Equal(t, map[string][]string{
+		"gpt-6.1-sol":       {APIProtocolChatCompletions},
+		"claude-sonnet-4-6": {APIProtocolAnthropic, APIProtocolChatCompletions},
+		"grok-4.7":          {APIProtocolChatCompletions, APIProtocolResponses},
+	}, models)
+
+	account := &Account{
+		Platform: PlatformShareLLM,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":      "sk-test",
+			"account_mode": AccountModePayG,
+			"api_protocol": APIProtocolAdaptive,
+			"protocol_rules": []any{
+				map[string]any{"pattern": "claude-*", "protocol": APIProtocolAnthropic},
+				map[string]any{"pattern": "anthropic/*", "protocol": APIProtocolAnthropic},
+			},
+		},
+	}
+	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "gpt-6.1-sol", models["gpt-6.1-sol"]))
+	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "grok-4.7", models["grok-4.7"]))
+	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolAnthropic, "claude-sonnet-4-6", models["claude-sonnet-4-6"]))
 }
 
 func TestModelProtocolCatalogLookupRefreshesInBackground(t *testing.T) {
@@ -417,4 +452,41 @@ func TestCommandCodeGatewayFetchesModelCatalog(t *testing.T) {
 		require.Equal(t, "Bearer user_test_key", req.Header.Get("Authorization"))
 		require.Equal(t, fmt.Sprintf("t-%d", account.ID), getHeaderRaw(req.Header, "x-tenant"))
 	}
+}
+
+func TestShareLLMGatewayFetchesEndpointTypeCatalog(t *testing.T) {
+	account := &Account{
+		ID:          int64(time.Now().UnixNano()),
+		Platform:    PlatformShareLLM,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{
+			"api_key":      "sk-test",
+			"account_mode": AccountModePayG,
+			"api_protocol": APIProtocolAdaptive,
+			"protocol_rules": []any{
+				map[string]any{"pattern": "claude-*", "protocol": APIProtocolAnthropic},
+				map[string]any{"pattern": "anthropic/*", "protocol": APIProtocolAnthropic},
+			},
+		},
+	}
+	upstream := &commandCodeAlphaUpstream{responses: map[string]commandCodeAlphaResponse{
+		"/v1/models": {status: http.StatusOK, body: shareLLMModelsSample},
+	}}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+
+	gptProtocols := svc.modelCatalogProtocols(t.Context(), account, "gpt-6.1-sol")
+	grokProtocols := svc.modelCatalogProtocols(t.Context(), account, "grok-4.7")
+	claudeProtocols := svc.modelCatalogProtocols(t.Context(), account, "claude-sonnet-4-6")
+	require.Equal(t, []string{APIProtocolChatCompletions}, gptProtocols)
+	require.Equal(t, []string{APIProtocolChatCompletions, APIProtocolResponses}, grokProtocols)
+	require.Equal(t, []string{APIProtocolAnthropic, APIProtocolChatCompletions}, claudeProtocols)
+	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1-sol", gptProtocols))
+	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "grok-4.7", grokProtocols))
+	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolAnthropic, "claude-sonnet-4-6", claudeProtocols))
+
+	upstream.mu.Lock()
+	defer upstream.mu.Unlock()
+	require.Len(t, upstream.requests, 1)
+	require.Equal(t, "/v1/models", upstream.requests[0].URL.Path)
 }

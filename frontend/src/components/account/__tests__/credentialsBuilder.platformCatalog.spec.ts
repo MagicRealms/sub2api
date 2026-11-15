@@ -62,7 +62,7 @@ function legacyIsMultiProtocol(platform: string): boolean {
 }
 
 function legacySupportsResponses(platform: string): boolean {
-  return ['deepseek', 'kimi', 'minimax', 'opencode_go', 'command_code'].includes(platform)
+  return ['deepseek', 'kimi', 'minimax', 'opencode_go', 'sharellm', 'command_code'].includes(platform)
 }
 
 function legacyHeaderOverride(platform: string, type: string): boolean {
@@ -191,8 +191,8 @@ describe('credentialsBuilder derives multi-protocol data from the platform catal
     expect(providerNativeProtocols('zhipu', 'coding')).toEqual(['chat_completions', 'anthropic'])
     expect(providerRoutesByModel('sharellm')).toBe(true)
     expect(providerAccountModes('sharellm')).toEqual(['payg'])
-    expect(providerNativeProtocols('sharellm', 'payg')).toEqual(['chat_completions', 'anthropic'])
-    expect(providerHasModelCatalog('sharellm')).toBe(false)
+    expect(providerNativeProtocols('sharellm', 'payg')).toEqual(['chat_completions', 'anthropic', 'responses'])
+    expect(providerHasModelCatalog('sharellm')).toBe(true)
     expect(resolveProviderAccountMode('kimi', 'coding')).toBe('coding')
     expect(resolveProviderAccountMode('deepseek', 'coding')).toBe('payg')
     expect(resolveProviderAccountMode('opencode_go', undefined)).toBe('go')

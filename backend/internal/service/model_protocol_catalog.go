@@ -14,11 +14,12 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-// 上游模型目录中的协议能力。部分聚合平台（Command Code）在 {Chat Completions 基址}/models
-// 的每个模型上给出 supported_endpoints，例如：
+// 上游模型目录中的协议能力。部分聚合平台在 {Chat Completions 基址}/models
+// 的每个模型上给出 supported_endpoints 或 supported_endpoint_types，例如：
 //
 //	{"id":"deepseek/deepseek-v4-flash","supported_endpoints":["/chat/completions","/responses"]}
 //	{"id":"claude-sonnet-4-6","supported_endpoints":["/messages"]}
+//	{"id":"grok-4.7","supported_endpoint_types":["openai","openai-response"]}
 //
 // 按模型分流时据此判断模型是否支持入站协议：支持就同协议直通，省去一次协议转换
 // （见 modelProtocolSet）。
@@ -142,8 +143,21 @@ func modelEndpointProtocol(endpoint string) string {
 	}
 }
 
-// parseModelProtocolCatalog 解析 /models 响应；没有任何模型带可识别的 supported_endpoints
-// 时返回错误（上游不提供该字段，或是中转站的普通 /models）。
+func modelEndpointTypeProtocol(endpointType string) string {
+	switch strings.ToLower(strings.TrimSpace(endpointType)) {
+	case "openai":
+		return APIProtocolChatCompletions
+	case "openai-response":
+		return APIProtocolResponses
+	case "anthropic":
+		return APIProtocolAnthropic
+	default:
+		return ""
+	}
+}
+
+// parseModelProtocolCatalog 解析 /models 响应；没有任何模型带可识别的协议元数据
+// 时返回错误（上游不提供这些字段，或是中转站的普通 /models）。
 func parseModelProtocolCatalog(body []byte) (map[string][]string, error) {
 	entries, err := extractUpstreamModelRawEntries(body)
 	if err != nil {
@@ -156,10 +170,18 @@ func parseModelProtocolCatalog(body []byte) (map[string][]string, error) {
 			continue
 		}
 		var protocols []string
-		for _, endpoint := range gjson.GetBytes(raw, "supported_endpoints").Array() {
-			protocol := modelEndpointProtocol(endpoint.String())
-			if protocol != "" && !slices.Contains(protocols, protocol) {
-				protocols = append(protocols, protocol)
+		for _, field := range []struct {
+			path   string
+			mapper func(string) string
+		}{
+			{path: "supported_endpoints", mapper: modelEndpointProtocol},
+			{path: "supported_endpoint_types", mapper: modelEndpointTypeProtocol},
+		} {
+			for _, endpoint := range gjson.GetBytes(raw, field.path).Array() {
+				protocol := field.mapper(endpoint.String())
+				if protocol != "" && !slices.Contains(protocols, protocol) {
+					protocols = append(protocols, protocol)
+				}
 			}
 		}
 		if len(protocols) > 0 {
