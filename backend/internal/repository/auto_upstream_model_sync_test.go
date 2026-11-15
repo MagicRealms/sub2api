@@ -47,6 +47,7 @@ func TestClaimAutoUpstreamModelSyncIsConditionalAndIntervalBound(t *testing.T) {
 	t.Cleanup(func() { _ = client.Close() })
 
 	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	require.Contains(t, claimAutoUpstreamModelSyncSQL, "<= $2::bigint - $4::bigint")
 	mock.ExpectExec(regexp.QuoteMeta(claimAutoUpstreamModelSyncSQL)).
 		WithArgs(int64(9), now.UnixMilli(), "0.5", int64(30*time.Minute/time.Millisecond)).
 		WillReturnResult(sqlmock.NewResult(0, 1))

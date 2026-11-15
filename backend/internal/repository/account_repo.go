@@ -1108,7 +1108,7 @@ WHERE id = $1
 	AND deleted_at IS NULL
 	AND extra ->> 'auto_sync_upstream_models_enabled' = 'true'
 	AND extra ->> 'auto_sync_upstream_models_interval_hours' = $3
-	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $2 - $4`
+	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $2::bigint - $4::bigint`
 
 func (r *accountRepository) ListDueAutoUpstreamModelSync(ctx context.Context, now time.Time) ([]service.AutoUpstreamModelSyncCandidate, error) {
 	rows, err := r.sql.QueryContext(ctx, listDueAutoUpstreamModelSyncSQL, now.UnixMilli())
