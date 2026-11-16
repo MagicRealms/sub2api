@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 )
 
 // resolveUpstreamProtocol 决定 OpenAI 网关本次请求发往上游的协议
@@ -71,15 +72,21 @@ func (a *Account) resolveModelRoutedProtocolFor(model, inbound string, catalog [
 
 // modelProtocolSet 返回模型支持的上游协议集合（首项为首选），来源依次为：
 //  1. 账号 protocol_rules 中命中的规则（管理员显式配置）；
-//  2. 上游模型目录（catalog）：首选沿用内置规则对该模型的首选（在集合内时），否则取目录首项；
-//  3. profile 内置规则——仅在账号未配置 protocol_rules 时，已配置但未命中视为有意不走内置规则；
-//  4. Chat Completions，避免落入 Responses 转换链。
+//  2. 工具调用必须使用 Responses 的已知模型，在供应商提供原生 Responses 端点时固定走该协议；
+//  3. 上游模型目录（catalog）：首选沿用内置规则对该模型的首选（在集合内时），否则取目录首项；
+//  4. profile 内置规则——仅在账号未配置 protocol_rules 时，已配置但未命中视为有意不走内置规则；
+//  5. Chat Completions，避免落入 Responses 转换链。
 func (a *Account) modelProtocolSet(model string, catalog []string) []string {
 	rules, configured := a.configuredProtocolRules()
 	if configured {
 		if set, ok := matchProtocolRuleSet(model, rules); ok {
 			return set
 		}
+	}
+	// Some aggregators under-report per-model Responses support in /models even though
+	// the model requires Responses for tools and the provider exposes a native endpoint.
+	if openai.RequiresResponsesForToolCalls(model) && a.providerSupportsProtocol(APIProtocolResponses) {
+		return []string{APIProtocolResponses}
 	}
 	profileRules := a.providerProfile().Endpoints(a.GetCredential("account_mode")).ProtocolRules
 	if set := a.supportedCatalogProtocols(catalog); len(set) > 0 {

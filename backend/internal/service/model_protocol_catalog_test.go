@@ -74,9 +74,16 @@ func TestParseModelProtocolCatalogEndpointTypes(t *testing.T) {
 			},
 		},
 	}
-	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "gpt-6.1-sol", models["gpt-6.1-sol"]))
+	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "gpt-6.1-sol", models["gpt-6.1-sol"]))
+	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1-sol", models["gpt-6.1-sol"]))
 	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "grok-4.7", models["grok-4.7"]))
 	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolAnthropic, "claude-sonnet-4-6", models["claude-sonnet-4-6"]))
+
+	// Explicit account rules still take precedence over model-specific defaults.
+	account.Credentials["protocol_rules"] = []any{
+		map[string]any{"pattern": "gpt-6.1-sol", "protocol": APIProtocolChatCompletions},
+	}
+	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1-sol", models["gpt-6.1-sol"]))
 }
 
 func TestModelProtocolCatalogLookupRefreshesInBackground(t *testing.T) {
@@ -481,7 +488,8 @@ func TestShareLLMGatewayFetchesEndpointTypeCatalog(t *testing.T) {
 	require.Equal(t, []string{APIProtocolChatCompletions}, gptProtocols)
 	require.Equal(t, []string{APIProtocolChatCompletions, APIProtocolResponses}, grokProtocols)
 	require.Equal(t, []string{APIProtocolAnthropic, APIProtocolChatCompletions}, claudeProtocols)
-	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1-sol", gptProtocols))
+	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "gpt-6.1-sol", gptProtocols))
+	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1-sol", gptProtocols))
 	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "grok-4.7", grokProtocols))
 	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolAnthropic, "claude-sonnet-4-6", claudeProtocols))
 
