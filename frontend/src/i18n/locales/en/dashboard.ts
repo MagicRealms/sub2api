@@ -805,6 +805,8 @@ export default {
       officialPrice: 'Official Price',
       rate: 'Rate',
       unitPerMillion: '$ / 1M tokens',
+      unitPerMillionCny: 'RMB / 1M tokens',
+      unitPerMillionMixed: '/ 1M tokens (currency shown per model)',
       perUnitRequest: '/ request',
       perUnitImage: '/ image',
       perRequest: 'Per request',

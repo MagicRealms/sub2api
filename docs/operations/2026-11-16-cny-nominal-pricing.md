@@ -8,6 +8,7 @@
 - 本机生效文件：`/root/sub2api-deploy/data/model_pricing_override.json`。
 - 本机配置：`/root/sub2api-deploy/data/config.yaml` 的 `pricing.override_file: /app/data/model_pricing_override.json`。
 - JSON 价格单位是「站内余额 / token」。例如每百万输入 1，填写 `input_cost_per_token: 0.000001`。
+- 人民币价卡增加 `pricing_currency: "CNY"`，模型广场官方价与实付价均显示 `¥` 和 `RMB`；美元模型保持 `$`。组合分组按每个模型的币种显示，不将整个分组统一标成美元。此字段仅控制标识，价格数值与扣费不再换算。
 - 覆盖文件已有热重载机制：修改有效 JSON 后，在 `pricing.hash_check_interval_minutes` 对应的检查周期内加载，未配置时为 10 分钟。格式错误保留上次有效价卡；远端目录更新后仍会叠加此覆盖文件。
 - 下次调价维护此文件即可，不必反复改源码常量或重建镜像。源码中的 JSON 是本次配置快照，运行时使用挂载的数据文件。
 

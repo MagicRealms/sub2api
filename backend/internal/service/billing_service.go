@@ -96,6 +96,7 @@ type BillingCache interface {
 
 // ModelPricing 模型价格配置（per-token价格，与LiteLLM格式一致）
 type ModelPricing struct {
+	PricingCurrency string // 参考价卡的显示币种，不参与汇率或费用计算。
 	// 本地覆盖文件的逐字段优先级，随目录解析结果传递到统一计费入口。
 	tokenPriceOverrides tokenPriceOverrideFields
 	// UltrafastMultiplier is model-owned and independent of operator Fast pricing.
@@ -1460,6 +1461,7 @@ func (s *BillingService) getModelPricingAt(model string, pricingAt time.Time) (*
 			price1h := litellmPricing.CacheCreationInputTokenCostAbove1hr
 			enableBreakdown := price1h > 0 && price1h > price5m
 			return s.applyModelSpecificPricingPolicyEx(model, &ModelPricing{
+				PricingCurrency:                    litellmPricing.PricingCurrency,
 				tokenPriceOverrides:                litellmPricing.tokenPriceOverrides,
 				InputPricePerToken:                 litellmPricing.InputCostPerToken,
 				InputPricePerTokenPriority:         litellmPricing.InputCostPerTokenPriority,

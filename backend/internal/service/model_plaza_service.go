@@ -9,9 +9,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
-// PlazaOfficialPricing 模型广场展示用的官方参考价（USD per token），与计费同源：
+// PlazaOfficialPricing 模型广场展示用的参考价（per token），与计费同源：
 // LiteLLM → 内置兜底价卡 → 模型策略。字段为 nil 表示该项缺失（0 视为未配置）。
 type PlazaOfficialPricing struct {
+	Currency           string // USD（默认）或 CNY；仅显示，不换算价格。
 	InputPrice         *float64
 	OutputPrice        *float64
 	CacheWritePrice    *float64 // 5m 缓存写入（= LiteLLM cache_creation）
@@ -447,7 +448,12 @@ func (s *ModelPlazaService) lookupOfficialPricing(ctx context.Context, modelName
 	}
 	var result *PlazaOfficialPricing
 	if mp, err := s.billingService.GetModelPricing(modelName); err == nil && mp != nil {
+		currency := "USD"
+		if strings.EqualFold(strings.TrimSpace(mp.PricingCurrency), "CNY") {
+			currency = "CNY"
+		}
 		result = &PlazaOfficialPricing{
+			Currency:        currency,
 			InputPrice:      nonZeroPtr(mp.InputPricePerToken),
 			OutputPrice:     nonZeroPtr(mp.OutputPricePerToken),
 			CacheWritePrice: nonZeroPtr(mp.CacheCreationPricePerToken),

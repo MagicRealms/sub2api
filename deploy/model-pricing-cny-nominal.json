@@ -10,6 +10,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4-flash": {
@@ -23,6 +24,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4-flash-0731": {
@@ -36,6 +38,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4.1-flash": {
@@ -49,6 +52,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4.1-flash-1017": {
@@ -62,6 +66,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4-flash-vision-exp": {
@@ -75,6 +80,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4-pro": {
@@ -88,6 +94,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "deepseek-v4-pro-0813": {
@@ -101,6 +108,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "deepseek",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/"
   },
   "kimi-k3": {
@@ -114,6 +122,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "moonshot",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://platform.kimi.com/docs/pricing/chat"
   },
   "kimi-k3.1-pro": {
@@ -127,6 +136,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "moonshot",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://platform.kimi.com/docs/pricing/chat"
   },
   "kimi-k3.1-pro-highspeed": {
@@ -140,6 +150,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "moonshot",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://platform.kimi.com/docs/pricing/chat"
   },
   "kimi-k2.8-code": {
@@ -153,6 +164,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "moonshot",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://platform.kimi.com/docs/pricing/chat",
     "pricing_note": "运营者指定按 K2.7 Code 价计费；K2.8 Code 未公布独立官方 token 价格。"
   },
@@ -167,6 +179,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "z_ai",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
   },
   "glm-5.3": {
@@ -180,6 +193,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "z_ai",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
   },
   "glm-5.3-flash": {
@@ -193,6 +207,7 @@
     "long_context_output_cost_multiplier": 1,
     "litellm_provider": "z_ai",
     "mode": "chat",
+    "pricing_currency": "CNY",
     "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
   }
 }

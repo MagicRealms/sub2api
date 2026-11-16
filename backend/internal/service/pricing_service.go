@@ -241,6 +241,8 @@ type tokenPriceOverrideFields struct {
 
 // LiteLLMModelPricing LiteLLM价格数据结构。
 type LiteLLMModelPricing struct {
+	// PricingCurrency 仅标识价卡显示币种；计费使用配置数值，不进行汇率换算。
+	PricingCurrency string `json:"pricing_currency,omitempty"`
 	// 仅记录本地 override_file 显式覆盖的字段，避免模型默认策略再次覆盖运营定价。
 	tokenPriceOverrides                 tokenPriceOverrideFields
 	CacheCreationInputTokenCostExplicit bool    `json:"-"`
@@ -282,6 +284,7 @@ type PricingRemoteClient interface {
 
 // LiteLLMRawEntry 用于解析原始JSON数据
 type LiteLLMRawEntry struct {
+	PricingCurrency                     string   `json:"pricing_currency,omitempty"`
 	InputCostPerToken                   *float64 `json:"input_cost_per_token"`
 	InputCostPerTokenPriority           *float64 `json:"input_cost_per_token_priority"`
 	OutputCostPerToken                  *float64 `json:"output_cost_per_token"`
@@ -720,6 +723,7 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 
 		pricing := &LiteLLMModelPricing{
+			PricingCurrency:       entry.PricingCurrency,
 			tokenPriceOverrides:   explicitTokenPriceOverrides(overrides[modelName]),
 			LiteLLMProvider:       entry.LiteLLMProvider,
 			Mode:                  entry.Mode,

@@ -809,6 +809,8 @@ export default {
       officialPrice: '官方价格',
       rate: '折扣倍率',
       unitPerMillion: '$ / 1M token',
+      unitPerMillionCny: 'RMB / 1M token',
+      unitPerMillionMixed: '/ 1M token（币种见各模型）',
       perUnitRequest: '/ 次',
       perUnitImage: '/ 张',
       perRequest: '按次计费',

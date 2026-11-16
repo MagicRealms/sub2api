@@ -102,6 +102,7 @@ func TestCNYNominalPricingConfigBillsSameNumbersAndPopulatesPlaza(t *testing.T) 
 			require.InDelta(t, (tc.input+tc.output+tc.cacheRead+tc.write5m+tc.write1h)*tc.rate, cost.ActualCost, 1e-9)
 			official := plaza.lookupOfficialPricing(context.Background(), tc.model, make(map[string]*PlazaOfficialPricing))
 			require.NotNil(t, official)
+			require.Equal(t, "CNY", official.Currency, "人民币价卡的显示币种必须传递到广场")
 			require.InDelta(t, tc.input, *official.InputPrice*1000000, 1e-9)
 			require.InDelta(t, tc.output, *official.OutputPrice*1000000, 1e-9)
 			require.InDelta(t, tc.cacheRead, *official.CacheReadPrice*1000000, 1e-9)
@@ -115,6 +116,8 @@ func TestCNYNominalPricingConfigBillsSameNumbersAndPopulatesPlaza(t *testing.T) 
 	pricing, err := bs.GetModelPricing("gpt-5.4")
 	require.NoError(t, err)
 	require.InDelta(t, 2.5e-6, pricing.InputPricePerToken, 1e-15)
+	usdOfficial := plaza.lookupOfficialPricing(context.Background(), "gpt-5.4", make(map[string]*PlazaOfficialPricing))
+	require.Equal(t, "USD", usdOfficial.Currency, "没有人民币标记的模型继续展示美元")
 }
 
 func TestDeepSeekOverrideHotReloadAndRemoval(t *testing.T) {

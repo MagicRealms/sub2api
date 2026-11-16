@@ -160,6 +160,22 @@ func TestToModelPlazaOfficialPricing_NilPassthrough(t *testing.T) {
 	require.Nil(t, toModelPlazaOfficialPricing(nil))
 }
 
+func TestToModelPlazaOfficialPricing_CurrencyDoesNotConvertPrices(t *testing.T) {
+	for _, currency := range []string{"USD", "CNY"} {
+		t.Run(currency, func(t *testing.T) {
+			dto := toModelPlazaOfficialPricing(&service.PlazaOfficialPricing{
+				Currency: currency, InputPrice: testPtr(1e-6),
+			})
+			raw, err := json.Marshal(dto)
+			require.NoError(t, err)
+			var decoded map[string]any
+			require.NoError(t, json.Unmarshal(raw, &decoded))
+			require.Equal(t, currency, decoded["currency"])
+			require.InDelta(t, 1e-6, decoded["input_price"], 1e-15)
+		})
+	}
+}
+
 func TestToModelPlazaGroupDTO_LongContextTiersAndBasis(t *testing.T) {
 	maxTokens := 272000
 	g := service.PlazaGroup{

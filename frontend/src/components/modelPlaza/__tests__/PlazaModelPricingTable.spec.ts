@@ -58,6 +58,67 @@ function mountTable(
 }
 
 describe('PlazaModelPricingTable', () => {
+  it.each([null, 0.1])('shows CNY official and discounted prices without converting amounts (user rate=%s)', (userRate) => {
+    const model = tokenModel({ name: 'deepseek-v4.1-flash-1017', platform: 'deepseek' })
+    Object.assign(model.pricing!, { input_price: 1e-6, output_price: 4e-6, cache_write_price: null, cache_read_price: 2e-8 })
+    model.official_pricing = { currency: 'CNY', input_price: 1e-6, output_price: 4e-6, cache_write_price: null, cache_read_price: 2e-8 }
+    const wrapper = mountTable([model], 0.2, userRate)
+    try {
+      const cells = wrapper.findAll('tbody tr td')
+      expect(wrapper.find('thead').text()).toContain('modelPlaza.table.unitPerMillionCny')
+      expect(wrapper.find('[data-pricing-currency="CNY"]').text()).toBe('RMB')
+      expect(cells[1]!.text()).toBe(userRate == null ? '¥0.20' : '¥0.10')
+      expect(cells[2]!.text()).toBe(userRate == null ? '¥0.80' : '¥0.40')
+      expect(cells[4]!.text()).toBe('¥1.00')
+      expect(cells[5]!.text()).toBe('¥4.00')
+      expect(cells[6]!.text()).toContain('¥0.02')
+      expect(wrapper.text()).not.toContain('$')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('keeps RMB and USD distinct in a composite group using each model price card', () => {
+    const cny = tokenModel({ name: 'deepseek-flash', platform: 'deepseek' })
+    cny.official_pricing!.currency = 'CNY'
+    const usd = tokenModel({ name: 'gpt-6.1-sol', platform: 'openai' })
+    const wrapper = mountTable([cny, usd], 0.2)
+    try {
+      expect(wrapper.find('thead').text()).toContain('modelPlaza.table.unitPerMillionMixed')
+      const rows = wrapper.findAll('tbody tr')
+      const cnyRow = rows.find(row => row.text().includes('deepseek-flash'))!
+      const usdRow = rows.find(row => row.text().includes('gpt-6.1-sol'))!
+      expect(cnyRow.text()).toContain('¥0.60')
+      expect(cnyRow.text()).not.toContain('$')
+      expect(usdRow.text()).toContain('$0.60')
+      expect(usdRow.text()).not.toContain('¥')
+      expect(usdRow.find('[data-pricing-currency]').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('uses RMB for cache durations, context tiers and time-based rows', () => {
+    const model = tokenModel({ name: 'kimi-k3', platform: 'kimi' })
+    model.official_pricing!.currency = 'CNY'
+    model.pricing!.cache_write_1h_price = 6e-6
+    const tier = { min_tokens: 0, max_tokens: null, input_price: 3e-6, output_price: 1.5e-5, cache_write_price: 3.75e-6, cache_write_1h_price: 6e-6, cache_read_price: 3e-7, per_request_price: null }
+    model.pricing!.intervals = [tier]
+    model.official_pricing!.intervals = [tier]
+    model.time_pricing = { timezone: 'Asia/Shanghai', periods: [{ start_time: '09:00', end_time: '12:00', multiplier: 2 }] }
+    const wrapper = mountTable([model], 0.2)
+    try {
+      const rows = wrapper.findAll('tbody tr')
+      expect(rows).toHaveLength(2)
+      expect(rows[0]!.text()).toContain('(1h ¥1.20)')
+      expect(rows[1]!.text()).toContain('(1h ¥2.40)')
+      expect(rows[1]!.text()).toContain('(1h ¥6.00)')
+      expect(wrapper.text()).not.toContain('$')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it.each([false, true])('shows independent 12h prices without a 1h label (intervals=%s)', (intervals) => {
     const model = tokenModel({ name: 'gpt-6-luna', platform: 'openai' })
     model.pricing!.cache_write_price = null
