@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/stretchr/testify/require"
 )
 
@@ -325,6 +326,22 @@ func TestOpenAIStrictPriority_OptInScope(t *testing.T) {
 	}
 	svc.cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs = nil
 	require.False(t, svc.useOpenAIStrictPriority(context.Background(), &groupID, PlatformOpenAI, "", true))
+}
+
+func TestOpenAIStrictPriority_GroupSettingOverridesLegacyGroupList(t *testing.T) {
+	svc, _ := strictPriorityTestService()
+	groupID := strictPriorityTestGroup
+	enabled := false
+	group := &Group{
+		ID: groupID, Platform: PlatformComposite, Status: StatusActive, Hydrated: true,
+		StrictPriorityEnabled: &enabled,
+	}
+	ctx := context.WithValue(context.Background(), ctxkey.Group, group)
+	require.False(t, svc.useOpenAIStrictPriority(ctx, &groupID, PlatformOpenAI, "", true), "an explicit group opt-out overrides the legacy ID list")
+
+	enabled = true
+	svc.cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs = nil
+	require.True(t, svc.useOpenAIStrictPriority(ctx, &groupID, PlatformOpenAI, "", true), "an explicit group opt-in works without the legacy ID list")
 }
 
 func TestOpenAIStrictPriority_StalePrimaryInvalidationAndPriorityChange(t *testing.T) {

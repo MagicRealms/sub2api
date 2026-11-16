@@ -1504,9 +1504,8 @@ func (w GatewayOpenAIWSSchedulerScoreWeights) IsValid() bool {
 
 // GatewayOpenAISchedulerConfig OpenAI 高级调度器配置。
 type GatewayOpenAISchedulerConfig struct {
-	// StrictPriorityGroupIDs opts OpenAI text groups into failover-only priority
-	// tiers. Lower numeric priorities win; a busy tier queues instead of spilling
-	// to a more expensive tier. Empty preserves the existing scheduler behavior.
+	// StrictPriorityGroupIDs is the legacy fallback for groups without an explicit
+	// strict_priority_enabled value. An explicit per-group value takes precedence.
 	StrictPriorityGroupIDs []int64 `mapstructure:"strict_priority_group_ids"`
 	// StickyEscapeEnabled: 是否允许 session_hash sticky 在账号健康度劣化时临时逃逸
 	StickyEscapeEnabled bool `mapstructure:"sticky_escape_enabled"`

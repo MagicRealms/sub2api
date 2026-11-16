@@ -1052,6 +1052,12 @@ export default {
         privacySetOnlyEnabled: '已启用 — Privacy 未设置的账号将被排除',
         disabled: '未启用'
       },
+      strictPriority: {
+        title: '主备严格优先级',
+        enabled: '已启用 — 按账号优先级逐层使用，高优先级账号不可用时才尝试备线',
+        disabled: '未启用 — 按调度器评分和负载选择账号',
+        hint: '仅应用于 OpenAI 文本请求；复合分组仅影响路由到 OpenAI 的请求。'
+      },
       i18nField: {
         default: '默认',
         add: '新增 {language} 版',

@@ -1878,6 +1878,33 @@
           </div>
         </div>
 
+        <div
+          v-if="
+            !authStore.isSimpleMode &&
+            ['openai', 'composite'].includes(createForm.platform)
+          "
+          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t("admin.groups.strictPriority.title") }}
+              </label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{
+                  createForm.strict_priority_enabled
+                    ? t("admin.groups.strictPriority.enabled")
+                    : t("admin.groups.strictPriority.disabled")
+                }}
+              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.groups.strictPriority.hint") }}
+              </p>
+            </div>
+            <Toggle v-model="createForm.strict_priority_enabled" />
+          </div>
+        </div>
+
         <!-- 无效请求兜底（仅 anthropic/antigravity 平台，且非订阅分组） -->
         <div
           v-if="
@@ -3527,6 +3554,33 @@
           </div>
         </div>
 
+        <div
+          v-if="
+            !authStore.isSimpleMode &&
+            ['openai', 'composite'].includes(editForm.platform)
+          "
+          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t("admin.groups.strictPriority.title") }}
+              </label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{
+                  editForm.strict_priority_enabled
+                    ? t("admin.groups.strictPriority.enabled")
+                    : t("admin.groups.strictPriority.disabled")
+                }}
+              </p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.groups.strictPriority.hint") }}
+              </p>
+            </div>
+            <Toggle v-model="editForm.strict_priority_enabled" />
+          </div>
+        </div>
+
         <!-- 无效请求兜底（仅 anthropic/antigravity 平台，且非订阅分组） -->
         <div
           v-if="
@@ -5008,6 +5062,7 @@ const createForm = reactive({
   // 账号过滤控制（OpenAI/Antigravity 平台）
   require_oauth_only: false,
   require_privacy_set: false,
+  strict_priority_enabled: false,
   // 模型路由开关
   model_routing_enabled: false,
   // 支持的模型系列（仅 antigravity 平台）
@@ -5376,6 +5431,7 @@ const editForm = reactive({
   // 账号过滤控制（OpenAI/Antigravity 平台）
   require_oauth_only: false,
   require_privacy_set: false,
+  strict_priority_enabled: false,
   // 模型路由开关
   model_routing_enabled: false,
   // 支持的模型系列（仅 antigravity 平台）
@@ -6149,6 +6205,7 @@ const handleEdit = async (group: AdminGroup) => {
     messagesDispatchFormState.exact_model_mappings;
   editForm.require_oauth_only = group.require_oauth_only ?? false;
   editForm.require_privacy_set = group.require_privacy_set ?? false;
+  editForm.strict_priority_enabled = group.strict_priority_enabled ?? false;
   editForm.model_routing_enabled = group.model_routing_enabled || false;
   editForm.supported_model_scopes = group.supported_model_scopes || [
     "claude",

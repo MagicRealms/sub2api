@@ -2272,14 +2272,23 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerBySize(
 type openAIGroupPrivacyRequirementContextKey struct{}
 
 type openAIGroupPrivacyRequirement struct {
-	groupID  int64
-	required bool
+	groupID               int64
+	required              bool
+	strictPriorityEnabled *bool
 }
 
 func (s *OpenAIGatewayService) withOpenAIGroupPrivacyRequirement(ctx context.Context, groupID *int64) context.Context {
+	group, err := s.loadOpenAIGroupSettings(ctx, groupID)
+	required := err != nil
+	var strictPriorityEnabled *bool
+	if err == nil && group != nil {
+		required = group.RequirePrivacySet
+		strictPriorityEnabled = group.StrictPriorityEnabled
+	}
 	return context.WithValue(ctx, openAIGroupPrivacyRequirementContextKey{}, openAIGroupPrivacyRequirement{
-		groupID:  derefGroupID(groupID),
-		required: s.loadOpenAIGroupRequiresPrivacySet(ctx, groupID),
+		groupID:               derefGroupID(groupID),
+		required:              required,
+		strictPriorityEnabled: strictPriorityEnabled,
 	})
 }
 
@@ -2291,22 +2300,36 @@ func (s *OpenAIGatewayService) openAIGroupRequiresPrivacySet(ctx context.Context
 }
 
 func (s *OpenAIGatewayService) loadOpenAIGroupRequiresPrivacySet(ctx context.Context, groupID *int64) bool {
-	if s == nil || groupID == nil {
-		return false
-	}
-	// 直连请求的被调度分组即认证分组，复用 auth 快照；composite 等 ID 不一致时回源。
-	if ctxGroup, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(ctxGroup) && ctxGroup.ID == *groupID {
-		return ctxGroup.RequirePrivacySet
-	}
-	if s.schedulerSnapshot == nil {
-		return false
-	}
-	// GetByID 会聚合账号计数；隐私开关只在分组行上。
-	group, err := s.schedulerSnapshot.GetGroupByIDLite(ctx, *groupID)
+	group, err := s.loadOpenAIGroupSettings(ctx, groupID)
 	if err != nil {
 		return true
 	}
 	return group != nil && group.RequirePrivacySet
+}
+
+func (s *OpenAIGatewayService) openAIGroupStrictPriorityOverride(ctx context.Context, groupID *int64) *bool {
+	if cached, ok := ctx.Value(openAIGroupPrivacyRequirementContextKey{}).(openAIGroupPrivacyRequirement); ok && cached.groupID == derefGroupID(groupID) {
+		return cached.strictPriorityEnabled
+	}
+	group, err := s.loadOpenAIGroupSettings(ctx, groupID)
+	if err != nil || group == nil {
+		return nil
+	}
+	return group.StrictPriorityEnabled
+}
+
+func (s *OpenAIGatewayService) loadOpenAIGroupSettings(ctx context.Context, groupID *int64) (*Group, error) {
+	if s == nil || groupID == nil {
+		return nil, nil
+	}
+	// The authentication snapshot covers direct groups; composite target groups are loaded by ID.
+	if ctxGroup, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(ctxGroup) && ctxGroup.ID == *groupID {
+		return ctxGroup, nil
+	}
+	if s.schedulerSnapshot == nil {
+		return nil, nil
+	}
+	return s.schedulerSnapshot.GetGroupByIDLite(ctx, *groupID)
 }
 
 // applyLegacySelectionDecision 把非高级调度路径的选号结果回填到决策：记录选中账号，

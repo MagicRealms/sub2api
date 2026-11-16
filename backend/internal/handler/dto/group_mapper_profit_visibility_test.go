@@ -73,3 +73,16 @@ func TestGroupFromServiceAdminIncludesProfitControl(t *testing.T) {
 		}
 	}
 }
+
+func TestGroupStrictPrioritySettingIsAdminOnly(t *testing.T) {
+	enabled := true
+	group := &service.Group{ID: 7, Name: "strict", Platform: service.PlatformOpenAI, StrictPriorityEnabled: &enabled}
+
+	admin := GroupFromServiceAdmin(group)
+	if !admin.StrictPriorityEnabled {
+		t.Fatal("administrator DTO should include the per-group priority setting")
+	}
+	if _, ok := marshalToMap(t, GroupFromService(group))["strict_priority_enabled"]; ok {
+		t.Fatal("strict_priority_enabled must not be exposed on the user-facing group DTO")
+	}
+}

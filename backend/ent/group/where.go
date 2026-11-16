@@ -275,6 +275,11 @@ func ModelRoutingEnabled(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldModelRoutingEnabled, v))
 }
 
+// StrictPriorityEnabled applies equality check predicate on the "strict_priority_enabled" field. It's identical to StrictPriorityEnabledEQ.
+func StrictPriorityEnabled(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldStrictPriorityEnabled, v))
+}
+
 // McpXMLInject applies equality check predicate on the "mcp_xml_inject" field. It's identical to McpXMLInjectEQ.
 func McpXMLInject(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldMcpXMLInject, v))
@@ -2228,6 +2233,26 @@ func ModelRoutingEnabledEQ(v bool) predicate.Group {
 // ModelRoutingEnabledNEQ applies the NEQ predicate on the "model_routing_enabled" field.
 func ModelRoutingEnabledNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldModelRoutingEnabled, v))
+}
+
+// StrictPriorityEnabledEQ applies the EQ predicate on the "strict_priority_enabled" field.
+func StrictPriorityEnabledEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldStrictPriorityEnabled, v))
+}
+
+// StrictPriorityEnabledNEQ applies the NEQ predicate on the "strict_priority_enabled" field.
+func StrictPriorityEnabledNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldStrictPriorityEnabled, v))
+}
+
+// StrictPriorityEnabledIsNil applies the IsNil predicate on the "strict_priority_enabled" field.
+func StrictPriorityEnabledIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldStrictPriorityEnabled))
+}
+
+// StrictPriorityEnabledNotNil applies the NotNil predicate on the "strict_priority_enabled" field.
+func StrictPriorityEnabledNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldStrictPriorityEnabled))
 }
 
 // McpXMLInjectEQ applies the EQ predicate on the "mcp_xml_inject" field.

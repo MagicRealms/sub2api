@@ -14,11 +14,17 @@ var errOpenAIStrictPriorityChanged = fmt.Errorf("%w: account priority changed du
 // their current routing. This policy is independent of the weighted scheduler's
 // global switch, so disabling scoring cannot silently restore capacity spillover.
 func (s *OpenAIGatewayService) useOpenAIStrictPriority(ctx context.Context, groupID *int64, platform string, imageCapability OpenAIImagesCapability, useUpstreamTokenCost bool) bool {
-	if s == nil || s.cfg == nil || groupID == nil || *groupID <= 0 ||
+	if s == nil || groupID == nil || *groupID <= 0 ||
 		platform != PlatformOpenAI || imageCapability != "" || !useUpstreamTokenCost {
 		return false
 	}
 	if _, suppressed := ctx.Value(openAIProfitControlSuppressCtxKey{}).(struct{}); suppressed {
+		return false
+	}
+	if override := s.openAIGroupStrictPriorityOverride(ctx, groupID); override != nil {
+		return *override
+	}
+	if s.cfg == nil {
 		return false
 	}
 	for _, id := range s.cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs {

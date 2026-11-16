@@ -141,6 +141,7 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		FallbackGroupIDOnInvalidRequest: cloneGroupValuePointer(source.FallbackGroupIDOnInvalidRequest),
 		ModelRouting:                    cloneGroupModelRouting(source.ModelRouting),
 		ModelRoutingEnabled:             source.ModelRoutingEnabled,
+		StrictPriorityEnabled:           cloneGroupValuePointer(source.StrictPriorityEnabled),
 		MCPXMLInject:                    source.MCPXMLInject,
 		SupportedModelScopes:            append([]string(nil), source.SupportedModelScopes...),
 		SortOrder:                       source.SortOrder,
@@ -211,6 +212,8 @@ func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorSc
 	if err != nil {
 		return nil, err
 	}
+	strictPriorityEnabled := s.effectiveGroupStrictPriorityEnabled(source)
+	source.StrictPriorityEnabled = &strictPriorityEnabled
 	if s.groupDuplicateRepo == nil {
 		return nil, errors.New("group duplicate repository is not configured")
 	}
@@ -242,4 +245,21 @@ func (s *adminServiceImpl) DuplicateGroup(ctx context.Context, id int64, actorSc
 			return recovered, nil
 		}
 	}
+}
+
+func (s *adminServiceImpl) effectiveGroupStrictPriorityEnabled(group *Group) bool {
+	if group == nil {
+		return false
+	}
+	if group.StrictPriorityEnabled != nil {
+		return *group.StrictPriorityEnabled
+	}
+	if s != nil && s.cfg != nil {
+		for _, groupID := range s.cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs {
+			if groupID == group.ID {
+				return true
+			}
+		}
+	}
+	return false
 }

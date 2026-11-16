@@ -662,6 +662,20 @@ func (_c *GroupCreate) SetNillableModelRoutingEnabled(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetStrictPriorityEnabled sets the "strict_priority_enabled" field.
+func (_c *GroupCreate) SetStrictPriorityEnabled(v bool) *GroupCreate {
+	_c.mutation.SetStrictPriorityEnabled(v)
+	return _c
+}
+
+// SetNillableStrictPriorityEnabled sets the "strict_priority_enabled" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableStrictPriorityEnabled(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetStrictPriorityEnabled(*v)
+	}
+	return _c
+}
+
 // SetMcpXMLInject sets the "mcp_xml_inject" field.
 func (_c *GroupCreate) SetMcpXMLInject(v bool) *GroupCreate {
 	_c.mutation.SetMcpXMLInject(v)
@@ -1670,6 +1684,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ModelRoutingEnabled(); ok {
 		_spec.SetField(group.FieldModelRoutingEnabled, field.TypeBool, value)
 		_node.ModelRoutingEnabled = value
+	}
+	if value, ok := _c.mutation.StrictPriorityEnabled(); ok {
+		_spec.SetField(group.FieldStrictPriorityEnabled, field.TypeBool, value)
+		_node.StrictPriorityEnabled = &value
 	}
 	if value, ok := _c.mutation.McpXMLInject(); ok {
 		_spec.SetField(group.FieldMcpXMLInject, field.TypeBool, value)
@@ -2720,6 +2738,24 @@ func (u *GroupUpsert) SetModelRoutingEnabled(v bool) *GroupUpsert {
 // UpdateModelRoutingEnabled sets the "model_routing_enabled" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateModelRoutingEnabled() *GroupUpsert {
 	u.SetExcluded(group.FieldModelRoutingEnabled)
+	return u
+}
+
+// SetStrictPriorityEnabled sets the "strict_priority_enabled" field.
+func (u *GroupUpsert) SetStrictPriorityEnabled(v bool) *GroupUpsert {
+	u.Set(group.FieldStrictPriorityEnabled, v)
+	return u
+}
+
+// UpdateStrictPriorityEnabled sets the "strict_priority_enabled" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateStrictPriorityEnabled() *GroupUpsert {
+	u.SetExcluded(group.FieldStrictPriorityEnabled)
+	return u
+}
+
+// ClearStrictPriorityEnabled clears the value of the "strict_priority_enabled" field.
+func (u *GroupUpsert) ClearStrictPriorityEnabled() *GroupUpsert {
+	u.SetNull(group.FieldStrictPriorityEnabled)
 	return u
 }
 
@@ -3984,6 +4020,27 @@ func (u *GroupUpsertOne) SetModelRoutingEnabled(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateModelRoutingEnabled() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateModelRoutingEnabled()
+	})
+}
+
+// SetStrictPriorityEnabled sets the "strict_priority_enabled" field.
+func (u *GroupUpsertOne) SetStrictPriorityEnabled(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetStrictPriorityEnabled(v)
+	})
+}
+
+// UpdateStrictPriorityEnabled sets the "strict_priority_enabled" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateStrictPriorityEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateStrictPriorityEnabled()
+	})
+}
+
+// ClearStrictPriorityEnabled clears the value of the "strict_priority_enabled" field.
+func (u *GroupUpsertOne) ClearStrictPriorityEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearStrictPriorityEnabled()
 	})
 }
 
@@ -5458,6 +5515,27 @@ func (u *GroupUpsertBulk) SetModelRoutingEnabled(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateModelRoutingEnabled() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateModelRoutingEnabled()
+	})
+}
+
+// SetStrictPriorityEnabled sets the "strict_priority_enabled" field.
+func (u *GroupUpsertBulk) SetStrictPriorityEnabled(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetStrictPriorityEnabled(v)
+	})
+}
+
+// UpdateStrictPriorityEnabled sets the "strict_priority_enabled" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateStrictPriorityEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateStrictPriorityEnabled()
+	})
+}
+
+// ClearStrictPriorityEnabled clears the value of the "strict_priority_enabled" field.
+func (u *GroupUpsertBulk) ClearStrictPriorityEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.ClearStrictPriorityEnabled()
 	})
 }
 

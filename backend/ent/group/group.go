@@ -112,6 +112,8 @@ const (
 	FieldModelRouting = "model_routing"
 	// FieldModelRoutingEnabled holds the string denoting the model_routing_enabled field in the database.
 	FieldModelRoutingEnabled = "model_routing_enabled"
+	// FieldStrictPriorityEnabled holds the string denoting the strict_priority_enabled field in the database.
+	FieldStrictPriorityEnabled = "strict_priority_enabled"
 	// FieldMcpXMLInject holds the string denoting the mcp_xml_inject field in the database.
 	FieldMcpXMLInject = "mcp_xml_inject"
 	// FieldSupportedModelScopes holds the string denoting the supported_model_scopes field in the database.
@@ -275,6 +277,7 @@ var Columns = []string{
 	FieldFallbackGroupIDOnInvalidRequest,
 	FieldModelRouting,
 	FieldModelRoutingEnabled,
+	FieldStrictPriorityEnabled,
 	FieldMcpXMLInject,
 	FieldSupportedModelScopes,
 	FieldSortOrder,
@@ -672,6 +675,11 @@ func ByFallbackGroupIDOnInvalidRequest(opts ...sql.OrderTermOption) OrderOption 
 // ByModelRoutingEnabled orders the results by the model_routing_enabled field.
 func ByModelRoutingEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldModelRoutingEnabled, opts...).ToFunc()
+}
+
+// ByStrictPriorityEnabled orders the results by the strict_priority_enabled field.
+func ByStrictPriorityEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStrictPriorityEnabled, opts...).ToFunc()
 }
 
 // ByMcpXMLInject orders the results by the mcp_xml_inject field.

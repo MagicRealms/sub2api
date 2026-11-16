@@ -956,6 +956,12 @@ export default {
         privacySetOnlyEnabled: 'Enabled — accounts with unset Privacy will be excluded',
         disabled: 'Disabled'
       },
+      strictPriority: {
+        title: 'Strict primary and backup priority',
+        enabled: 'Enabled — use accounts by priority tier; try backups only when higher-priority accounts are unavailable',
+        disabled: 'Disabled — choose accounts by scheduler score and load',
+        hint: 'Applies to OpenAI text requests. Composite groups use it only for requests routed to OpenAI.'
+      },
       form: {
         name: 'Name',
         description: 'Description',

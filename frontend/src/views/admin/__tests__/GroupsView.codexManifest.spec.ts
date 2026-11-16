@@ -12,12 +12,14 @@ const {
   getUsageSummary,
   getCapacitySummary,
   getLiveCapability,
+  updateGroup,
 } = vi.hoisted(() => ({
   listGroups: vi.fn(),
   getModelAllowlistCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
   getLiveCapability: vi.fn(),
+  updateGroup: vi.fn(),
 }));
 
 vi.mock("@/api/admin", () => ({
@@ -30,7 +32,7 @@ vi.mock("@/api/admin", () => ({
       getCapacitySummary,
       getLiveCapability,
       create: vi.fn(),
-      update: vi.fn(),
+      update: updateGroup,
       delete: vi.fn(),
       duplicate: vi.fn(),
       updateSortOrder: vi.fn(),
@@ -118,6 +120,7 @@ const sourceGroup = {
   updated_at: "2026-09-05T00:00:00Z",
   model_routing: null,
   model_routing_enabled: false,
+  strict_priority_enabled: true,
   mcp_xml_inject: true,
   supported_model_scopes: [],
   account_count: 1,
@@ -202,6 +205,13 @@ const CodexManifestAccountsFieldStub = defineComponent({
   },
 });
 
+const ReasoningEffortPolicyFieldsStub = defineComponent({
+  setup(_props, { expose }) {
+    expose({ validate: () => true, resetValidation: () => undefined });
+    return () => h("div");
+  },
+});
+
 const mountView = () =>
   mount(GroupsView, {
     global: {
@@ -220,7 +230,7 @@ const mountView = () =>
         GroupCapacityBadge: true,
         GroupRateMultipliersModal: true,
         GroupRPMOverridesModal: true,
-        ReasoningEffortPolicyFields: true,
+        ReasoningEffortPolicyFields: ReasoningEffortPolicyFieldsStub,
         CodexManifestAccountsField: CodexManifestAccountsFieldStub,
         PricingEntryCard: true,
         VueDraggable: true,
@@ -236,6 +246,7 @@ describe("GroupsView Codex manifest binding", () => {
     getUsageSummary.mockReset();
     getCapacitySummary.mockReset();
     getLiveCapability.mockReset();
+    updateGroup.mockReset().mockResolvedValue(sourceGroup);
 
     listGroups.mockResolvedValue({
       items: [sourceGroup],
@@ -283,6 +294,38 @@ describe("GroupsView Codex manifest binding", () => {
       }),
     );
 
+    wrapper.unmount();
+  });
+
+  it("saves the per-group strict priority setting from the editor", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const editButton = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("common.edit"));
+    expect(editButton).toBeTruthy();
+    await editButton!.trigger("click");
+    await flushPromises();
+
+    const strictLabel = wrapper
+      .findAll("label")
+      .find((label) => label.text().includes("admin.groups.strictPriority.title"));
+    expect(strictLabel).toBeTruthy();
+    const toggleContainer = strictLabel!.element.parentElement!.parentElement!;
+    const toggle = wrapper
+      .findAll('button[role="switch"]')
+      .find((button) => toggleContainer.contains(button.element));
+    expect(toggle?.attributes("aria-checked")).toBe("true");
+
+    await toggle!.trigger("click");
+    await wrapper.get("#edit-group-form").trigger("submit");
+    await flushPromises();
+
+    expect(updateGroup).toHaveBeenCalledWith(
+      sourceGroup.id,
+      expect.objectContaining({ strict_priority_enabled: false }),
+    );
     wrapper.unmount();
   });
 });

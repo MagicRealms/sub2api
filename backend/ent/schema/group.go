@@ -226,6 +226,10 @@ func (Group) Fields() []ent.Field {
 		field.Bool("model_routing_enabled").
 			Default(false).
 			Comment("是否启用模型路由配置"),
+		field.Bool("strict_priority_enabled").
+			Optional().
+			Nillable().
+			Comment("是否为该分组启用 OpenAI 文本账号严格优先级；空值沿用旧版全局名单"),
 
 		// MCP XML 协议注入开关 (added by migration 042)
 		field.Bool("mcp_xml_inject").

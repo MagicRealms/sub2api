@@ -934,6 +934,26 @@ func (_u *GroupUpdate) SetNillableModelRoutingEnabled(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetStrictPriorityEnabled sets the "strict_priority_enabled" field.
+func (_u *GroupUpdate) SetStrictPriorityEnabled(v bool) *GroupUpdate {
+	_u.mutation.SetStrictPriorityEnabled(v)
+	return _u
+}
+
+// SetNillableStrictPriorityEnabled sets the "strict_priority_enabled" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableStrictPriorityEnabled(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetStrictPriorityEnabled(*v)
+	}
+	return _u
+}
+
+// ClearStrictPriorityEnabled clears the value of the "strict_priority_enabled" field.
+func (_u *GroupUpdate) ClearStrictPriorityEnabled() *GroupUpdate {
+	_u.mutation.ClearStrictPriorityEnabled()
+	return _u
+}
+
 // SetMcpXMLInject sets the "mcp_xml_inject" field.
 func (_u *GroupUpdate) SetMcpXMLInject(v bool) *GroupUpdate {
 	_u.mutation.SetMcpXMLInject(v)
@@ -1860,6 +1880,12 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ModelRoutingEnabled(); ok {
 		_spec.SetField(group.FieldModelRoutingEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.StrictPriorityEnabled(); ok {
+		_spec.SetField(group.FieldStrictPriorityEnabled, field.TypeBool, value)
+	}
+	if _u.mutation.StrictPriorityEnabledCleared() {
+		_spec.ClearField(group.FieldStrictPriorityEnabled, field.TypeBool)
 	}
 	if value, ok := _u.mutation.McpXMLInject(); ok {
 		_spec.SetField(group.FieldMcpXMLInject, field.TypeBool, value)
@@ -3154,6 +3180,26 @@ func (_u *GroupUpdateOne) SetNillableModelRoutingEnabled(v *bool) *GroupUpdateOn
 	return _u
 }
 
+// SetStrictPriorityEnabled sets the "strict_priority_enabled" field.
+func (_u *GroupUpdateOne) SetStrictPriorityEnabled(v bool) *GroupUpdateOne {
+	_u.mutation.SetStrictPriorityEnabled(v)
+	return _u
+}
+
+// SetNillableStrictPriorityEnabled sets the "strict_priority_enabled" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableStrictPriorityEnabled(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetStrictPriorityEnabled(*v)
+	}
+	return _u
+}
+
+// ClearStrictPriorityEnabled clears the value of the "strict_priority_enabled" field.
+func (_u *GroupUpdateOne) ClearStrictPriorityEnabled() *GroupUpdateOne {
+	_u.mutation.ClearStrictPriorityEnabled()
+	return _u
+}
+
 // SetMcpXMLInject sets the "mcp_xml_inject" field.
 func (_u *GroupUpdateOne) SetMcpXMLInject(v bool) *GroupUpdateOne {
 	_u.mutation.SetMcpXMLInject(v)
@@ -4110,6 +4156,12 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.ModelRoutingEnabled(); ok {
 		_spec.SetField(group.FieldModelRoutingEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.StrictPriorityEnabled(); ok {
+		_spec.SetField(group.FieldStrictPriorityEnabled, field.TypeBool, value)
+	}
+	if _u.mutation.StrictPriorityEnabledCleared() {
+		_spec.ClearField(group.FieldStrictPriorityEnabled, field.TypeBool)
 	}
 	if value, ok := _u.mutation.McpXMLInject(); ok {
 		_spec.SetField(group.FieldMcpXMLInject, field.TypeBool, value)

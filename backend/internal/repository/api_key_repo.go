@@ -239,6 +239,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldProfitSafetyBuffer,
 				// OpenAI 选号从 ctx 分组读取隐私门，漏选会放行未设置隐私的账号。
 				group.FieldRequirePrivacySet,
+				group.FieldStrictPriorityEnabled,
 			)
 		}).
 		Only(ctx)
@@ -1060,6 +1061,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
 		ModelRouting:                    g.ModelRouting,
 		ModelRoutingEnabled:             g.ModelRoutingEnabled,
+		StrictPriorityEnabled:           g.StrictPriorityEnabled,
 		MCPXMLInject:                    g.McpXMLInject,
 		SupportedModelScopes:            g.SupportedModelScopes,
 		SortOrder:                       g.SortOrder,

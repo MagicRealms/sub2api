@@ -29,6 +29,26 @@ type GroupHandler struct {
 	cfg                  *config.Config
 }
 
+func (h *GroupHandler) adminGroupDTO(group *service.Group) *dto.AdminGroup {
+	out := dto.GroupFromServiceAdmin(group)
+	if out == nil || group == nil {
+		return out
+	}
+	if group.StrictPriorityEnabled != nil {
+		out.StrictPriorityEnabled = *group.StrictPriorityEnabled
+		return out
+	}
+	if h != nil && h.cfg != nil {
+		for _, groupID := range h.cfg.Gateway.OpenAIScheduler.StrictPriorityGroupIDs {
+			if groupID == group.ID {
+				out.StrictPriorityEnabled = true
+				break
+			}
+		}
+	}
+	return out
+}
+
 // GetLiveCapability 返回当前服务端是否具备生成 Live attestation 的运行环境。
 func (h *GroupHandler) GetLiveCapability(c *gin.Context) {
 	if h.rejectUnsupportedSimpleModeOperation(c, "live_capability") {
@@ -231,9 +251,10 @@ type CreateGroupRequest struct {
 	FallbackGroupID                 *int64                        `json:"fallback_group_id"`
 	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request"`
 	// 模型路由配置（仅 anthropic 平台使用）
-	ModelRouting        map[string][]int64 `json:"model_routing"`
-	ModelRoutingEnabled bool               `json:"model_routing_enabled"`
-	MCPXMLInject        *bool              `json:"mcp_xml_inject"`
+	ModelRouting          map[string][]int64 `json:"model_routing"`
+	ModelRoutingEnabled   bool               `json:"model_routing_enabled"`
+	StrictPriorityEnabled bool               `json:"strict_priority_enabled"`
+	MCPXMLInject          *bool              `json:"mcp_xml_inject"`
 	// 支持的模型系列（仅 antigravity 平台使用）
 	SupportedModelScopes []string `json:"supported_model_scopes"`
 	// OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -308,9 +329,10 @@ type UpdateGroupRequest struct {
 	FallbackGroupID                 *int64                        `json:"fallback_group_id"`
 	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request"`
 	// 模型路由配置（仅 anthropic 平台使用）
-	ModelRouting        map[string][]int64 `json:"model_routing"`
-	ModelRoutingEnabled *bool              `json:"model_routing_enabled"`
-	MCPXMLInject        *bool              `json:"mcp_xml_inject"`
+	ModelRouting          map[string][]int64 `json:"model_routing"`
+	ModelRoutingEnabled   *bool              `json:"model_routing_enabled"`
+	StrictPriorityEnabled *bool              `json:"strict_priority_enabled"`
+	MCPXMLInject          *bool              `json:"mcp_xml_inject"`
 	// 支持的模型系列（仅 antigravity 平台使用）
 	SupportedModelScopes *[]string `json:"supported_model_scopes"`
 	// OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -396,7 +418,7 @@ func (h *GroupHandler) List(c *gin.Context) {
 	}
 	outGroups := make([]dto.AdminGroup, 0, len(groups))
 	for i := range groups {
-		outGroups = append(outGroups, *dto.GroupFromServiceAdmin(&groups[i]))
+		outGroups = append(outGroups, *h.adminGroupDTO(&groups[i]))
 	}
 	response.Paginated(c, outGroups, total, page, pageSize)
 }
@@ -583,7 +605,7 @@ func (h *GroupHandler) GetAll(c *gin.Context) {
 	}
 	outGroups := make([]dto.AdminGroup, 0, len(groups))
 	for i := range groups {
-		outGroups = append(outGroups, *dto.GroupFromServiceAdmin(&groups[i]))
+		outGroups = append(outGroups, *h.adminGroupDTO(&groups[i]))
 	}
 	response.Success(c, outGroups)
 }
@@ -610,7 +632,7 @@ func (h *GroupHandler) GetByID(c *gin.Context) {
 		response.Success(c, groupForSimpleMode(group))
 		return
 	}
-	response.Success(c, dto.GroupFromServiceAdmin(group))
+	response.Success(c, h.adminGroupDTO(group))
 }
 
 // GetGroupModelAllowlistCandidates handles getting candidate model IDs for the group model allowlist.
@@ -715,6 +737,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		FallbackGroupIDOnInvalidRequest: req.FallbackGroupIDOnInvalidRequest,
 		ModelRouting:                    req.ModelRouting,
 		ModelRoutingEnabled:             req.ModelRoutingEnabled,
+		StrictPriorityEnabled:           req.StrictPriorityEnabled,
 		MCPXMLInject:                    req.MCPXMLInject,
 		SupportedModelScopes:            req.SupportedModelScopes,
 		AllowMessagesDispatch:           req.AllowMessagesDispatch,
@@ -742,7 +765,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		response.Success(c, groupForSimpleMode(group))
 		return
 	}
-	response.Success(c, dto.GroupFromServiceAdmin(group))
+	response.Success(c, h.adminGroupDTO(group))
 }
 
 // Duplicate handles creating an inactive group copy with the source account bindings.
@@ -770,7 +793,7 @@ func (h *GroupHandler) Duplicate(c *gin.Context) {
 			if execErr != nil {
 				return nil, execErr
 			}
-			return dto.GroupFromServiceAdmin(group), nil
+			return h.adminGroupDTO(group), nil
 		},
 	)
 	if err != nil {
@@ -781,7 +804,7 @@ func (h *GroupHandler) Duplicate(c *gin.Context) {
 				slog.Warn("group_duplicate_recovery_failed", "group_id", groupID, "actor_scope", actorScope, "reason", reason, "error", recoverErr)
 			} else if recovered != nil {
 				c.Header("X-Idempotency-Recovered", "true")
-				response.Success(c, dto.GroupFromServiceAdmin(recovered))
+				response.Success(c, h.adminGroupDTO(recovered))
 				return
 			}
 		}
@@ -863,6 +886,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		FallbackGroupIDOnInvalidRequest: req.FallbackGroupIDOnInvalidRequest,
 		ModelRouting:                    req.ModelRouting,
 		ModelRoutingEnabled:             req.ModelRoutingEnabled,
+		StrictPriorityEnabled:           req.StrictPriorityEnabled,
 		MCPXMLInject:                    req.MCPXMLInject,
 		SupportedModelScopes:            req.SupportedModelScopes,
 		AllowMessagesDispatch:           req.AllowMessagesDispatch,
@@ -890,7 +914,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		response.Success(c, groupForSimpleMode(group))
 		return
 	}
-	response.Success(c, dto.GroupFromServiceAdmin(group))
+	response.Success(c, h.adminGroupDTO(group))
 }
 
 // Delete handles deleting a group
