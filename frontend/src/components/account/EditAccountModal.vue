@@ -3519,6 +3519,7 @@ import { getAccountExpiryTimestamp } from '@/components/account/accountExpiry'
 import { allSelectedGroupsEnableLongContextPricing } from '@/components/account/longContextBilling'
 import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import { supportsUpstreamModelSync } from '@/constants/platformCatalog'
+import { AUTO_UPSTREAM_MODEL_SYNC_INTERVALS } from '@/constants/autoUpstreamModelSync'
 import {
   OPENAI_WS_MODE_CTX_POOL,
   OPENAI_WS_MODE_OFF,
@@ -4687,7 +4688,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoResetCreditExpiringEnabled.value = extra?.auto_reset_credit_expiring_enabled === true
 	autoUpstreamModelSyncConfig.value = {
 		enabled: extra?.auto_sync_upstream_models_enabled === true,
-		intervalHours: ['0.5', '1', '1.5', '2', '3', '4', '5'].includes(String(extra?.auto_sync_upstream_models_interval_hours))
+		intervalHours: AUTO_UPSTREAM_MODEL_SYNC_INTERVALS.includes(String(extra?.auto_sync_upstream_models_interval_hours))
 			? String(extra?.auto_sync_upstream_models_interval_hours)
 			: '1'
 	}

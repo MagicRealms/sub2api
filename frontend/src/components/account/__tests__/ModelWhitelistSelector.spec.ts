@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS } from '@/constants/autoUpstreamModelSync'
 import {
   BUILTIN_PLATFORM_CATALOG,
   resetPlatformCatalog,
@@ -158,7 +159,10 @@ describe('ModelWhitelistSelector', () => {
 
     await wrapper.setProps({ autoSyncConfig: { enabled: true, intervalHours: '1' } })
     const interval = wrapper.get<HTMLSelectElement>('[data-testid="auto-sync-upstream-models-interval"]')
-    expect(Array.from(interval.element.options).map(option => option.value)).toEqual(['0.5', '1', '1.5', '2', '3', '4', '5'])
+    expect(Array.from(interval.element.options).map(option => option.value)).toEqual([AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS, '0.5', '1', '1.5', '2', '3', '4', '5'])
+    expect(interval.element.options[0].textContent).toContain('admin.accounts.autoSyncUpstreamModels.intervalMinutes')
+    await interval.setValue(AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS)
+    expect(wrapper.emitted('update:autoSyncConfig')?.at(-1)).toEqual([{ enabled: true, intervalHours: AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS }])
     await interval.setValue('1.5')
     expect(wrapper.emitted('update:autoSyncConfig')?.at(-1)).toEqual([{ enabled: true, intervalHours: '1.5' }])
   })

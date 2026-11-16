@@ -1076,6 +1076,7 @@ const autoUpstreamModelSyncLastAttemptMSExpr = `CASE
 END`
 
 const autoUpstreamModelSyncIntervalMSExpr = `CASE extra ->> 'auto_sync_upstream_models_interval_hours'
+	WHEN '0.016666666666666666' THEN 60000
 	WHEN '0.5' THEN 1800000
 	WHEN '1' THEN 3600000
 	WHEN '1.5' THEN 5400000
@@ -1092,9 +1093,9 @@ const listDueAutoUpstreamModelSyncSQL = `SELECT id,
 FROM accounts
 WHERE deleted_at IS NULL
 	AND extra ->> 'auto_sync_upstream_models_enabled' = 'true'
-	AND extra ->> 'auto_sync_upstream_models_interval_hours' IN ('0.5', '1', '1.5', '2', '3', '4', '5')
+	AND extra ->> 'auto_sync_upstream_models_interval_hours' IN ('0.016666666666666666', '0.5', '1', '1.5', '2', '3', '4', '5')
 	AND ` + autoUpstreamModelSyncLastAttemptMSExpr + ` <= $1::bigint - (` + autoUpstreamModelSyncIntervalMSExpr + `)
-ORDER BY id
+ORDER BY last_attempt_ms, id
 LIMIT 100`
 
 const claimAutoUpstreamModelSyncSQL = `UPDATE accounts

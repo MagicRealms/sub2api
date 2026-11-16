@@ -154,7 +154,9 @@
           @change="setAutoSyncInterval(($event.target as HTMLSelectElement).value)"
         >
           <option v-for="option in autoSyncIntervals" :key="option" :value="option">
-            {{ t('admin.accounts.autoSyncUpstreamModels.intervalHours', { hours: option }) }}
+            {{ option === AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS
+              ? t('admin.accounts.autoSyncUpstreamModels.intervalMinutes', { minutes: 1 })
+              : t('admin.accounts.autoSyncUpstreamModels.intervalHours', { hours: option }) }}
           </option>
         </select>
       </div>
@@ -198,6 +200,10 @@ import Icon from '@/components/icons/Icon.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
 import { supportsUpstreamModelSync } from '@/constants/platformCatalog'
+import {
+  AUTO_UPSTREAM_MODEL_SYNC_INTERVALS as autoSyncIntervals,
+  AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS
+} from '@/constants/autoUpstreamModelSync'
 import { extractApiErrorMessage } from '@/utils/apiError'
 
 const { t } = useI18n()
@@ -206,8 +212,6 @@ interface AutoSyncConfig {
   enabled: boolean
   intervalHours: string
 }
-
-const autoSyncIntervals = ['0.5', '1', '1.5', '2', '3', '4', '5']
 
 const props = withDefaults(defineProps<{
   modelValue: string[]

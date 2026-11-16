@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,7 +15,9 @@ const (
 	AutoUpstreamModelSyncEnabledExtraKey       = "auto_sync_upstream_models_enabled"
 	AutoUpstreamModelSyncIntervalExtraKey      = "auto_sync_upstream_models_interval_hours"
 	AutoUpstreamModelSyncLastAttemptExtraKey   = "auto_sync_upstream_models_last_attempt_ms"
-	autoUpstreamModelSyncPollInterval          = time.Minute
+	AutoUpstreamModelSyncOneMinuteHours        = 1.0 / 60
+	autoUpstreamModelSyncPollInterval          = 5 * time.Second
+	autoUpstreamModelSyncStoreTimeout          = 5 * time.Second
 	autoUpstreamModelSyncRequestTimeout        = 2 * time.Minute
 	autoUpstreamModelSyncMaxConcurrentAccounts = 3
 )
@@ -46,6 +49,9 @@ type AutoUpstreamModelSyncService struct {
 	stopOnce    sync.Once
 	stop        chan struct{}
 	wg          sync.WaitGroup
+	slots       chan struct{}
+	inFlight    sync.Map
+	scanMu      sync.Mutex
 }
 
 func NewAutoUpstreamModelSyncService(store AutoUpstreamModelSyncStore, catalogSync UpstreamModelCatalogSyncer) *AutoUpstreamModelSyncService {
@@ -56,11 +62,14 @@ func NewAutoUpstreamModelSyncService(store AutoUpstreamModelSyncStore, catalogSy
 		rootCtx:     rootCtx,
 		cancel:      cancel,
 		stop:        make(chan struct{}),
+		slots:       make(chan struct{}, autoUpstreamModelSyncMaxConcurrentAccounts),
 	}
 }
 
 func AutoUpstreamModelSyncInterval(hours float64) (time.Duration, bool) {
 	switch hours {
+	case AutoUpstreamModelSyncOneMinuteHours:
+		return time.Minute, true
 	case 0.5:
 		return 30 * time.Minute, true
 	case 1:
@@ -93,13 +102,20 @@ func (s *AutoUpstreamModelSyncService) Start() {
 				return
 			default:
 			}
-			s.runOnce(s.rootCtx, time.Now())
 			ticker := time.NewTicker(autoUpstreamModelSyncPollInterval)
 			defer ticker.Stop()
+			launch := func(now time.Time) {
+				s.wg.Add(1)
+				go func() {
+					defer s.wg.Done()
+					s.runOnce(s.rootCtx, now)
+				}()
+			}
+			launch(time.Now())
 			for {
 				select {
 				case now := <-ticker.C:
-					s.runOnce(s.rootCtx, now)
+					launch(now)
 				case <-s.stop:
 					return
 				}
@@ -123,7 +139,14 @@ func (s *AutoUpstreamModelSyncService) runOnce(ctx context.Context, now time.Tim
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
-	candidates, err := s.store.ListDueAutoUpstreamModelSync(ctx, now)
+	// A slow database must not accumulate a new scan goroutine on every tick.
+	if !s.scanMu.TryLock() {
+		return
+	}
+	listCtx, listCancel := context.WithTimeout(ctx, autoUpstreamModelSyncStoreTimeout)
+	candidates, err := s.store.ListDueAutoUpstreamModelSync(listCtx, now)
+	listCancel()
+	s.scanMu.Unlock()
 	if err != nil {
 		slog.Warn("auto_upstream_model_sync_list_failed", "error", err)
 		return
@@ -132,36 +155,53 @@ func (s *AutoUpstreamModelSyncService) runOnce(ctx context.Context, now time.Tim
 		return
 	}
 
-	sem := make(chan struct{}, autoUpstreamModelSyncMaxConcurrentAccounts)
 	var wg sync.WaitGroup
+dispatch:
 	for _, candidate := range candidates {
 		interval, valid := AutoUpstreamModelSyncInterval(candidate.IntervalHours)
 		if !valid || candidate.AccountID <= 0 {
 			continue
 		}
+		if _, loaded := s.inFlight.LoadOrStore(candidate.AccountID, struct{}{}); loaded {
+			continue
+		}
 		select {
-		case sem <- struct{}{}:
+		case s.slots <- struct{}{}:
 		case <-ctx.Done():
+			s.inFlight.Delete(candidate.AccountID)
 			wg.Wait()
 			return
 		case <-s.stop:
+			s.inFlight.Delete(candidate.AccountID)
 			wg.Wait()
 			return
+		default:
+			// Poll again when capacity is free instead of building a queue of
+			// goroutines behind a slow upstream. Slots are shared across polls.
+			s.inFlight.Delete(candidate.AccountID)
+			break dispatch
 		}
-		claimed, claimErr := s.store.ClaimAutoUpstreamModelSync(ctx, candidate.AccountID, candidate.IntervalHours, now)
+		claimCtx, claimCancel := context.WithTimeout(ctx, autoUpstreamModelSyncStoreTimeout)
+		claimed, claimErr := s.store.ClaimAutoUpstreamModelSync(claimCtx, candidate.AccountID, candidate.IntervalHours, time.Now())
+		claimCancel()
 		if claimErr != nil {
-			<-sem
+			<-s.slots
+			s.inFlight.Delete(candidate.AccountID)
 			slog.Warn("auto_upstream_model_sync_claim_failed", "account_id", candidate.AccountID, "error", claimErr)
 			continue
 		}
 		if !claimed {
-			<-sem
+			<-s.slots
+			s.inFlight.Delete(candidate.AccountID)
 			continue
 		}
 		wg.Add(1)
 		go func(accountID int64, interval time.Duration) {
 			defer wg.Done()
-			defer func() { <-sem }()
+			defer func() {
+				s.inFlight.Delete(accountID)
+				<-s.slots
+			}()
 			s.syncOne(ctx, accountID, interval)
 		}(candidate.AccountID, interval)
 	}
@@ -169,7 +209,14 @@ func (s *AutoUpstreamModelSyncService) runOnce(ctx context.Context, now time.Tim
 }
 
 func (s *AutoUpstreamModelSyncService) syncOne(parent context.Context, accountID int64, interval time.Duration) {
-	ctx, cancel := context.WithTimeout(parent, autoUpstreamModelSyncRequestTimeout)
+	started := time.Now()
+	timeout := autoUpstreamModelSyncRequestTimeout
+	if interval/2 < timeout {
+		// Finish a short-interval attempt before its next claim can become due,
+		// including when another application instance is running the worker.
+		timeout = interval / 2
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	account, err := s.store.GetByID(ctx, accountID)
@@ -204,11 +251,15 @@ func (s *AutoUpstreamModelSyncService) syncOne(parent context.Context, accountID
 		slog.Warn("auto_upstream_model_sync_empty_catalog", "account_id", accountID)
 		return
 	}
+	if account != nil && reflect.DeepEqual(account.Credentials["model_mapping"], mapping) {
+		slog.Debug("auto_upstream_model_sync_unchanged", "account_id", accountID, "model_count", len(mapping), "duration_ms", time.Since(started).Milliseconds())
+		return
+	}
 	if err := s.store.UpdateAccountModelMapping(ctx, accountID, mapping); err != nil {
 		slog.Warn("auto_upstream_model_sync_save_failed", "account_id", accountID, "error", err)
 		return
 	}
-	slog.Info("auto_upstream_model_sync_succeeded", "account_id", accountID, "model_count", len(mapping), "interval_hours", interval.Hours())
+	slog.Info("auto_upstream_model_sync_succeeded", "account_id", accountID, "model_count", len(mapping), "interval_hours", interval.Hours(), "duration_ms", time.Since(started).Milliseconds())
 }
 
 func parseAutoUpstreamModelSyncInterval(raw string) (float64, bool) {
@@ -241,7 +292,7 @@ func ValidateAutoUpstreamModelSyncExtra(extra map[string]any) error {
 		}
 		hours, valid := parseAutoUpstreamModelSyncInterval(strings.TrimSpace(intervalText))
 		if !valid {
-			return errors.New("auto upstream model sync interval must be one of 0.5, 1, 1.5, 2, 3, 4, or 5 hours")
+			return errors.New("auto upstream model sync interval must be 1 minute or one of 0.5, 1, 1.5, 2, 3, 4, or 5 hours")
 		}
 		extra[AutoUpstreamModelSyncIntervalExtraKey] = strconv.FormatFloat(hours, 'f', -1, 64)
 	}

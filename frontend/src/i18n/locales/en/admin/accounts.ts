@@ -866,7 +866,8 @@ export default {
         title: 'Automatically sync upstream models',
         hint: 'Fetch this account’s own upstream model catalog on the selected interval. Failures and empty catalogs keep the current restrictions.',
         interval: 'Sync interval',
-        intervalHours: '{hours} hours'
+        intervalHours: '{hours} hours',
+        intervalMinutes: '{minutes} minute'
       },
       customModelName: 'Custom model name',
       enterCustomModelName: 'Enter custom model name',

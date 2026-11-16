@@ -362,11 +362,11 @@ describe('EditAccountModal', () => {
     ])
   })
 
-  it('loads and saves the per-account upstream model sync schedule', async () => {
+  it.each(['1.5', '0.016666666666666666'])('loads and saves the per-account upstream model sync schedule (%s hours)', async (intervalHours) => {
     const account = buildAccount()
     account.extra = {
       auto_sync_upstream_models_enabled: true,
-      auto_sync_upstream_models_interval_hours: '1.5'
+      auto_sync_upstream_models_interval_hours: intervalHours
     }
     updateAccountMock.mockReset().mockResolvedValue(account)
     checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
@@ -374,14 +374,19 @@ describe('EditAccountModal', () => {
 
     expect(wrapper.getComponent(ModelWhitelistSelectorStub).props('autoSyncConfig')).toEqual({
       enabled: true,
-      intervalHours: '1.5'
+      intervalHours
     })
-    await wrapper.get('[data-testid="set-auto-sync-config"]').trigger('click')
+    if (intervalHours === '1.5') {
+      await wrapper.get('[data-testid="set-auto-sync-config"]').trigger('click')
+    }
     await wrapper.get('form#edit-account-form').trigger('submit.prevent')
 
-    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject(intervalHours === '1.5' ? {
       auto_sync_upstream_models_enabled: false,
       auto_sync_upstream_models_interval_hours: '4'
+    } : {
+      auto_sync_upstream_models_enabled: true,
+      auto_sync_upstream_models_interval_hours: intervalHours
     })
     wrapper.unmount()
   })

@@ -977,7 +977,8 @@ export default {
         title: '自动同步上游模型',
         hint: '按所选周期读取此账号自己的上游模型目录；失败或返回空目录时保留当前模型限制。',
         interval: '同步周期',
-        intervalHours: '{hours} 小时'
+        intervalHours: '{hours} 小时',
+        intervalMinutes: '{minutes} 分钟'
       },
       customModelName: '自定义模型名称',
       enterCustomModelName: '输入自定义模型名称',

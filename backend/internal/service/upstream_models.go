@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -324,7 +325,8 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 	persistedCapabilities := false
 	if len(completeMetadata) > 0 && account != nil && account.ID > 0 && s.accountRepo != nil {
 		// Retain known metadata only for models still listed or explicitly mapped.
-		if previous := account.GetUpstreamModelMetadataSnapshot(); previous != nil {
+		previous := account.GetUpstreamModelMetadataSnapshot()
+		if previous != nil {
 			retainedModels := capabilityIDs
 			if !liveListAvailable {
 				retainedModels = append([]string(nil), capabilityIDs...)
@@ -338,10 +340,12 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 					continue
 				}
 				if entry, ok := completeMetadata[modelID]; ok {
-					if entry.CodexToolCapabilities == nil {
-						entry.CodexToolCapabilities = make(map[string]json.RawMessage)
+					if len(old.CodexToolCapabilities) > 0 {
+						if entry.CodexToolCapabilities == nil {
+							entry.CodexToolCapabilities = make(map[string]json.RawMessage)
+						}
+						applyCodexToolCapabilities(entry.CodexToolCapabilities, old.CodexToolCapabilities, false)
 					}
-					applyCodexToolCapabilities(entry.CodexToolCapabilities, old.CodexToolCapabilities, false)
 					completeMetadata[modelID] = entry
 				} else {
 					completeMetadata[modelID] = old
@@ -353,10 +357,15 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 			SyncedAt: time.Now().UTC().Format(time.RFC3339),
 			Models:   completeMetadata,
 		}
-		if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{UpstreamModelMetadataExtraKey: snapshot}); err != nil {
-			return nil, newUpstreamModelSyncInternalError("Failed to save upstream model metadata", err)
+		// SyncedAt records when this snapshot was persisted. Unchanged catalog
+		// checks already have a separate attempt timestamp; avoid rewriting the
+		// snapshot and refreshing scheduler caches just to advance its timestamp.
+		if !upstreamModelMetadataSnapshotMatches(previous, source, completeMetadata) {
+			if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{UpstreamModelMetadataExtraKey: snapshot}); err != nil {
+				return nil, newUpstreamModelSyncInternalError("Failed to save upstream model metadata", err)
+			}
+			account.SetUpstreamModelMetadataSnapshot(snapshot)
 		}
-		account.SetUpstreamModelMetadataSnapshot(snapshot)
 		persistedCapabilities = true
 	}
 
@@ -374,6 +383,20 @@ func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, accou
 		}
 	}
 	return catalog, nil
+}
+
+func upstreamModelMetadataSnapshotMatches(previous *UpstreamModelMetadataSnapshot, source string, models map[string]UpstreamModelMetadata) bool {
+	if previous == nil || previous.Source != source {
+		return false
+	}
+	// Compare the persisted representation: omitempty normalizes nil and empty
+	// slices/maps after a snapshot has made a round trip through PostgreSQL.
+	before, err := json.Marshal(previous.Models)
+	if err != nil {
+		return false
+	}
+	after, err := json.Marshal(models)
+	return err == nil && bytes.Equal(before, after)
 }
 
 func upstreamModelSyncStatusCode(err error) int {

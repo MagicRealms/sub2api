@@ -17,11 +17,12 @@ import (
 
 type upstreamModelMetadataRepoStub struct {
 	AccountRepository
-	accountID int64
-	updates   map[string]any
-	err       error
-	account   *Account
-	casCalls  int
+	accountID   int64
+	updates     map[string]any
+	err         error
+	account     *Account
+	casCalls    int
+	updateCalls int
 }
 
 func headerValuesEqualFold(header http.Header, name string) []string {
@@ -34,6 +35,7 @@ func headerValuesEqualFold(header http.Header, name string) []string {
 }
 
 func (r *upstreamModelMetadataRepoStub) UpdateExtra(_ context.Context, id int64, updates map[string]any) error {
+	r.updateCalls++
 	r.accountID = id
 	r.updates = updates
 	return r.err
@@ -746,6 +748,34 @@ func TestSyncUpstreamModelCatalogReplacesSnapshotWhenUpstreamModelsChange(t *tes
 	require.NoError(t, json.Unmarshal(encoded, &snapshot))
 	require.NotContains(t, snapshot.Models, "old-model")
 	require.Contains(t, snapshot.Models, "new-model")
+}
+
+func TestSyncUpstreamModelCatalogDoesNotRewriteUnchangedCapabilities(t *testing.T) {
+	upstream := &httpUpstreamRecorder{}
+	for _, contextWindow := range []int64{128000, 128000, 256000} {
+		body, err := json.Marshal(map[string]any{"data": []map[string]any{{
+			"id": "model-a", "reasoning": false, "input_modalities": []string{"text"}, "context_window": contextWindow,
+		}}})
+		require.NoError(t, err)
+		upstream.responses = append(upstream.responses, &http.Response{
+			StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(string(body))),
+		})
+	}
+	repo := &upstreamModelMetadataRepoStub{}
+	svc := &AccountTestService{accountRepo: repo, httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	account := &Account{ID: 101, Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+		Credentials: map[string]any{"api_key": "key", "base_url": "https://provider.example/v1"}}
+	_, err := svc.SyncUpstreamModelCatalog(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, 1, repo.updateCalls)
+	_, err = svc.SyncUpstreamModelCatalog(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, 1, repo.updateCalls, "identical metadata must not rewrite the account or scheduler snapshot")
+	_, err = svc.SyncUpstreamModelCatalog(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, 2, repo.updateCalls, "actual capability changes must still be persisted")
+	require.Equal(t, int64(256000), account.GetUpstreamModelMetadataSnapshot().Models["model-a"].ContextWindow)
 }
 
 // Scenario: 上游明确声明无推理能力时保存 false。
