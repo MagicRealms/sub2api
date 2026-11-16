@@ -232,9 +232,17 @@ var (
 	}
 )
 
-// LiteLLMModelPricing LiteLLM价格数据结构
-// 只保留我们需要的字段，使用指针来处理可能缺失的值
+// tokenPriceOverrideFields 记录本地覆盖文件中的显式价格，不把目录值误认为运营定价。
+type tokenPriceOverrideFields struct {
+	input     bool
+	output    bool
+	cacheRead bool
+}
+
+// LiteLLMModelPricing LiteLLM价格数据结构。
 type LiteLLMModelPricing struct {
+	// 仅记录本地 override_file 显式覆盖的字段，避免模型默认策略再次覆盖运营定价。
+	tokenPriceOverrides                 tokenPriceOverrideFields
 	CacheCreationInputTokenCostExplicit bool    `json:"-"`
 	InputCostPerToken                   float64 `json:"input_cost_per_token"`
 	InputCostPerTokenPriority           float64 `json:"input_cost_per_token_priority"`
@@ -686,7 +694,8 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 	if err := json.Unmarshal(body, &rawData); err != nil {
 		return nil, fmt.Errorf("parse raw JSON: %w", err)
 	}
-	rawData = s.applyPricingOverrides(rawData)
+	overrides := s.loadPricingOverrideEntries()
+	rawData = s.applyPricingOverrides(rawData, overrides)
 
 	result := make(map[string]*LiteLLMModelPricing)
 	skipped := 0
@@ -711,6 +720,7 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 
 		pricing := &LiteLLMModelPricing{
+			tokenPriceOverrides:   explicitTokenPriceOverrides(overrides[modelName]),
 			LiteLLMProvider:       entry.LiteLLMProvider,
 			Mode:                  entry.Mode,
 			SupportsPromptCaching: entry.SupportsPromptCaching,
@@ -951,8 +961,7 @@ func warnOrphanCacheTierFields(entries []string) {
 // 文件的解析都经过 parsePricingData，因此 override 是最高优先级的数据源。这里只修补
 // 已存在的条目：目录/回退里都没有的模型由 mergeOverrideOnlyModels 在两层数据合并后
 // 统一并入——若在此处抢先建条目，纯 override 条目会挡住回退文件中同名完整条目的合并。
-func (s *PricingService) applyPricingOverrides(rawData map[string]json.RawMessage) map[string]json.RawMessage {
-	overrides := s.loadPricingOverrideEntries()
+func (s *PricingService) applyPricingOverrides(rawData, overrides map[string]json.RawMessage) map[string]json.RawMessage {
 	if len(overrides) == 0 {
 		return rawData
 	}
@@ -969,6 +978,24 @@ func (s *PricingService) applyPricingOverrides(rawData map[string]json.RawMessag
 		rawData[name] = merged
 	}
 	return rawData
+}
+
+// explicitTokenPriceOverrides 区分未配置、null（删除）与显式价格（含 0）。
+// 只对覆盖文件中的有效数值标记；目录自身的美元价格不能绕过模型默认策略。
+func explicitTokenPriceOverrides(patch json.RawMessage) tokenPriceOverrideFields {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(patch, &fields) != nil {
+		return tokenPriceOverrideFields{}
+	}
+	hasPrice := func(key string) bool {
+		var value *float64
+		return json.Unmarshal(fields[key], &value) == nil && value != nil
+	}
+	return tokenPriceOverrideFields{
+		input:     hasPrice("input_cost_per_token"),
+		output:    hasPrice("output_cost_per_token"),
+		cacheRead: hasPrice("cache_read_input_token_cost"),
+	}
 }
 
 // loadPricingOverrideEntries 读取 override 文件的原始条目。未配置返回 nil；

@@ -96,6 +96,8 @@ type BillingCache interface {
 
 // ModelPricing 模型价格配置（per-token价格，与LiteLLM格式一致）
 type ModelPricing struct {
+	// 本地覆盖文件的逐字段优先级，随目录解析结果传递到统一计费入口。
+	tokenPriceOverrides tokenPriceOverrideFields
 	// UltrafastMultiplier is model-owned and independent of operator Fast pricing.
 	UltrafastMultiplier                float64
 	InputPricePerToken                 float64            // 每token输入价格 (USD)
@@ -1458,6 +1460,7 @@ func (s *BillingService) getModelPricingAt(model string, pricingAt time.Time) (*
 			price1h := litellmPricing.CacheCreationInputTokenCostAbove1hr
 			enableBreakdown := price1h > 0 && price1h > price5m
 			return s.applyModelSpecificPricingPolicyEx(model, &ModelPricing{
+				tokenPriceOverrides:                litellmPricing.tokenPriceOverrides,
 				InputPricePerToken:                 litellmPricing.InputCostPerToken,
 				InputPricePerTokenPriority:         litellmPricing.InputCostPerTokenPriority,
 				OutputPricePerToken:                litellmPricing.OutputCostPerToken,
@@ -1991,7 +1994,8 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 	if pricing == nil {
 		return nil
 	}
-	// DeepSeek 模型：无论 JSON/远端价格表给什么价，一律强制官方低谷价
+	// DeepSeek 模型：目录/远端价格表使用官方低谷价；本地 override_file 显式
+	// 配置的字段优先（含 0），未覆盖的字段仍回落官方低谷价。
 	// （Flash 三档为 2026-09-10 官方降价后口径）。这是覆盖远端旧价的关键——远端
 	// 仓库不可改，生产会先拉到旧价，必须在此兜底修正；克隆后再覆盖，避免污染
 	// 共享 fallbackPrices 指针。
@@ -2002,16 +2006,18 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 	// 对默认价卡另行叠加（分组/渠道自定义定价不叠加）。
 	if forceDeepSeekRates && isDeepSeekModel(model) {
 		cloned := *pricing
+		inputPrice, outputPrice, cacheReadPrice := deepseekFlashOffPeakInputPrice, deepseekFlashOffPeakOutputPrice, deepseekFlashOffPeakCacheRead
 		if isDeepSeekProModel(model) {
-			cloned.InputPricePerToken = deepseekProOffPeakInputPrice
-			cloned.OutputPricePerToken = deepseekProOffPeakOutputPrice
-			cloned.CacheReadPricePerToken = deepseekProOffPeakCacheRead
-		} else {
-			// deepseek-flash（= V4.1-Flash）、deepseek-v4-flash /
-			// deepseek-v4-flash-vision-exp 与其余 deepseek-* 共用 flash 价。
-			cloned.InputPricePerToken = deepseekFlashOffPeakInputPrice
-			cloned.OutputPricePerToken = deepseekFlashOffPeakOutputPrice
-			cloned.CacheReadPricePerToken = deepseekFlashOffPeakCacheRead
+			inputPrice, outputPrice, cacheReadPrice = deepseekProOffPeakInputPrice, deepseekProOffPeakOutputPrice, deepseekProOffPeakCacheRead
+		}
+		if !pricing.tokenPriceOverrides.input {
+			cloned.InputPricePerToken = inputPrice
+		}
+		if !pricing.tokenPriceOverrides.output {
+			cloned.OutputPricePerToken = outputPrice
+		}
+		if !pricing.tokenPriceOverrides.cacheRead {
+			cloned.CacheReadPricePerToken = cacheReadPrice
 		}
 		return &cloned
 	}
