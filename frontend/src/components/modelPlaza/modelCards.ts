@@ -1,6 +1,6 @@
 import type { ModelPlazaGroup, PlazaModel } from '@/api/modelPlaza'
 import { BILLING_MODE_IMAGE, BILLING_MODE_VIDEO } from '@/constants/channel'
-import { resolveIntervalPrices } from '@/utils/pricing'
+import { resolveIntervalPrices, type PricingCurrency } from '@/utils/pricing'
 import { platformLabel } from '@/utils/platformColors'
 
 export function modelPlazaPlatformLabel(platform: string): string {
@@ -17,6 +17,11 @@ export interface PlazaModelEntry {
   name: string
   platform: string
   variants: PlazaModelVariant[]
+}
+
+/** Cards and detail tables use the currency declared by the same price card. */
+export function modelPricingCurrency(model: PlazaModel): PricingCurrency {
+  return model.official_pricing?.currency === 'CNY' ? 'CNY' : 'USD'
 }
 
 /** Model capability is independent of billing: image models may bill by token. */

@@ -336,6 +336,7 @@ import {
 } from '@/constants/channel'
 import type { PlazaModel, PlazaTimePricingPeriod } from '@/api/modelPlaza'
 import type { UserPricingInterval } from '@/api/channels'
+import { modelPricingCurrency } from './modelCards'
 
 function reasoningEffortMultipliers(model: PlazaModel): [string, number][] {
   const multipliers = model.pricing?.reasoning_effort_multipliers
@@ -377,12 +378,8 @@ const accentStyle = computed(() => ({ '--plaza-accent': platformAccentColor(prop
 
 const PER_MILLION = 1_000_000
 
-function modelCurrency(model: PlazaModel): PricingCurrency {
-  return model.official_pricing?.currency === 'CNY' ? 'CNY' : 'USD'
-}
-
 const priceUnit = computed(() => {
-  const currencies = new Set(props.models.map(modelCurrency))
+  const currencies = new Set(props.models.map(modelPricingCurrency))
   if (currencies.size > 1) return t('modelPlaza.table.unitPerMillionMixed')
   return t(currencies.has('CNY') ? 'modelPlaza.table.unitPerMillionCny' : 'modelPlaza.table.unitPerMillion')
 })
@@ -435,12 +432,12 @@ interface PlazaRow {
 
 const rows = computed<PlazaRow[]>(() =>
   sortedModels.value.flatMap((m) => {
-    const base: PlazaRow = { model: m, period: null, key: `${m.platform}:${m.name}`, currency: modelCurrency(m) }
+    const base: PlazaRow = { model: m, period: null, key: `${m.platform}:${m.name}`, currency: modelPricingCurrency(m) }
     const periodRows = timePeriods(m).map<PlazaRow>((p, idx) => ({
       model: m,
       period: p,
       key: `${m.platform}:${m.name}:${idx}`,
-      currency: modelCurrency(m)
+      currency: modelPricingCurrency(m)
     }))
     return [base, ...periodRows]
   })
@@ -477,7 +474,7 @@ function requestRate(m: PlazaModel): number {
 /** 非 token 单价乘该行生效倍率，不换算为每百万 token。 */
 function paidRequestPrice(m: PlazaModel, value: number | null | undefined): string {
   if (value == null) return '-'
-  return formatScaled(value * requestRate(m), 1, MIN_DECIMALS, modelCurrency(m))
+  return formatScaled(value * requestRate(m), 1, MIN_DECIMALS, modelPricingCurrency(m))
 }
 
 /** 官方参考价不乘倍率。 */

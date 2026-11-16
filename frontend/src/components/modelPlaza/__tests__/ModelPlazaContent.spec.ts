@@ -43,6 +43,44 @@ function render(groups: ModelPlazaGroup[], description = '') {
 }
 
 describe('Model Plaza cards and filters', () => {
+  it('shows RMB on the actual home-page cards for CNY models, including group switches', async () => {
+    const nativeModels = [
+      { name: 'deepseek-v4.1-flash-1017', platform: 'deepseek', input: 1e-6, output: 4e-6, cache: 2e-8 },
+      { name: 'kimi-k3', platform: 'kimi', input: 20e-6, output: 100e-6, cache: 2e-6 },
+      { name: 'glm-5.3', platform: 'zhipu', input: 8e-6, output: 28e-6, cache: 2e-6 }
+    ].map(item => ({
+      ...model(item.name, { input_price: item.input, output_price: item.output, cache_read_price: item.cache }),
+      platform: item.platform,
+      official_pricing: { currency: 'CNY' as const, input_price: item.input, output_price: item.output, cache_write_price: null, cache_read_price: item.cache }
+    }))
+    const wrapper = render([
+      group(1, { platform: 'composite', rate_multiplier: 0.2, models: [...nativeModels, model('gpt-6.1-sol')] }),
+      group(2, { platform: 'deepseek', rate_multiplier: 0.3, models: [nativeModels[0]!] })
+    ])
+    try {
+      for (const item of nativeModels) {
+        const card = wrapper.get(`[data-model="${item.name}"]`)
+        expect(card.text()).toContain('modelPlaza.table.unitPerMillionCny')
+        expect(card.text()).not.toContain('$')
+        for (const price of ['input', 'output', 'cache']) {
+          expect(card.get(`[data-test="model-${price}-price"]`).text()).toMatch(/^¥/)
+        }
+      }
+      const deepseek = wrapper.get('[data-model="deepseek-v4.1-flash-1017"]')
+      expect(deepseek.get('[data-test="model-input-price"]').text()).toBe('¥0.20')
+      expect(deepseek.get('[data-test="model-output-price"]').text()).toBe('¥0.80')
+      expect(deepseek.get('[data-test="model-cache-price"]').text()).toBe('¥0.004')
+      await deepseek.get('[data-test="model-group-select"]').setValue('2')
+      expect(deepseek.get('[data-test="model-input-price"]').text()).toBe('¥0.30')
+      expect(deepseek.text()).not.toContain('$')
+      const usd = wrapper.get('[data-model="gpt-6.1-sol"]')
+      expect(usd.get('[data-test="model-input-price"]').text()).toBe('$0.40')
+      expect(usd.text()).not.toContain('¥')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('labels ShareLLM models as 聚合站 in the plaza', () => {
     const wrapper = render([group(1, { models: [{ ...model('aggregate-model'), platform: 'sharellm' }] })])
     expect(wrapper.text()).toContain('聚合站')

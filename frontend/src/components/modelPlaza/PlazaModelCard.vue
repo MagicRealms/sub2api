@@ -35,7 +35,7 @@
     </div>
 
     <div class="plaza-price-panel flex flex-1 flex-col rounded-xl border px-3 py-2.5" aria-live="polite" aria-atomic="true">
-      <p class="mb-2 flex items-center justify-between gap-1 text-[9px] text-gray-500 dark:text-dark-400"><span>{{ t('modelPlaza.cards.basePrice') }}</span><span v-if="tokenBilling">{{ t('modelPlaza.table.unitPerMillion') }}</span></p>
+      <p class="mb-2 flex items-center justify-between gap-1 text-[9px] text-gray-500 dark:text-dark-400"><span>{{ t('modelPlaza.cards.basePrice') }}</span><span v-if="tokenBilling">{{ t(currency === 'CNY' ? 'modelPlaza.table.unitPerMillionCny' : 'modelPlaza.table.unitPerMillion') }}</span></p>
       <dl v-if="tokenBilling" class="grid gap-2" :class="tokenPrices?.cache_read_price != null ? 'grid-cols-3' : 'grid-cols-2'">
         <div><dt class="text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.input') }}</dt><dd class="mt-1 break-all font-mono text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-input-price">{{ tokenPrice(tokenPrices?.input_price) }}</dd></div>
         <div><dt class="text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.output') }}</dt><dd class="mt-1 break-all font-mono text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-output-price">{{ tokenPrice(tokenPrices?.output_price) }}</dd></div>
@@ -64,7 +64,7 @@ import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN } from '@/constants/channel'
 import { formatScaled } from '@/utils/pricing'
 import { platformAccentColor } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
-import { baseTokenPrices, modelKind, modelPlazaPlatformLabel, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
+import { baseTokenPrices, modelKind, modelPlazaPlatformLabel, modelPricingCurrency, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
 
 const props = defineProps<{ entry: PlazaModelEntry }>()
 const emit = defineEmits<{ open: [variant: PlazaModelVariant] }>()
@@ -73,6 +73,7 @@ const { copied, copyToClipboard } = useClipboard()
 const selectId = useId()
 const selectedGroupId = ref<number>()
 const variant = computed(() => props.entry.variants.find(v => v.group.id === selectedGroupId.value) ?? props.entry.variants[0]!)
+const currency = computed(() => modelPricingCurrency(variant.value.model))
 const rate = computed(() => modelRate(variant.value))
 const mode = computed(() => variant.value.model.pricing?.billing_mode ?? BILLING_MODE_TOKEN)
 const tokenBilling = computed(() => mode.value === BILLING_MODE_TOKEN)
@@ -85,13 +86,13 @@ const requestPrice = computed(() => {
   if (!values.length && pricing?.per_request_price != null) values.push(pricing.per_request_price)
   if (!values.length) return '-'
   const prices = values.map(value => value * rate.value)
-  const low = formatScaled(Math.min(...prices), 1, 2)
-  const high = formatScaled(Math.max(...prices), 1, 2)
+  const low = formatScaled(Math.min(...prices), 1, 2, currency.value)
+  const high = formatScaled(Math.max(...prices), 1, 2, currency.value)
   return low === high ? low : `${low} – ${high}`
 })
 
 function tokenPrice(value: number | null | undefined): string {
-  return value == null ? '-' : formatScaled(value * rate.value, 1_000_000, 2)
+  return value == null ? '-' : formatScaled(value * rate.value, 1_000_000, 2, currency.value)
 }
 
 function selectGroup(event: Event) {
