@@ -18,6 +18,14 @@
         </div>
       </header>
 
+      <section class="card flex items-center justify-between gap-4 p-5 sm:p-6">
+        <div>
+          <h2 id="iq-visibility-label" class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.channelIQ.visibility.label') }}</h2>
+          <p id="iq-visibility-hint" class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.channelIQ.visibility.hint') }}</p>
+        </div>
+        <Toggle :model-value="visible" :disabled="visibilitySaving || loading" aria-labelledby="iq-visibility-label" aria-describedby="iq-visibility-hint" @update:model-value="setVisibility" />
+      </section>
+
       <section class="card p-5 sm:p-6">
         <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -70,11 +78,11 @@
         </div>
 
         <div class="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-5 dark:border-dark-700">
-          <button v-if="!form.enabled" type="button" class="btn btn-secondary" :disabled="saving || running" @click="runNow">
+          <button v-if="!form.enabled" type="button" class="btn btn-secondary" :disabled="loading || saving || running || !form.account_id" @click="runNow">
             <Icon name="refresh" size="sm" :class="running ? 'animate-spin' : ''" />
             <span class="ml-2">{{ t('admin.channelIQ.config.runNow') }}</span>
           </button>
-          <button type="button" class="btn btn-primary" :disabled="saving || !form.account_id" @click="save">
+          <button type="button" class="btn btn-primary" :disabled="loading || saving || running || !form.account_id" @click="save">
             <Icon name="check" size="sm" />
             <span class="ml-2">{{ saving ? t('common.submitting') : t('common.save') }}</span>
           </button>
@@ -157,6 +165,8 @@ const appStore = useAppStore()
 const loading = ref(false)
 const saving = ref(false)
 const running = ref(false)
+const visible = ref(true)
+const visibilitySaving = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 const accountsLoading = ref(false)
 const accounts = ref<AccountListItem[]>([])
@@ -177,6 +187,7 @@ const reasoningOptions = computed(() => [
   { value: 'ultra', label: 'ultra' },
 ])
 function applySnapshot(snapshot: Awaited<ReturnType<typeof adminAPI.channelIQ.get>>) {
+  if (!visibilitySaving.value) visible.value = snapshot.visible !== false
   results.value = snapshot.results || []
   if (snapshot.config) {
     form.account_id = snapshot.config.account_id
@@ -204,7 +215,13 @@ async function load(silent = false) {
   if (!silent) loading.value = true
   try {
     const snapshot = await adminAPI.channelIQ.get()
-    applySnapshot(snapshot)
+    if (silent) {
+      // Background refresh updates results, not the account/model being edited.
+      results.value = snapshot.results || []
+      if (!visibilitySaving.value) visible.value = snapshot.visible !== false
+    } else {
+      applySnapshot(snapshot)
+    }
   } catch (error: unknown) {
     if (!silent) appStore.showError(extractApiErrorMessage(error, t('admin.channelIQ.loadError')))
   } finally {
@@ -226,10 +243,29 @@ async function save() {
   }
 }
 
+async function setVisibility(nextVisible: boolean) {
+  if (visibilitySaving.value || loading.value) return
+  visibilitySaving.value = true
+  try {
+    const result = await adminAPI.channelIQ.setVisibility(nextVisible)
+    visible.value = result.visible
+    if (appStore.cachedPublicSettings) appStore.cachedPublicSettings.channel_iq_enabled = result.visible
+    appStore.showSuccess(t(result.visible ? 'admin.channelIQ.visibility.shown' : 'admin.channelIQ.visibility.hidden'))
+  } catch (error: unknown) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.channelIQ.visibility.saveError')))
+  } finally {
+    visibilitySaving.value = false
+  }
+}
+
 async function runNow() {
-  if (running.value) return
+  if (running.value || saving.value || !form.account_id) return
   running.value = true
   try {
+    // The server probes the persisted plan. Save the current selection first so
+    // switching away from an OAuth account actually tests the new API key.
+    const snapshot = await adminAPI.channelIQ.save({ ...form })
+    applySnapshot(snapshot)
     const result = await adminAPI.channelIQ.run()
     results.value = [result, ...results.value.filter(item => item.id !== result.id)].slice(0, 6)
   } catch (error: unknown) {

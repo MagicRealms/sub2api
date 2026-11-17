@@ -1025,7 +1025,10 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		if resp.StatusCode == http.StatusTooManyRequests {
 			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
 		}
-		// 401 Unauthorized: 标记账号为永久错误
+		if accountTestUpstreamOAuthRevoked(credentialAccount, resp.StatusCode, body) {
+			return s.sendErrorAndEnd(c, fmt.Sprintf("API returned %d: %s %s", resp.StatusCode, string(body), accountTestUpstreamOAuthHint))
+		}
+		// A direct authentication failure still marks the selected account.
 		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
 			errMsg := fmt.Sprintf("Authentication failed (401): %s", string(body))
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
@@ -2216,6 +2219,9 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 		body, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode == http.StatusTooManyRequests {
 			s.reconcileOpenAI429State(ctx, account, resp.Header, body)
+		}
+		if accountTestUpstreamOAuthRevoked(account, resp.StatusCode, body) {
+			return s.sendErrorAndEnd(c, fmt.Sprintf("Chat Completions API (/v1/chat/completions) returned %d: %s %s", resp.StatusCode, string(body), accountTestUpstreamOAuthHint))
 		}
 		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
 			errMsg := fmt.Sprintf("Chat Completions authentication failed (401): %s", string(body))

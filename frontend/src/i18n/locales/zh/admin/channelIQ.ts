@@ -6,6 +6,13 @@ export default {
     saveError: '渠道智商配置保存失败',
     runError: '渠道智商立即测试失败',
     saveSuccess: '渠道智商配置已保存',
+    visibility: {
+      label: '向用户显示智商状态',
+      hint: '关闭后隐藏用户侧入口与测试结果；自动测试计划和历史记录仍保留。此开关立即保存。',
+      shown: '已向用户显示智商状态',
+      hidden: '已对用户隐藏智商状态',
+      saveError: '智商状态显示设置保存失败',
+    },
     config: {
       title: '测试配置',
       description: '这里不会读取或展示分组，测试只针对你选中的一个上游 Key。',
@@ -32,7 +39,7 @@ export default {
       prompt: '测试提示词',
       promptPlaceholder: '例如：请生成一个鹈鹕骑自行车的 HTML/SVG 动画，只输出完整代码。',
       promptHint: '模型会自评两个车轮、腿连到脚踏、视角统一、鹈鹕喙与喉囊四项；这些结果尚未经过独立视觉校验。',
-      runNow: '立即测试（管理员）',
+      runNow: '保存并立即测试',
     },
     results: {
       title: '最近六次结果',

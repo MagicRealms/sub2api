@@ -198,6 +198,9 @@ func (s *AccountTestService) testCNProviderAdaptiveResponsesConnection(c *gin.Co
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("Adaptive Responses endpoint returned %d: %s", resp.StatusCode, string(body))
+		if accountTestUpstreamOAuthRevoked(account, resp.StatusCode, body) {
+			return s.sendErrorAndEnd(c, errMsg+" "+accountTestUpstreamOAuthHint)
+		}
 		if resp.StatusCode == http.StatusUnauthorized && s.accountRepo != nil {
 			_ = s.accountRepo.SetError(ctx, account.ID, errMsg)
 		}

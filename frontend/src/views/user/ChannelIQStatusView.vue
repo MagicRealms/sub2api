@@ -18,7 +18,11 @@
         </div>
       </section>
 
-      <section v-if="loading && results.length === 0" class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+      <section v-if="!visible" class="card p-10 text-center text-sm text-gray-500 dark:text-gray-400">
+        {{ t('channelIQ.hidden') }}
+      </section>
+
+      <section v-else-if="loading && results.length === 0" class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <div v-for="n in 6" :key="n" class="h-64 animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-800"></div>
       </section>
 
@@ -95,6 +99,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const results = ref<ChannelIQResult[]>([])
 const configured = ref(false)
+const visible = ref(appStore.cachedPublicSettings?.channel_iq_enabled !== false)
 const loading = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -143,8 +148,10 @@ async function load(silent = false) {
   if (!silent) loading.value = true
   try {
     const snapshot = await channelIQAPI.get()
+    visible.value = snapshot.visible !== false
+    if (appStore.cachedPublicSettings) appStore.cachedPublicSettings.channel_iq_enabled = visible.value
     configured.value = snapshot.configured
-    results.value = (snapshot.results || []).slice(0, 6)
+    results.value = visible.value ? (snapshot.results || []).slice(0, 6) : []
   } catch (error: unknown) {
     if (!silent) appStore.showError(extractApiErrorMessage(error, t('channelIQ.loadError')))
   } finally {

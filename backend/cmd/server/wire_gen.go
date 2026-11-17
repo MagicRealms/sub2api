@@ -193,7 +193,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	pluginKVStore := repository.NewPluginKVStore(redisClient)
 	pluginManager := service.ProvidePluginManager(pluginRepository, secretEncryptor, configConfig, pluginHostInfo, pluginKVStore, openAIGatewayService)
 	accountTestService := service.ProvideAccountTestService(accountRepository, geminiTokenProvider, claudeTokenProvider, grokTokenProvider, antigravityGatewayService, httpUpstream, configConfig, tlsFingerprintProfileService, openAIGatewayService, settingService, pluginManager)
-	channelIQService := service.NewChannelIQService(scheduledTestPlanRepository, scheduledTestResultRepository, scheduledTestService, accountRepository, accountTestService)
+	channelIQService := service.NewChannelIQService(scheduledTestPlanRepository, scheduledTestResultRepository, scheduledTestService, accountRepository, accountTestService, settingService)
 	channelIQHandler := handler.NewChannelIQHandler(channelIQService)
 	channelMonitorV2Repository := repository.NewChannelMonitorV2Repository(db)
 	channelMonitorV2Service := service.ProvideChannelMonitorV2Service(channelMonitorV2Repository, settingService, channelMonitorService)

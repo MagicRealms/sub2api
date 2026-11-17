@@ -64,6 +64,14 @@ describe('resolveFeatureFlag', () => {
   })
 })
 
+describe('FeatureFlags.channelIQ', () => {
+  it('is independent of channel monitor and only explicit false hides it', () => {
+    expect(resolveFeatureFlag({ channel_monitor_enabled: false }, FeatureFlags.channelIQ)).toBe(true)
+    expect(resolveFeatureFlag({ channel_monitor_enabled: true, channel_iq_enabled: false }, FeatureFlags.channelIQ)).toBe(false)
+    expect(resolveFeatureFlag({ channel_iq_enabled: true }, FeatureFlags.channelIQ)).toBe(true)
+  })
+})
+
 describe('FeatureFlags.mcp', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

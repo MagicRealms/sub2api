@@ -40,6 +40,21 @@ func (h *ChannelIQHandler) Save(c *gin.Context) {
 	response.Success(c, snapshot)
 }
 
+func (h *ChannelIQHandler) SetVisibility(c *gin.Context) {
+	var input struct {
+		Visible *bool `json:"visible" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.service.SetVisibility(c.Request.Context(), *input.Visible); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"visible": *input.Visible})
+}
+
 // Run POST /admin/channel-iq/run. This is intentionally admin-only; public
 // users only see the persisted cards returned by the user handler.
 func (h *ChannelIQHandler) Run(c *gin.Context) {

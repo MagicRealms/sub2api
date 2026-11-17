@@ -126,11 +126,13 @@ type ChannelIQResult struct {
 }
 
 type ChannelIQAdminSnapshot struct {
+	Visible bool               `json:"visible"`
 	Config  *ChannelIQConfig   `json:"config"`
 	Results []*ChannelIQResult `json:"results"`
 }
 
 type ChannelIQPublicSnapshot struct {
+	Visible         bool               `json:"visible"`
 	Configured      bool               `json:"configured"`
 	Enabled         bool               `json:"enabled"`
 	ModelID         string             `json:"model_id,omitempty"`
@@ -155,6 +157,7 @@ type ChannelIQService struct {
 	scheduled   *ScheduledTestService
 	accountRepo AccountRepository
 	accountTest *AccountTestService
+	settings    *SettingService
 	runMu       sync.Mutex
 }
 
@@ -164,10 +167,11 @@ func NewChannelIQService(
 	scheduled *ScheduledTestService,
 	accountRepo AccountRepository,
 	accountTest *AccountTestService,
+	settings *SettingService,
 ) *ChannelIQService {
 	return &ChannelIQService{
 		planRepo: planRepo, resultRepo: resultRepo, scheduled: scheduled,
-		accountRepo: accountRepo, accountTest: accountTest,
+		accountRepo: accountRepo, accountTest: accountTest, settings: settings,
 	}
 }
 
@@ -235,6 +239,10 @@ func (s *ChannelIQService) listResults(ctx context.Context, plan *ScheduledTestP
 }
 
 func (s *ChannelIQService) GetAdminSnapshot(ctx context.Context) (*ChannelIQAdminSnapshot, error) {
+	visible, err := s.settings.GetChannelIQVisibility(ctx)
+	if err != nil {
+		return nil, err
+	}
 	plan, err := s.findPlan(ctx)
 	if err != nil {
 		return nil, err
@@ -243,10 +251,17 @@ func (s *ChannelIQService) GetAdminSnapshot(ctx context.Context) (*ChannelIQAdmi
 	if err != nil {
 		return nil, err
 	}
-	return &ChannelIQAdminSnapshot{Config: s.adminConfig(ctx, plan), Results: results}, nil
+	return &ChannelIQAdminSnapshot{Visible: visible, Config: s.adminConfig(ctx, plan), Results: results}, nil
 }
 
 func (s *ChannelIQService) GetPublicSnapshot(ctx context.Context) (*ChannelIQPublicSnapshot, error) {
+	visible, err := s.settings.GetChannelIQVisibility(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return &ChannelIQPublicSnapshot{Visible: false, Results: []*ChannelIQResult{}}, nil
+	}
 	plan, err := s.findPlan(ctx)
 	if err != nil {
 		return nil, err
@@ -255,7 +270,7 @@ func (s *ChannelIQService) GetPublicSnapshot(ctx context.Context) (*ChannelIQPub
 	if err != nil {
 		return nil, err
 	}
-	view := &ChannelIQPublicSnapshot{Results: results}
+	view := &ChannelIQPublicSnapshot{Visible: true, Results: results}
 	if plan != nil {
 		view.Configured = true
 		view.Enabled = plan.Enabled
@@ -263,6 +278,12 @@ func (s *ChannelIQService) GetPublicSnapshot(ctx context.Context) (*ChannelIQPub
 		view.ReasoningEffort = strings.TrimSpace(plan.ReasoningEffort)
 	}
 	return view, nil
+}
+
+// SetVisibility changes only user-facing publication, without rescheduling or
+// changing the selected account. Administrators always retain access to history.
+func (s *ChannelIQService) SetVisibility(ctx context.Context, visible bool) error {
+	return s.settings.SetChannelIQVisibility(ctx, visible)
 }
 
 func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveInput) (*ChannelIQAdminSnapshot, error) {

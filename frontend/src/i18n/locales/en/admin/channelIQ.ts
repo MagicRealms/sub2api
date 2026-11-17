@@ -6,6 +6,13 @@ export default {
     saveError: 'Failed to save Channel IQ configuration',
     runError: 'Channel IQ test failed',
     saveSuccess: 'Channel IQ configuration saved',
+    visibility: {
+      label: 'Show intelligence status to users',
+      hint: 'Hide the user entry and results while keeping the test schedule and history. Changes save immediately.',
+      shown: 'Intelligence status is visible to users',
+      hidden: 'Intelligence status is hidden from users',
+      saveError: 'Failed to save intelligence status visibility',
+    },
     config: {
       title: 'Test configuration',
       description: 'Groups are not shown here. Every test targets only the selected upstream key.',
@@ -32,7 +39,7 @@ export default {
       prompt: 'Test prompt',
       promptPlaceholder: 'For example: generate a pelican riding a bicycle as an HTML/SVG animation; output code only.',
       promptHint: 'The model self-reports on two wheels, legs connected to pedals, a consistent view, and a pelican beak and pouch. These scores have no independent visual verification.',
-      runNow: 'Run now (admin)',
+      runNow: 'Save and run now',
     },
     results: {
       title: 'Latest six results',

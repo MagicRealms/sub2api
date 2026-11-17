@@ -48,6 +48,7 @@ export interface ChannelIQResult {
 }
 
 export interface ChannelIQSnapshot {
+  visible: boolean
   config: ChannelIQConfig | null
   results: ChannelIQResult[]
 }
@@ -77,4 +78,9 @@ export async function run(): Promise<ChannelIQResult> {
   return data
 }
 
-export default { get, save, run }
+export async function setVisibility(visible: boolean): Promise<{ visible: boolean }> {
+  const { data } = await apiClient.put<{ visible: boolean }>('/admin/channel-iq/visibility', { visible })
+  return data
+}
+
+export default { get, save, run, setVisibility }

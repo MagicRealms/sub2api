@@ -34,6 +34,7 @@ export interface ChannelIQResult {
 }
 
 export interface ChannelIQPublicSnapshot {
+  visible: boolean
   configured: boolean
   enabled: boolean
   model_id?: string

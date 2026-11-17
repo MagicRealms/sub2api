@@ -3,6 +3,7 @@ export default {
     title: '智商状态',
     description: '展示最近六次鹈鹕动画。结构评分来自模型自评，尚未经过独立视觉校验，请结合动画核验两个轮子、脚踏连接、视角和喉囊。',
     loadError: '智商状态加载失败',
+    hidden: '管理员暂未公开智商状态。',
     footnote: '结果由管理员配置的测试任务自动更新，用户端仅可查看。',
     status: {
       disabled: '渠道已停用',

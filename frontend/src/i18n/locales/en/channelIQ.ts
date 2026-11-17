@@ -3,6 +3,7 @@ export default {
     title: 'Intelligence Status',
     description: 'View the latest six pelican animations. Scores are self-reported by the model, without independent visual verification. Check the wheels, pedals, viewpoint and pouch in the animation.',
     loadError: 'Failed to load intelligence status',
+    hidden: 'Intelligence status is not currently published.',
     footnote: 'Results are updated by the administrator task. This page is read-only for users.',
     status: {
       disabled: 'Channel disabled',

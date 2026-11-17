@@ -806,6 +806,7 @@ func registerChannelIQRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		channelIQ.GET("", h.Admin.ChannelIQ.Get)
 		channelIQ.PUT("", h.Admin.ChannelIQ.Save)
+		channelIQ.PUT("/visibility", h.Admin.ChannelIQ.SetVisibility)
 		channelIQ.POST("/run", h.Admin.ChannelIQ.Run)
 	}
 }
