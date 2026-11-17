@@ -37,7 +37,7 @@ func TestProvideHTTPServerAppliesIngressLimits(t *testing.T) {
 	srv := ProvideHTTPServer(ingressTestConfig(), gin.New())
 	require.Equal(t, 8*1024, srv.MaxHeaderBytes)
 	require.Equal(t, time.Second, srv.ReadHeaderTimeout)
-	require.Equal(t, time.Second, srv.ReadTimeout)
+	require.Zero(t, srv.ReadTimeout, "large streaming uploads use per-read body deadlines")
 	require.Equal(t, 5*time.Second, srv.IdleTimeout)
 }
 

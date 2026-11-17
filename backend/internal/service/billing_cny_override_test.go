@@ -16,15 +16,17 @@ import (
 func TestDeepSeekLocalOverrideWinsPerField(t *testing.T) {
 	const catalog = `{"deepseek-flash":{"input_cost_per_token":9,"output_cost_per_token":8,"cache_read_input_token_cost":7}}`
 	for _, tc := range []struct {
-		name, patch              string
-		input, output, cacheRead float64
+		name, patch                       string
+		input, output, cacheRead          float64
+		inputOverridden, outputOverridden bool
+		cacheReadOverridden               bool
 	}{
-		{"input only", `{"input_cost_per_token":0.000001}`, 1e-6, 6e-7, 3e-9},
-		{"output only", `{"output_cost_per_token":0.000004}`, 1.5e-7, 4e-6, 3e-9},
-		{"cache only", `{"cache_read_input_token_cost":0.00000002}`, 1.5e-7, 6e-7, 2e-8},
-		{"explicit zero", `{"input_cost_per_token":0,"output_cost_per_token":0,"cache_read_input_token_cost":0}`, 0, 0, 0},
-		{"null is not a price", `{"input_cost_per_token":null}`, 1.5e-7, 6e-7, 3e-9},
-		{"unrelated override", `{"max_input_tokens":1048576}`, 1.5e-7, 6e-7, 3e-9},
+		{"input only", `{"input_cost_per_token":0.000001}`, 1e-6, 6e-7, 3e-9, true, false, false},
+		{"output only", `{"output_cost_per_token":0.000004}`, 1.5e-7, 4e-6, 3e-9, false, true, false},
+		{"cache only", `{"cache_read_input_token_cost":0.00000002}`, 1.5e-7, 6e-7, 2e-8, false, false, true},
+		{"explicit zero", `{"input_cost_per_token":0,"output_cost_per_token":0,"cache_read_input_token_cost":0}`, 0, 0, 0, true, true, true},
+		{"null is not a price", `{"input_cost_per_token":null}`, 1.5e-7, 6e-7, 3e-9, false, false, false},
+		{"unrelated override", `{"max_input_tokens":1048576}`, 1.5e-7, 6e-7, 3e-9, false, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ps := newPricingServiceWithOverride(t, `{"deepseek-flash":`+tc.patch+`}`)
@@ -51,7 +53,19 @@ func TestDeepSeekLocalOverrideWinsPerField(t *testing.T) {
 					PricingAt: period.at,
 				})
 				require.NoError(t, err)
-				want := (tc.input + tc.output + tc.cacheRead) * 1000000 * period.multiplier
+				inputMultiplier, outputMultiplier, cacheReadMultiplier := period.multiplier, period.multiplier, period.multiplier
+				if period.multiplier > 1 {
+					if tc.inputOverridden {
+						inputMultiplier = 1
+					}
+					if tc.outputOverridden {
+						outputMultiplier = 1
+					}
+					if tc.cacheReadOverridden {
+						cacheReadMultiplier = 1
+					}
+				}
+				want := (tc.input*inputMultiplier + tc.output*outputMultiplier + tc.cacheRead*cacheReadMultiplier) * 1000000
 				require.InDelta(t, want, cost.TotalCost, 1e-12)
 				require.InDelta(t, want*0.2, cost.ActualCost, 1e-12)
 			}
@@ -106,6 +120,24 @@ func TestCNYNominalPricingConfigBillsSameNumbersAndPopulatesPlaza(t *testing.T) 
 			require.InDelta(t, tc.input, *official.InputPrice*1000000, 1e-9)
 			require.InDelta(t, tc.output, *official.OutputPrice*1000000, 1e-9)
 			require.InDelta(t, tc.cacheRead, *official.CacheReadPrice*1000000, 1e-9)
+			modelPricing, err := bs.GetModelPricing(tc.model)
+			require.NoError(t, err)
+			if tc.platform == PlatformDeepseek {
+				require.True(t, modelPricing.DeepSeekPeakPricingEnabled)
+				peakCost, err := bs.CalculateTokenCostForRequest(TokenCostRequest{
+					Ctx: context.Background(), Model: tc.model, Group: group,
+					Resolver: resolver, RateMultiplier: tc.rate,
+					PricingAt: time.Date(2026, 11, 16, 2, 0, 0, 0, time.UTC),
+					Tokens:    UsageTokens{InputTokens: 1000000, OutputTokens: 1000000, CacheReadTokens: 1000000},
+				})
+				require.NoError(t, err)
+				require.InDelta(t, tc.input*2, peakCost.InputCost, 1e-9)
+				require.InDelta(t, tc.output*2, peakCost.OutputCost, 1e-9)
+				require.InDelta(t, tc.cacheRead*2, peakCost.CacheReadCost, 1e-9)
+				require.InDelta(t, (tc.input+tc.output+tc.cacheRead)*2*tc.rate, peakCost.ActualCost, 1e-9)
+			} else {
+				require.False(t, modelPricing.DeepSeekPeakPricingEnabled)
+			}
 			if tc.write1h > 0 {
 				require.InDelta(t, tc.write5m, *official.CacheWritePrice*1000000, 1e-9)
 				require.InDelta(t, tc.write1h, *official.CacheWrite1hPrice*1000000, 1e-9)

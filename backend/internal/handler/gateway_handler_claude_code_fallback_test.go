@@ -126,15 +126,15 @@ func TestGatewayOpenAICompatibleHandlersClaudeCodeOnlyFallback(t *testing.T) {
 					newAccount(primaryAccountID, primaryGroupID),
 					newAccount(fallbackAccountID, fallbackGroupID),
 				}}}
+				cfg := &config.Config{RunMode: config.RunModeSimple}
 				gatewayService := service.NewGatewayService(
 					nil, &groupMapRepo{fakeGroupRepo: &fakeGroupRepo{}, groups: map[int64]*service.Group{
 						primaryGroupID:  primary,
 						fallbackGroupID: fallback,
-					}}, nil, nil, nil, nil, nil, nil, nil,
+					}}, nil, nil, nil, nil, nil, nil, cfg,
 					service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil),
 					nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 				)
-				cfg := &config.Config{RunMode: config.RunModeSimple}
 				billingCacheService := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 				t.Cleanup(billingCacheService.Stop)
 				h := &GatewayHandler{

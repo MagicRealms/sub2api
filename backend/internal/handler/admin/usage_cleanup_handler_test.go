@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -345,8 +346,10 @@ func TestUsageHandlerCreateCleanupTaskSuccess(t *testing.T) {
 	require.NotNil(t, created.Filters.Model)
 	require.Equal(t, "gpt-4", *created.Filters.Model)
 
-	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC).Add(24*time.Hour - time.Nanosecond)
+	loc, err := time.LoadLocation(usagestats.DashboardTimezone)
+	require.NoError(t, err)
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, loc)
+	end := time.Date(2024, 1, 2, 0, 0, 0, 0, loc).Add(24*time.Hour - time.Nanosecond)
 	require.True(t, created.Filters.StartTime.Equal(start))
 	require.True(t, created.Filters.EndTime.Equal(end))
 }

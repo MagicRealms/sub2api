@@ -165,6 +165,8 @@ func newTestGatewayHandlerWithSchedulerCache(t *testing.T, group *service.Group,
 	t.Helper()
 
 	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil)
+	// RunModeSimple disables pricing admission for these routing-only tests.
+	cfg := &config.Config{RunMode: config.RunModeSimple}
 
 	gwSvc := service.NewGatewayService(
 		nil, // accountRepo (not used: scheduler snapshot hit)
@@ -175,7 +177,7 @@ func newTestGatewayHandlerWithSchedulerCache(t *testing.T, group *service.Group,
 		nil, // userSubRepo
 		nil, // userGroupRateRepo
 		nil, // cache (disable sticky)
-		nil, // cfg
+		cfg,
 		schedulerSnapshot,
 		nil, // concurrencyService (disable load-aware; tryAcquire always acquired)
 		nil, // billingService
@@ -197,8 +199,6 @@ func newTestGatewayHandlerWithSchedulerCache(t *testing.T, group *service.Group,
 		nil, // userPlatformQuotaRepo
 	)
 
-	// RunModeSimple：跳过计费检查，避免引入 repo/cache 依赖。
-	cfg := &config.Config{RunMode: config.RunModeSimple}
 	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 
 	concurrencySvc := service.NewConcurrencyService(&fakeConcurrencyCache{})

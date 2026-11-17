@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -24,8 +25,10 @@ func TestParseTimeRange(t *testing.T) {
 	c.Request = req
 
 	start, end := parseTimeRange(c)
-	require.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), start)
-	require.Equal(t, time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC), end)
+	loc, err := time.LoadLocation(usagestats.DashboardTimezone)
+	require.NoError(t, err)
+	require.True(t, start.Equal(time.Date(2024, 1, 1, 0, 0, 0, 0, loc)))
+	require.True(t, end.Equal(time.Date(2024, 1, 3, 0, 0, 0, 0, loc)))
 
 	req = httptest.NewRequest(http.MethodGet, "/?start_date=bad&timezone=UTC", nil)
 	c.Request = req

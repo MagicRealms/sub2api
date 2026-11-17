@@ -60,13 +60,13 @@ func runGeminiImageGateEndpoint(t *testing.T, ep geminiImageGateEndpoint, group 
 		Status: service.StatusActive, Schedulable: true, Concurrency: 1,
 		AccountGroups: []service.AccountGroup{{AccountID: accountID, GroupID: group.ID}},
 	}}}}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
 	gatewayService := service.NewGatewayService(
 		nil, &groupMapRepo{fakeGroupRepo: &fakeGroupRepo{}, groups: map[int64]*service.Group{group.ID: group}},
-		nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, cfg,
 		service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
-	cfg := &config.Config{RunMode: config.RunModeSimple}
 	billingCacheService := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(billingCacheService.Stop)
 	h := &GatewayHandler{
