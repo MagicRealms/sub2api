@@ -9,7 +9,7 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-var scheduledTestCronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+var scheduledTestCronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 
 // ScheduledTestService provides CRUD operations for scheduled test plans and results.
 type ScheduledTestService struct {
@@ -103,4 +103,20 @@ func computeNextRun(cronExpr string, from time.Time) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return sched.Next(from), nil
+}
+
+func nextChannelIQRun(plan *ScheduledTestPlan, now time.Time) (time.Time, error) {
+	if plan != nil && strings.TrimSpace(plan.CronExpression) == "@every 90m" && plan.NextRunAt != nil {
+		interval := 90 * time.Minute
+		next := plan.NextRunAt.Add(interval)
+		if !next.After(now) {
+			missedIntervals := now.Sub(*plan.NextRunAt)/interval + 1
+			next = plan.NextRunAt.Add(missedIntervals * interval)
+		}
+		return next, nil
+	}
+	if plan == nil {
+		return time.Time{}, fmt.Errorf("scheduled test plan is required")
+	}
+	return computeNextRun(plan.CronExpression, now)
 }

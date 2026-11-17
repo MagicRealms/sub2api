@@ -28,4 +28,23 @@ describe('user IQ visibility', () => {
     expect(appStore.cachedPublicSettings.channel_iq_enabled).toBe(false)
     wrapper.unmount()
   })
+
+  it('renders the saved test note instead of a numeric sequence', async () => {
+    get.mockResolvedValue({
+      visible: true, configured: true, enabled: false,
+      results: [{
+        id: 131, status: 'failed', model_id: 'gpt-6.1-sol', reasoning_effort: 'high', note: 'api-key smoke test',
+        response_text: '', error_message: 'upstream failed', latency_ms: 10,
+        started_at: '2026-11-17T12:00:00Z', finished_at: '2026-11-17T12:00:01Z', created_at: '2026-11-17T12:00:01Z',
+      }],
+    })
+    const wrapper = mount(ChannelIQStatusView, { global: { stubs: {
+      AppLayout: defineComponent({ template: '<main><slot /></main>' }),
+      Icon: true, ChannelIQPreview: true,
+    } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('api-key smoke test')
+    expect(wrapper.text()).not.toContain('#131')
+    wrapper.unmount()
+  })
 })

@@ -41,7 +41,7 @@ func TestChannelIQOverloadWithoutPartialRestartsOriginalPrompt(t *testing.T) {
 	require.Equal(t, "success", result.Status)
 }
 
-func TestChannelIQOverloadWaitsUntilNextTaskThenRecordsReason(t *testing.T) {
+func TestChannelIQOverloadWaitsUntilNextScheduledRunThenRecordsReason(t *testing.T) {
 	deadline := time.Now().Add(20 * time.Millisecond)
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
@@ -66,7 +66,7 @@ func TestChannelIQOtherErrorsAreTerminal(t *testing.T) {
 	require.Equal(t, "Authentication failed (401)", result.ErrorMessage)
 }
 
-func TestChannelIQRequestTimeoutContinuesBeforeNextHour(t *testing.T) {
+func TestChannelIQRequestTimeoutContinuesBeforeNextScheduledRun(t *testing.T) {
 	attempts := 0
 	result := runChannelIQProbeUntil(context.Background(), time.Now().Add(time.Hour), func(context.Context, string) (*ScheduledTestResult, error) {
 		attempts++

@@ -36,14 +36,14 @@
 
       <section v-else class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         <article
-          v-for="(result, index) in results"
+          v-for="result in results"
           :key="result.id"
           class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
         >
           <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'running' ? 'bg-amber-500' : result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
           <div class="flex items-start justify-between gap-3">
             <div>
-              <div class="text-xs text-gray-400 dark:text-gray-500">{{ t('channelIQ.card.startedAt') }} {{ formatTime(result.started_at) }} · #{{ result.id }}</div>
+              <div class="max-w-full break-words text-xs text-gray-400 dark:text-gray-500">{{ t('channelIQ.card.startedAt') }} {{ formatTime(result.started_at) }} · {{ result.note || t('channelIQ.card.noNote') }}</div>
               <div class="mt-2 flex flex-wrap gap-1.5 text-xs">
                 <span class="rounded-full bg-violet-50 px-2 py-1 font-medium text-violet-700 dark:bg-violet-900/25 dark:text-violet-300">{{ result.model_id || t('channelIQ.card.autoModel') }}</span>
                 <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ result.reasoning_effort || t('channelIQ.card.autoReasoning') }}</span>
@@ -54,7 +54,7 @@
             </span>
           </div>
 
-          <ChannelIQPreview v-if="result.status === 'success'" :response-text="result.response_text" :title="t('channelIQ.card.animationTitle')" :autoplay="index === 0" />
+          <ChannelIQPreview v-if="result.status === 'success'" :response-text="result.response_text" :title="t('channelIQ.card.animationTitle')" />
           <p v-else-if="result.status === 'running'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('channelIQ.card.running') }}</p>
           <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('channelIQ.card.waiting') }}</p>
           <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">

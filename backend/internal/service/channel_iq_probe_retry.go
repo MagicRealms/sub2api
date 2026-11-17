@@ -67,9 +67,8 @@ func waitChannelIQRetry(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-// A single hourly result stays running while overloads are retried. Each
-// request gets a fresh 30-minute context; the outer context ends at the next
-// scheduled hour so retries cannot delay the following task.
+// A single result stays running while overloads are retried. Each request gets
+// a fresh 30-minute context; the outer context ends at the next scheduled run.
 func runChannelIQProbeUntil(ctx context.Context, deadline time.Time, attempt channelIQProbeAttempt, wait func(context.Context, time.Duration) error) *ScheduledTestResult {
 	startedAt := time.Now()
 	partial := ""
@@ -77,7 +76,7 @@ func runChannelIQProbeUntil(ctx context.Context, deadline time.Time, attempt cha
 	for count := 0; ; count++ {
 		if ctx.Err() != nil || !time.Now().Before(deadline) {
 			if lastReason == "" {
-				lastReason = "测试未在下一整点前完成"
+				lastReason = "测试未在下次计划运行前完成"
 			}
 			return channelIQFailedResult(startedAt, partial, lastReason)
 		}
@@ -96,7 +95,7 @@ func runChannelIQProbeUntil(ctx context.Context, deadline time.Time, attempt cha
 				lastReason = channelIQResultReason(result, err)
 			}
 			if lastReason == "" {
-				lastReason = "测试未在下一整点前完成"
+				lastReason = "测试未在下次计划运行前完成"
 			}
 			return channelIQFailedResult(startedAt, partial, lastReason)
 		}

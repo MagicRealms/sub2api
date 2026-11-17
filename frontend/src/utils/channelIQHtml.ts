@@ -169,9 +169,6 @@ export function extractChannelIQAnimationDocument(value: string): string {
 
 const channelIQFrameStyle = `<style>
 html, body { width: 100%; min-height: 100%; margin: 0; overflow: hidden; }
-html.channel-iq-paused *, html.channel-iq-paused *::before, html.channel-iq-paused *::after {
-  animation-play-state: paused !important;
-}
 </style>`
 
 function stripExternalResources(markup: string): string {
@@ -192,16 +189,8 @@ function stripExternalResources(markup: string): string {
   return doc.body.innerHTML
 }
 
-function channelIQControlScript(token: string, autoplay: boolean): string {
+function channelIQLayoutScript(): string {
   return `(() => {
-  const token = ${JSON.stringify(token)};
-  let playing = ${autoplay ? 'true' : 'false'};
-  let pausedAt = playing ? 0 : performance.now();
-  let pausedDuration = 0;
-  let nextID = 1;
-  const callbacks = new Map();
-  const nativeRAF = window.requestAnimationFrame.bind(window);
-  const nativeCancel = window.cancelAnimationFrame.bind(window);
   const content = () => Array.from(document.body.children)
     .find(element => !['SCRIPT', 'STYLE'].includes(element.tagName)) || null;
 
@@ -222,68 +211,9 @@ function channelIQControlScript(token: string, autoplay: boolean): string {
     root.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
   }
 
-  function reportReady() {
-    fitContent();
-    window.parent.postMessage({
-      kind: 'channel-iq-ready', token,
-      width: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
-      height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
-    }, '*');
-  }
-
-  function schedule(id) {
-    const pending = callbacks.get(id);
-    if (!pending || !playing) return;
-    pending.nativeID = nativeRAF(timestamp => {
-      callbacks.delete(id);
-      pending.callback(timestamp - pausedDuration);
-    });
-  }
-  window.requestAnimationFrame = callback => {
-    const id = nextID++;
-    callbacks.set(id, { callback, nativeID: null });
-    schedule(id);
-    return id;
-  };
-  window.cancelAnimationFrame = id => {
-    const pending = callbacks.get(id);
-    if (pending && pending.nativeID !== null) nativeCancel(pending.nativeID);
-    callbacks.delete(id);
-  };
-
-  function syncAnimations() {
-    document.documentElement.classList.toggle('channel-iq-paused', !playing);
-    document.querySelectorAll('svg').forEach(svg => {
-      if (playing) svg.unpauseAnimations?.();
-      else svg.pauseAnimations?.();
-    });
-  }
-  function setPlaying(next) {
-    if (next === playing) return;
-    if (next) {
-      pausedDuration += performance.now() - pausedAt;
-      playing = true;
-      syncAnimations();
-      for (const id of callbacks.keys()) schedule(id);
-    } else {
-      playing = false;
-      pausedAt = performance.now();
-      for (const pending of callbacks.values()) {
-        if (pending.nativeID !== null) nativeCancel(pending.nativeID);
-        pending.nativeID = null;
-      }
-      syncAnimations();
-    }
-  }
-
-  window.addEventListener('message', event => {
-    if (event.source !== window.parent || event.data?.kind !== 'channel-iq-control' || event.data.token !== token) return;
-    setPlaying(event.data.playing === true);
-  });
   window.addEventListener('resize', fitContent, { passive: true });
   document.addEventListener('DOMContentLoaded', () => {
-    syncAnimations();
-    reportReady();
+    fitContent();
     setTimeout(fitContent, 0);
     setTimeout(fitContent, 120);
   });
@@ -291,7 +221,7 @@ function channelIQControlScript(token: string, autoplay: boolean): string {
 }
 
 /** Render model HTML in an opaque-origin iframe with only local, inline assets. */
-export function extractChannelIQHtmlPreviewDocument(value: string, nonce: string, token: string, autoplay: boolean): string {
+export function extractChannelIQHtmlPreviewDocument(value: string, nonce: string): string {
   const source = unwrapHtmlSource(value.trim())
   if (!/<svg\b/i.test(source)) return ''
   const parsed = new DOMParser().parseFromString(source, 'text/html')
@@ -309,8 +239,8 @@ export function extractChannelIQHtmlPreviewDocument(value: string, nonce: string
   const scriptPolicy = safeNonce ? `'nonce-${safeNonce}'` : "'none'"
   const csp = `default-src 'none'; script-src ${scriptPolicy}; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; form-action 'none'; object-src 'none'; base-uri 'none'; navigate-to 'none'`
   const scripts = safeNonce
-    ? [channelIQControlScript(token, autoplay), ...inlineScripts]
+    ? [channelIQLayoutScript(), ...inlineScripts]
       .map(script => `<script nonce="${safeNonce}">${script.replace(/<\/script/gi, '<\\/script')}</script>`).join('\n')
     : ''
-  return `<!doctype html><html${autoplay ? '' : ' class="channel-iq-paused"'}><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer">${styles}${channelIQPreviewStyle}${channelIQFrameStyle}</head><body>${body}${scripts}</body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="referrer" content="no-referrer">${styles}${channelIQPreviewStyle}${channelIQFrameStyle}</head><body>${body}${scripts}</body></html>`
 }

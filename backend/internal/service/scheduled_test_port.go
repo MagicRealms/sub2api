@@ -15,6 +15,7 @@ type ScheduledTestPlan struct {
 	// channel IQ plan uses service.ChannelIQPlanKind.
 	Kind            string     `json:"kind"`
 	Prompt          string     `json:"prompt"`
+	Note            string     `json:"note"`
 	ReasoningEffort string     `json:"reasoning_effort"`
 	CronExpression  string     `json:"cron_expression"`
 	Enabled         bool       `json:"enabled"`
@@ -33,6 +34,7 @@ type ScheduledTestResult struct {
 	Status          string    `json:"status"`
 	ModelID         string    `json:"model_id"`
 	ReasoningEffort string    `json:"reasoning_effort"`
+	Note            string    `json:"note"`
 	ResponseText    string    `json:"response_text"`
 	ErrorMessage    string    `json:"error_message"`
 	LatencyMs       int64     `json:"latency_ms"`

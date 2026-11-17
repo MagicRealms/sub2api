@@ -112,7 +112,12 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 	var wg sync.WaitGroup
 
 	for _, plan := range plans {
-		nextRun, err := computeNextRun(plan.CronExpression, now)
+		var nextRun time.Time
+		if plan.Kind == ChannelIQPlanKind {
+			nextRun, err = nextChannelIQRun(plan, now)
+		} else {
+			nextRun, err = computeNextRun(plan.CronExpression, now)
+		}
 		if err != nil {
 			logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d computeNextRun error: %v", plan.ID, err)
 			continue
@@ -121,7 +126,7 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 		var claimed bool
 		if plan.Kind == ChannelIQPlanKind {
 			runningResult = &ScheduledTestResult{
-				ModelID: plan.ModelID, ReasoningEffort: plan.ReasoningEffort, StartedAt: now,
+				ModelID: plan.ModelID, ReasoningEffort: plan.ReasoningEffort, Note: plan.Note, StartedAt: now,
 			}
 			claimed, err = s.planRepo.ClaimDueWithResult(ctx, plan.ID, now, nextRun, runningResult, channelIQResultLimit)
 		} else {
@@ -177,6 +182,7 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 	}
 	result.ModelID = plan.ModelID
 	result.ReasoningEffort = plan.ReasoningEffort
+	result.Note = plan.Note
 	if pending != nil {
 		result.StartedAt = pending.StartedAt
 		result.LatencyMs = result.FinishedAt.Sub(pending.StartedAt).Milliseconds()

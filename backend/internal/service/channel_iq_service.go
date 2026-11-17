@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 // ChannelIQPlanKind marks the single scheduled test plan owned by the
@@ -18,18 +19,21 @@ const ChannelIQPlanKind = "channel_iq"
 const ChannelIQFeatureKey = "channel_iq"
 
 const (
-	ChannelIQStatusDisabled     = "disabled"
-	ChannelIQStatusUnconfigured = "unconfigured"
-	ChannelIQStatusPending      = "pending"
-	ChannelIQStatusHealthy      = "healthy"
-	ChannelIQStatusWarning      = "warning"
-	ChannelIQStatusError        = "error"
-	channelIQDefaultInterval    = 300 * time.Second
-	channelIQDefaultPrompt      = "创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md"
-	channelIQMinInterval        = 60 * time.Second
-	channelIQMaxInterval        = 24 * time.Hour
-	channelIQResultLimit        = 6
-	channelIQHourlyInterval     = 3600
+	ChannelIQStatusDisabled       = "disabled"
+	ChannelIQStatusUnconfigured   = "unconfigured"
+	ChannelIQStatusPending        = "pending"
+	ChannelIQStatusHealthy        = "healthy"
+	ChannelIQStatusWarning        = "warning"
+	ChannelIQStatusError          = "error"
+	channelIQDefaultInterval      = 300 * time.Second
+	channelIQDefaultPrompt        = "创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试，只靠你自己完成，不要使用任何skill，不要依赖我本地的AGENTS.md"
+	channelIQMinInterval          = 60 * time.Second
+	channelIQMaxInterval          = 24 * time.Hour
+	channelIQResultLimit          = 6
+	channelIQHourlyInterval       = 3600
+	channelIQNinetyMinuteInterval = 90 * 60
+	channelIQTwoHourInterval      = 2 * 3600
+	channelIQNoteMaxRunes         = 200
 )
 
 // ChannelIQConfig contains the persisted single-key test configuration. The
@@ -43,6 +47,7 @@ type ChannelIQConfig struct {
 	ModelID         string     `json:"model_id"`
 	Model           string     `json:"model,omitempty"`
 	Prompt          string     `json:"prompt"`
+	Note            string     `json:"note"`
 	ReasoningEffort string     `json:"reasoning_effort"`
 	IntervalSeconds int        `json:"interval_seconds"`
 	Enabled         bool       `json:"enabled"`
@@ -116,6 +121,7 @@ type ChannelIQResult struct {
 	Status          string               `json:"status"`
 	ModelID         string               `json:"model_id"`
 	ReasoningEffort string               `json:"reasoning_effort"`
+	Note            string               `json:"note"`
 	ResponseText    string               `json:"response_text"`
 	ErrorMessage    string               `json:"error_message,omitempty"`
 	LatencyMs       int64                `json:"latency_ms"`
@@ -144,6 +150,7 @@ type ChannelIQSaveInput struct {
 	AccountID       int64  `json:"account_id" binding:"required"`
 	ModelID         string `json:"model_id"`
 	Prompt          string `json:"prompt"`
+	Note            string `json:"note"`
 	ReasoningEffort string `json:"reasoning_effort"`
 	IntervalSeconds int    `json:"interval_seconds"`
 	Enabled         bool   `json:"enabled"`
@@ -192,7 +199,7 @@ func (s *ChannelIQService) adminConfig(ctx context.Context, plan *ScheduledTestP
 	}
 	cfg := &ChannelIQConfig{
 		ID: plan.ID, AccountID: plan.AccountID, ModelID: strings.TrimSpace(plan.ModelID),
-		Prompt: defaultChannelIQPrompt(plan.Prompt), ReasoningEffort: strings.TrimSpace(plan.ReasoningEffort),
+		Prompt: defaultChannelIQPrompt(plan.Prompt), Note: strings.TrimSpace(plan.Note), ReasoningEffort: strings.TrimSpace(plan.ReasoningEffort),
 		IntervalSeconds: channelIQIntervalFromCron(plan.CronExpression), Enabled: plan.Enabled,
 		LastRunAt: plan.LastRunAt, NextRunAt: plan.NextRunAt, UpdatedAt: plan.UpdatedAt,
 	}
@@ -225,7 +232,7 @@ func (s *ChannelIQService) listResults(ctx context.Context, plan *ScheduledTestP
 		}
 		item := &ChannelIQResult{
 			ID: result.ID, Status: result.Status, ModelID: modelID,
-			ReasoningEffort: reasoningEffort, ResponseText: result.ResponseText,
+			ReasoningEffort: reasoningEffort, Note: strings.TrimSpace(result.Note), ResponseText: result.ResponseText,
 			ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
 			FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
 		}
@@ -290,6 +297,10 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 	if input.AccountID <= 0 {
 		return nil, fmt.Errorf("请选择用于测试的 Key")
 	}
+	input.Note = strings.TrimSpace(input.Note)
+	if utf8.RuneCountInString(input.Note) > channelIQNoteMaxRunes {
+		return nil, fmt.Errorf("测试备注不能超过 %d 个字符", channelIQNoteMaxRunes)
+	}
 	if s.accountRepo == nil {
 		return nil, fmt.Errorf("账号服务未就绪")
 	}
@@ -315,7 +326,7 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 	if plan == nil {
 		plan, err = s.scheduled.CreatePlan(ctx, &ScheduledTestPlan{
 			AccountID: input.AccountID, ModelID: strings.TrimSpace(input.ModelID), Kind: ChannelIQPlanKind,
-			Prompt: defaultChannelIQPrompt(input.Prompt), ReasoningEffort: strings.TrimSpace(input.ReasoningEffort),
+			Prompt: defaultChannelIQPrompt(input.Prompt), Note: input.Note, ReasoningEffort: strings.TrimSpace(input.ReasoningEffort),
 			CronExpression: cronExpr, Enabled: input.Enabled, MaxResults: channelIQResultLimit,
 		})
 	} else {
@@ -325,6 +336,7 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 		plan.ModelID = strings.TrimSpace(input.ModelID)
 		plan.Kind = ChannelIQPlanKind
 		plan.Prompt = defaultChannelIQPrompt(input.Prompt)
+		plan.Note = input.Note
 		plan.ReasoningEffort = strings.TrimSpace(input.ReasoningEffort)
 		plan.CronExpression = cronExpr
 		plan.Enabled = input.Enabled
@@ -354,7 +366,7 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 		return nil, fmt.Errorf("请先保存渠道智商配置")
 	}
 	if plan.Enabled {
-		return nil, fmt.Errorf("自动测试已启用，每小时整点只运行一次；暂停自动测试后才可手动测试")
+		return nil, fmt.Errorf("自动测试已启用，请暂停后再手动测试")
 	}
 	if s.accountTest == nil || s.scheduled == nil {
 		return nil, fmt.Errorf("渠道智商测试服务未就绪")
@@ -368,6 +380,7 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	}
 	result.ModelID = plan.ModelID
 	result.ReasoningEffort = plan.ReasoningEffort
+	result.Note = plan.Note
 	persistCtx, persistCancel := scheduledTestPersistenceContext(testCtx)
 	defer persistCancel()
 	if err := s.scheduled.SaveResult(persistCtx, plan.ID, channelIQResultLimit, result); err != nil {
@@ -380,7 +393,7 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	evaluation := evaluateChannelIQResponse(result.ResponseText)
 	return &ChannelIQResult{
 		ID: result.ID, Status: result.Status, ModelID: strings.TrimSpace(plan.ModelID),
-		ReasoningEffort: strings.TrimSpace(plan.ReasoningEffort), ResponseText: result.ResponseText,
+		ReasoningEffort: strings.TrimSpace(plan.ReasoningEffort), Note: strings.TrimSpace(result.Note), ResponseText: result.ResponseText,
 		ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
 		FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
 		Evaluation: &evaluation,
@@ -388,10 +401,16 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 }
 
 func channelIQCronForInterval(seconds int) (string, error) {
-	if seconds != channelIQHourlyInterval {
-		return "", fmt.Errorf("渠道智商仅支持每小时整点测试一次")
+	switch seconds {
+	case channelIQHourlyInterval:
+		return "0 */1 * * *", nil
+	case channelIQNinetyMinuteInterval:
+		return "@every 90m", nil
+	case channelIQTwoHourInterval:
+		return "0 */2 * * *", nil
+	default:
+		return "", fmt.Errorf("不支持的渠道智商测试间隔")
 	}
-	return "0 */1 * * *", nil
 }
 
 func channelIQIntervalFromCron(expr string) int {
@@ -406,6 +425,9 @@ func channelIQIntervalFromCron(expr string) int {
 	var hours int
 	if _, err := fmt.Sscanf(expr, "0 */%d * * *", &hours); err == nil && hours > 0 {
 		return hours * 3600
+	}
+	if expr == "@every 90m" {
+		return channelIQNinetyMinuteInterval
 	}
 	if expr == "0 0 * * *" {
 		return 24 * 3600

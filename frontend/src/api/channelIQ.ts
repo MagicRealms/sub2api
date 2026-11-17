@@ -24,6 +24,7 @@ export interface ChannelIQResult {
   status: ChannelIQStatus | string
   model_id: string
   reasoning_effort: string
+  note: string
   response_text: string
   error_message?: string
   latency_ms: number

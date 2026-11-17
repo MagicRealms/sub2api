@@ -25,6 +25,7 @@ export interface ChannelIQConfig {
   account_platform: string
   model_id: string
   prompt: string
+  note: string
   reasoning_effort: string
   interval_seconds: number
   enabled: boolean
@@ -38,6 +39,7 @@ export interface ChannelIQResult {
   status: string
   model_id: string
   reasoning_effort: string
+  note: string
   response_text: string
   error_message?: string
   latency_ms: number
@@ -57,6 +59,7 @@ export interface SaveChannelIQConfigRequest {
   account_id: number
   model_id: string
   prompt: string
+  note: string
   reasoning_effort: string
   interval_seconds: number
   enabled: boolean

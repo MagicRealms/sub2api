@@ -25,7 +25,7 @@ function snapshot(accountId = 1): ChannelIQSnapshot {
   return { visible: true, results: [], config: {
     id: 1, account_id: accountId, account_name: 'selected account', account_platform: 'openai',
     model_id: 'gpt-6.1-sol', prompt: 'saved prompt', reasoning_effort: 'high',
-    interval_seconds: 3600, enabled: false,
+    note: 'primary route', interval_seconds: 3600, enabled: false,
   } }
 }
 
@@ -82,6 +82,33 @@ describe('Channel IQ configuration', () => {
     await clickRun(wrapper)
     expect(run).not.toHaveBeenCalled()
     expect(appStore.showError).toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('saves the selected interval and test note', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('select')[2].setValue('5400')
+    await wrapper.get('input[maxlength="200"]').setValue('90-minute primary route')
+    await wrapper.findAll('button').find(item => item.text().includes('common.save'))!.trigger('click')
+    await flushPromises()
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ interval_seconds: 5400, note: '90-minute primary route' }))
+    wrapper.unmount()
+  })
+
+  it('shows the test note in place of the numeric result id', async () => {
+    get.mockResolvedValue({
+      ...snapshot(),
+      results: [{
+        id: 132, status: 'failed', model_id: 'gpt-6.1-sol', reasoning_effort: 'high', note: 'primary key check',
+        response_text: '', error_message: 'upstream failed', latency_ms: 12,
+        started_at: '2026-11-17T12:00:00Z', finished_at: '2026-11-17T12:00:01Z', created_at: '2026-11-17T12:00:01Z',
+      }],
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('primary key check')
+    expect(wrapper.text()).not.toContain('#132')
     wrapper.unmount()
   })
 

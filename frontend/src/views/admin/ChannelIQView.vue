@@ -61,7 +61,7 @@
           </div>
           <div>
             <label class="input-label">{{ t('admin.channelIQ.config.interval') }}</label>
-            <div class="input flex items-center">{{ t('admin.channelIQ.config.intervalOptions.hour') }}</div>
+            <Select v-model.number="form.interval_seconds" :options="intervalOptions" />
           </div>
           <div class="flex items-center justify-between rounded-xl border border-gray-200 px-4 dark:border-dark-700">
             <div>
@@ -69,6 +69,10 @@
               <div class="mt-0.5 text-xs text-gray-400">{{ t('admin.channelIQ.config.enabledHint') }}</div>
             </div>
             <Toggle v-model="form.enabled" />
+          </div>
+          <div class="lg:col-span-2">
+            <label class="input-label">{{ t('admin.channelIQ.config.note') }}</label>
+            <input v-model="form.note" class="input" type="text" maxlength="200" :placeholder="t('admin.channelIQ.config.notePlaceholder')" />
           </div>
           <div class="lg:col-span-2">
             <label class="input-label">{{ t('admin.channelIQ.config.prompt') }}</label>
@@ -99,11 +103,11 @@
         </div>
 
         <div v-if="results.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-          <article v-for="(result, index) in results" :key="result.id" class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+          <article v-for="result in results" :key="result.id" class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
             <div class="absolute inset-x-0 top-0 h-1" :class="result.status === 'running' ? 'bg-amber-500' : result.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'"></div>
             <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="text-xs text-gray-400">{{ t('admin.channelIQ.results.startedAt') }} {{ formatTime(result.started_at) }} · #{{ result.id }}</div>
+              <div class="min-w-0">
+                <div class="max-w-full break-words text-xs text-gray-400">{{ t('admin.channelIQ.results.startedAt') }} {{ formatTime(result.started_at) }} · {{ result.note || t('admin.channelIQ.results.noNote') }}</div>
                 <div class="mt-2 flex flex-wrap gap-1.5 text-xs">
                   <span class="rounded-full bg-violet-50 px-2 py-1 font-medium text-violet-700 dark:bg-violet-900/25 dark:text-violet-300">{{ result.model_id || t('admin.channelIQ.results.autoModel') }}</span>
                   <span class="rounded-full bg-gray-100 px-2 py-1 text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ result.reasoning_effort || t('admin.channelIQ.results.autoReasoning') }}</span>
@@ -113,7 +117,7 @@
                 {{ result.status === 'running' ? t('admin.channelIQ.results.running') : result.status === 'success' ? t('admin.channelIQ.results.success') : t('admin.channelIQ.results.failed') }}
               </span>
             </div>
-            <ChannelIQPreview v-if="result.status === 'success'" :response-text="result.response_text" :title="t('admin.channelIQ.results.animationTitle')" :autoplay="index === 0" />
+            <ChannelIQPreview v-if="result.status === 'success'" :response-text="result.response_text" :title="t('admin.channelIQ.results.animationTitle')" />
             <p v-else-if="result.status === 'running'" class="mt-4 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{{ t('admin.channelIQ.results.runningDetail') }}</p>
             <p v-else class="mt-4 max-h-24 overflow-auto rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">{{ result.error_message || t('admin.channelIQ.results.empty') }}</p>
             <div v-if="result.evaluation" class="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-dark-700 dark:bg-dark-900/50">
@@ -171,7 +175,7 @@ let refreshTimer: ReturnType<typeof setInterval> | undefined
 const accountsLoading = ref(false)
 const accounts = ref<AccountListItem[]>([])
 const results = ref<ChannelIQResult[]>([])
-const form = reactive({ account_id: 0, model_id: '', prompt: '', reasoning_effort: '', interval_seconds: 3600, enabled: false })
+const form = reactive({ account_id: 0, model_id: '', prompt: '', note: '', reasoning_effort: '', interval_seconds: 3600, enabled: false })
 
 const accountOptions = computed(() => accounts.value.map(account => ({
   value: account.id,
@@ -186,6 +190,11 @@ const reasoningOptions = computed(() => [
   { value: 'max', label: 'max' },
   { value: 'ultra', label: 'ultra' },
 ])
+const intervalOptions = computed(() => [
+  { value: 3600, label: t('admin.channelIQ.config.intervalOptions.hour') },
+  { value: 5400, label: t('admin.channelIQ.config.intervalOptions.ninetyMinutes') },
+  { value: 7200, label: t('admin.channelIQ.config.intervalOptions.twoHours') },
+])
 function applySnapshot(snapshot: Awaited<ReturnType<typeof adminAPI.channelIQ.get>>) {
   if (!visibilitySaving.value) visible.value = snapshot.visible !== false
   results.value = snapshot.results || []
@@ -193,8 +202,9 @@ function applySnapshot(snapshot: Awaited<ReturnType<typeof adminAPI.channelIQ.ge
     form.account_id = snapshot.config.account_id
     form.model_id = snapshot.config.model_id || ''
     form.prompt = snapshot.config.prompt || ''
+    form.note = snapshot.config.note || ''
     form.reasoning_effort = snapshot.config.reasoning_effort || ''
-    form.interval_seconds = 3600
+    form.interval_seconds = snapshot.config.interval_seconds || 3600
     form.enabled = snapshot.config.enabled
   }
 }

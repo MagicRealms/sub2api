@@ -56,10 +56,11 @@ describe('channel IQ full HTML preview', () => {
     const result = extractChannelIQHtmlPreviewDocument(`
       <html><head><style>.scene { animation: ride 1s infinite }</style></head>
       <body><main class="scene"><h1>Pelican ride</h1>
+      <button id="restart">Restart animation</button>
       <svg viewBox="0 0 800 500"><defs><circle id="wheel" r="20"/></defs>
       <use href="#wheel" x="100"/><use xlink:href="#wheel" x="300"/>
-      </svg></main><script>requestAnimationFrame(() => document.body.dataset.moving = 'yes')</script></body></html>
-    `, 'abc123456789==', 'preview-token', false)
+      </svg></main><script>document.querySelector('#restart').addEventListener('click', () => document.body.dataset.moving = 'yes')</script></body></html>
+    `, 'abc123456789==')
 
     expect(result).toContain('<main class="scene">')
     expect(result).toContain('Pelican ride')
@@ -67,8 +68,9 @@ describe('channel IQ full HTML preview', () => {
     expect(result).toContain('xlink:href="#wheel"')
     expect(result).toContain('position: relative !important')
     expect(result).toContain('background: transparent !important')
-    expect(result).toContain('requestAnimationFrame(() => document.body.dataset.moving')
-    expect(result).toContain('animation-play-state: paused')
+    expect(result).toContain("addEventListener('click'")
+    expect(result).not.toContain('animation-play-state: paused')
+    expect(result).not.toContain('channel-iq-paused')
     expect(result).toContain('function fitContent()')
     expect(result).toContain("scale(' + scale + ')")
     expect(result).toContain('script-src \'nonce-abc123456789==\'')
@@ -82,7 +84,7 @@ describe('channel IQ full HTML preview', () => {
       <script src="https://example.com/evil.js"></script>
       <script>document.querySelector('circle').setAttribute('r', '12')</script>
       </body></html>
-    `, 'abc123456789==', 'preview-token', true)
+    `, 'abc123456789==')
 
     expect(result).not.toContain('https://example.com')
     expect(result).not.toContain('onclick=')
@@ -91,8 +93,8 @@ describe('channel IQ full HTML preview', () => {
   })
 
   it('rejects plain text and disables scripts when the page nonce is unavailable', () => {
-    expect(extractChannelIQHtmlPreviewDocument('No animation', '', 'token', false)).toBe('')
-    const result = extractChannelIQHtmlPreviewDocument('<svg><circle r="2"/></svg><script>alert(1)</script>', '', 'token', false)
+    expect(extractChannelIQHtmlPreviewDocument('No animation', '')).toBe('')
+    const result = extractChannelIQHtmlPreviewDocument('<svg><circle r="2"/></svg><script>alert(1)</script>', '')
     expect(result).toContain("script-src 'none'")
     expect(result).not.toContain('<script')
   })

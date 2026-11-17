@@ -1,0 +1,5 @@
+ALTER TABLE scheduled_test_plans
+    ADD COLUMN IF NOT EXISTS note VARCHAR(200) NOT NULL DEFAULT '';
+
+ALTER TABLE scheduled_test_results
+    ADD COLUMN IF NOT EXISTS note VARCHAR(200) NOT NULL DEFAULT '';
