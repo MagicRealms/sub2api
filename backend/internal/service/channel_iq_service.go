@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 )
 
 // ChannelIQPlanKind marks the single scheduled test plan owned by the
@@ -156,6 +157,10 @@ type ChannelIQSaveInput struct {
 	Enabled         bool   `json:"enabled"`
 }
 
+type channelIQAccountTester interface {
+	RunPromptTestBackgroundWithOptions(context.Context, int64, string, string, string) (*ScheduledTestResult, error)
+}
+
 // ChannelIQService owns the singleton plan and exposes separate admin/public
 // views. It deliberately never returns account credentials to panel users.
 type ChannelIQService struct {
@@ -163,9 +168,8 @@ type ChannelIQService struct {
 	resultRepo  ScheduledTestResultRepository
 	scheduled   *ScheduledTestService
 	accountRepo AccountRepository
-	accountTest *AccountTestService
+	accountTest channelIQAccountTester
 	settings    *SettingService
-	runMu       sync.Mutex
 }
 
 func NewChannelIQService(
@@ -176,10 +180,14 @@ func NewChannelIQService(
 	accountTest *AccountTestService,
 	settings *SettingService,
 ) *ChannelIQService {
-	return &ChannelIQService{
+	svc := &ChannelIQService{
 		planRepo: planRepo, resultRepo: resultRepo, scheduled: scheduled,
-		accountRepo: accountRepo, accountTest: accountTest, settings: settings,
+		accountRepo: accountRepo, settings: settings,
 	}
+	if accountTest != nil {
+		svc.accountTest = accountTest
+	}
+	return svc
 }
 
 func (s *ChannelIQService) findPlan(ctx context.Context) (*ScheduledTestPlan, error) {
@@ -222,27 +230,29 @@ func (s *ChannelIQService) listResults(ctx context.Context, plan *ScheduledTestP
 	}
 	items := make([]*ChannelIQResult, 0, len(results))
 	for _, result := range results {
-		modelID := strings.TrimSpace(result.ModelID)
-		if modelID == "" {
-			modelID = strings.TrimSpace(plan.ModelID)
-		}
-		reasoningEffort := strings.TrimSpace(result.ReasoningEffort)
-		if reasoningEffort == "" {
-			reasoningEffort = strings.TrimSpace(plan.ReasoningEffort)
-		}
-		item := &ChannelIQResult{
-			ID: result.ID, Status: result.Status, ModelID: modelID,
-			ReasoningEffort: reasoningEffort, Note: strings.TrimSpace(result.Note), ResponseText: result.ResponseText,
-			ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
-			FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
-		}
-		if result.Status == "success" {
-			evaluation := evaluateChannelIQResponse(result.ResponseText)
-			item.Evaluation = &evaluation
-		}
-		items = append(items, item)
+		items = append(items, channelIQResultCard(result, plan))
 	}
 	return items, nil
+}
+
+func channelIQResultCard(result *ScheduledTestResult, plan *ScheduledTestPlan) *ChannelIQResult {
+	modelID, reasoningEffort := strings.TrimSpace(result.ModelID), strings.TrimSpace(result.ReasoningEffort)
+	if modelID == "" {
+		modelID = strings.TrimSpace(plan.ModelID)
+	}
+	if reasoningEffort == "" {
+		reasoningEffort = strings.TrimSpace(plan.ReasoningEffort)
+	}
+	card := &ChannelIQResult{
+		ID: result.ID, Status: result.Status, ModelID: modelID, ReasoningEffort: reasoningEffort,
+		Note: strings.TrimSpace(result.Note), ResponseText: result.ResponseText, ErrorMessage: result.ErrorMessage,
+		LatencyMs: result.LatencyMs, StartedAt: result.StartedAt, FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
+	}
+	if result.Status == "success" {
+		evaluation := evaluateChannelIQResponse(result.ResponseText)
+		card.Evaluation = &evaluation
+	}
+	return card
 }
 
 func (s *ChannelIQService) GetAdminSnapshot(ctx context.Context) (*ChannelIQAdminSnapshot, error) {
@@ -353,11 +363,13 @@ func (s *ChannelIQService) SaveConfig(ctx context.Context, input ChannelIQSaveIn
 	return s.GetAdminSnapshot(ctx)
 }
 
-// RunNow is available only to administrators. The public user route has no
-// mutation endpoint, so customers can only read the stored six cards.
-func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error) {
-	s.runMu.Lock()
-	defer s.runMu.Unlock()
+// RunNow persists the running card before starting work. Replays and concurrent
+// requests return the existing card instead of queuing another upstream test.
+func (s *ChannelIQService) RunNow(ctx context.Context, requestKey string) (*ChannelIQResult, error) {
+	requestKey = strings.TrimSpace(requestKey)
+	if len(requestKey) > 128 {
+		return nil, fmt.Errorf("测试请求标识过长")
+	}
 	plan, err := s.findPlan(ctx)
 	if err != nil {
 		return nil, err
@@ -365,39 +377,63 @@ func (s *ChannelIQService) RunNow(ctx context.Context) (*ChannelIQResult, error)
 	if plan == nil {
 		return nil, fmt.Errorf("请先保存渠道智商配置")
 	}
-	if plan.Enabled {
-		return nil, fmt.Errorf("自动测试已启用，请暂停后再手动测试")
-	}
 	if s.accountTest == nil || s.scheduled == nil {
 		return nil, fmt.Errorf("渠道智商测试服务未就绪")
 	}
-	// Each probe has its own lifetime, independent of the browser request.
-	testCtx, cancel := newChannelIQProbeContext()
-	defer cancel()
-	result, err := s.accountTest.RunPromptTestBackgroundWithOptions(testCtx, plan.AccountID, plan.ModelID, channelIQPromptForExecution(plan.Prompt), plan.ReasoningEffort)
+	startedAt := time.Now()
+	deadline := startedAt.Add(channelIQTestTimeout)
+	pending, started, err := s.planRepo.StartManualRun(ctx, plan.ID, &ScheduledTestResult{
+		Status: "running", ModelID: plan.ModelID, ReasoningEffort: plan.ReasoningEffort, Note: plan.Note,
+		StartedAt: startedAt, FinishedAt: startedAt, RequestKey: requestKey, DeadlineAt: &deadline,
+	}, channelIQResultLimit)
 	if err != nil {
 		return nil, err
 	}
-	result.ModelID = plan.ModelID
-	result.ReasoningEffort = plan.ReasoningEffort
-	result.Note = plan.Note
-	persistCtx, persistCancel := scheduledTestPersistenceContext(testCtx)
-	defer persistCancel()
-	if err := s.scheduled.SaveResult(persistCtx, plan.ID, channelIQResultLimit, result); err != nil {
-		return nil, fmt.Errorf("保存渠道智商结果失败: %w", err)
+	// Copy the persisted snapshot before the worker can finish and mutate it.
+	card := channelIQResultCard(pending, plan)
+	if started {
+		go s.runManualTest(*plan, *pending)
 	}
-	nextRun, cronErr := computeNextRun(plan.CronExpression, time.Now())
-	if cronErr == nil {
-		_ = s.planRepo.UpdateAfterRun(persistCtx, plan.ID, time.Now(), nextRun)
+	return card, nil
+}
+
+func (s *ChannelIQService) runManualTest(plan ScheduledTestPlan, pending ScheduledTestResult) {
+	testCtx, cancel := newChannelIQProbeWindowContext(*pending.DeadlineAt)
+	defer cancel()
+	var result *ScheduledTestResult
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			logger.LegacyPrintf("service.channel_iq", "[ChannelIQ] result=%d panic: %v", pending.ID, recovered)
+			result = channelIQFailedResult(pending.StartedAt, "", "测试进程异常，请重试")
+		}
+		if result == nil {
+			result = channelIQFailedResult(pending.StartedAt, "", "测试没有返回结果")
+		}
+		result.ID, result.PlanID = pending.ID, pending.PlanID
+		result.ModelID, result.ReasoningEffort, result.Note = pending.ModelID, pending.ReasoningEffort, pending.Note
+		result.StartedAt = pending.StartedAt
+		if result.FinishedAt.IsZero() {
+			result.FinishedAt = time.Now()
+		}
+		result.LatencyMs = result.FinishedAt.Sub(pending.StartedAt).Milliseconds()
+		persistCtx, persistCancel := scheduledTestPersistenceContext(testCtx)
+		defer persistCancel()
+		if err := s.scheduled.CompleteRunningResult(persistCtx, result); err != nil {
+			logger.LegacyPrintf("service.channel_iq", "[ChannelIQ] result=%d save failed: %v", pending.ID, err)
+			return
+		}
+		// Finishing a manual test must not skip an automatic slot enabled in the meantime.
+		if plan.NextRunAt != nil {
+			if err := s.planRepo.UpdateAfterRun(persistCtx, plan.ID, result.FinishedAt, *plan.NextRunAt); err != nil {
+				logger.LegacyPrintf("service.channel_iq", "[ChannelIQ] plan=%d update failed: %v", plan.ID, err)
+			}
+		}
+	}()
+	var err error
+	result, err = s.accountTest.RunPromptTestBackgroundWithOptions(testCtx, plan.AccountID, plan.ModelID, channelIQPromptForExecution(plan.Prompt), plan.ReasoningEffort)
+	if err != nil {
+		result = channelIQFailedResult(pending.StartedAt, "", err.Error())
 	}
-	evaluation := evaluateChannelIQResponse(result.ResponseText)
-	return &ChannelIQResult{
-		ID: result.ID, Status: result.Status, ModelID: strings.TrimSpace(plan.ModelID),
-		ReasoningEffort: strings.TrimSpace(plan.ReasoningEffort), Note: strings.TrimSpace(result.Note), ResponseText: result.ResponseText,
-		ErrorMessage: result.ErrorMessage, LatencyMs: result.LatencyMs, StartedAt: result.StartedAt,
-		FinishedAt: result.FinishedAt, CreatedAt: result.CreatedAt,
-		Evaluation: &evaluation,
-	}, nil
 }
 
 func channelIQCronForInterval(seconds int) (string, error) {

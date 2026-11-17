@@ -82,11 +82,11 @@
         </div>
 
         <div class="mt-5 flex flex-wrap justify-end gap-3 border-t border-gray-100 pt-5 dark:border-dark-700">
-          <button v-if="!form.enabled" type="button" class="btn btn-secondary" :disabled="loading || saving || running || !form.account_id" @click="runNow">
-            <Icon name="refresh" size="sm" :class="running ? 'animate-spin' : ''" />
-            <span class="ml-2">{{ t('admin.channelIQ.config.runNow') }}</span>
+          <button v-if="!form.enabled" type="button" class="btn btn-secondary" :disabled="loading || saving || testRunning || !form.account_id" @click="runNow">
+            <Icon name="refresh" size="sm" :class="testRunning ? 'animate-spin' : ''" />
+            <span class="ml-2">{{ testRunning ? t('admin.channelIQ.results.running') : t('admin.channelIQ.config.runNow') }}</span>
           </button>
-          <button type="button" class="btn btn-primary" :disabled="loading || saving || running || !form.account_id" @click="save">
+          <button type="button" class="btn btn-primary" :disabled="loading || saving || testRunning || !form.account_id" @click="save">
             <Icon name="check" size="sm" />
             <span class="ml-2">{{ saving ? t('common.submitting') : t('common.save') }}</span>
           </button>
@@ -171,10 +171,15 @@ const saving = ref(false)
 const running = ref(false)
 const visible = ref(true)
 const visibilitySaving = ref(false)
-let refreshTimer: ReturnType<typeof setInterval> | undefined
+let refreshTimer: ReturnType<typeof setTimeout> | undefined
+let disposed = false
+let resultRevision = 0
+let runRequestKey: string | undefined
 const accountsLoading = ref(false)
 const accounts = ref<AccountListItem[]>([])
 const results = ref<ChannelIQResult[]>([])
+const hasRunningResult = computed(() => results.value.some(result => result.status === 'running'))
+const testRunning = computed(() => running.value || hasRunningResult.value)
 const form = reactive({ account_id: 0, model_id: '', prompt: '', note: '', reasoning_effort: '', interval_seconds: 3600, enabled: false })
 
 const accountOptions = computed(() => accounts.value.map(account => ({
@@ -223,8 +228,11 @@ async function loadAccounts() {
 
 async function load(silent = false) {
   if (!silent) loading.value = true
+  const revision = resultRevision
   try {
     const snapshot = await adminAPI.channelIQ.get()
+    // A read started before a task was accepted must not hide its running card.
+    if (revision !== resultRevision || disposed) return
     if (silent) {
       // Background refresh updates results, not the account/model being edited.
       results.value = snapshot.results || []
@@ -240,7 +248,8 @@ async function load(silent = false) {
 }
 
 async function save() {
-  if (!form.account_id) return
+  if (saving.value || testRunning.value || !form.account_id) return
+  resultRevision++
   saving.value = true
   try {
     const snapshot = await adminAPI.channelIQ.save({ ...form })
@@ -269,20 +278,34 @@ async function setVisibility(nextVisible: boolean) {
 }
 
 async function runNow() {
-  if (running.value || saving.value || !form.account_id) return
+  if (testRunning.value || saving.value || !form.account_id) return
   running.value = true
+  resultRevision++
   try {
     // The server probes the persisted plan. Save the current selection first so
     // switching away from an OAuth account actually tests the new API key.
     const snapshot = await adminAPI.channelIQ.save({ ...form })
     applySnapshot(snapshot)
-    const result = await adminAPI.channelIQ.run()
+    runRequestKey ??= crypto.randomUUID()
+    const result = await adminAPI.channelIQ.run(runRequestKey)
+    resultRevision++
     results.value = [result, ...results.value.filter(item => item.id !== result.id)].slice(0, 6)
+    runRequestKey = undefined
   } catch (error: unknown) {
     appStore.showError(extractApiErrorMessage(error, t('admin.channelIQ.runError')))
   } finally {
     running.value = false
+    scheduleRefresh()
   }
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  if (disposed) return
+  refreshTimer = setTimeout(async () => {
+    if (!saving.value && !running.value) await load(true)
+    scheduleRefresh()
+  }, hasRunningResult.value ? 5000 : 30000)
 }
 
 function evaluationGradeLabel(result: ChannelIQResult): string {
@@ -332,12 +355,11 @@ function formatDate(value?: string): string {
 
 onMounted(async () => {
   await Promise.all([loadAccounts(), load()])
-  refreshTimer = setInterval(() => {
-    if (!saving.value && !running.value) void load(true)
-  }, 30000)
+  scheduleRefresh()
 })
 
 onUnmounted(() => {
-  if (refreshTimer) clearInterval(refreshTimer)
+  disposed = true
+  if (refreshTimer) clearTimeout(refreshTimer)
 })
 </script>

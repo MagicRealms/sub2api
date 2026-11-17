@@ -16,6 +16,26 @@ vi.mock('vue-i18n', async () => ({
 }))
 
 describe('user IQ visibility', () => {
+  it('shows a manual test as running before its animation is finished', async () => {
+    get.mockResolvedValue({
+      visible: true, configured: true, enabled: false,
+      results: [{
+        id: 135, status: 'running', model_id: 'gpt-6.1-sol', reasoning_effort: 'high', note: 'manual test',
+        response_text: '', latency_ms: 0, started_at: '2026-11-17T12:00:00Z',
+        finished_at: '2026-11-17T12:00:00Z', created_at: '2026-11-17T12:00:00Z',
+      }],
+    })
+    const wrapper = mount(ChannelIQStatusView, { global: { stubs: {
+      AppLayout: defineComponent({ template: '<main><slot /></main>' }),
+      Icon: true, ChannelIQPreview: true,
+    } } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('channelIQ.card.running')
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    expect(wrapper.find('channel-i-q-preview-stub').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('hides cards and updates navigation when the server stops publishing', async () => {
     get.mockResolvedValue({ visible: false, configured: false, enabled: false, results: [] })
     const wrapper = mount(ChannelIQStatusView, { global: { stubs: {

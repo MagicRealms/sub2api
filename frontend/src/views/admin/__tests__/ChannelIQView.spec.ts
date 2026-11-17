@@ -2,7 +2,7 @@ import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChannelIQView from '@/views/admin/ChannelIQView.vue'
-import type { ChannelIQSnapshot } from '@/api/admin/channelIQ'
+import type { ChannelIQResult, ChannelIQSnapshot } from '@/api/admin/channelIQ'
 
 const { get, save, run, setVisibility, listAccounts, appStore } = vi.hoisted(() => ({
   get: vi.fn(), save: vi.fn(), run: vi.fn(), setVisibility: vi.fn(), listAccounts: vi.fn(),
@@ -29,6 +29,20 @@ function snapshot(accountId = 1): ChannelIQSnapshot {
   } }
 }
 
+function runningResult(): ChannelIQResult {
+  return {
+    id: 135, status: 'running', model_id: 'gpt-6.1-sol', reasoning_effort: 'high', note: 'primary route',
+    response_text: '', latency_ms: 0, started_at: '2026-11-17T12:00:00Z',
+    finished_at: '2026-11-17T12:00:00Z', created_at: '2026-11-17T12:00:00Z',
+  }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(done => { resolve = done })
+  return { promise, resolve }
+}
+
 function mountView() {
   return mount(ChannelIQView, { global: { stubs: {
     AppLayout: defineComponent({ template: '<main><slot /></main>' }),
@@ -49,7 +63,7 @@ async function clickRun(wrapper: ReturnType<typeof mountView>) {
 describe('Channel IQ configuration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     appStore.cachedPublicSettings.channel_iq_enabled = true
     get.mockResolvedValue(snapshot())
     listAccounts.mockResolvedValue({ items: [
@@ -85,6 +99,64 @@ describe('Channel IQ configuration', () => {
     wrapper.unmount()
   })
 
+  it('publishes a running card, blocks another click, and completes it through polling', async () => {
+    run.mockResolvedValue(runningResult())
+    const wrapper = mountView()
+    await flushPromises()
+    await clickRun(wrapper)
+    expect(wrapper.text()).toContain('admin.channelIQ.results.runningDetail')
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    const runningButton = wrapper.findAll('button').find(item => item.text().includes('admin.channelIQ.results.running'))!
+    expect(runningButton.attributes('disabled')).toBeDefined()
+    await runningButton.trigger('click')
+    expect(run).toHaveBeenCalledOnce()
+
+    get.mockResolvedValue({ ...snapshot(), results: [{ ...runningResult(), status: 'success', response_text: '<svg></svg>' }] })
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    expect(wrapper.findAll('article')).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('admin.channelIQ.results.runningDetail')
+    expect(wrapper.findAll('button').find(item => item.text().includes('admin.channelIQ.config.runNow'))!.attributes('disabled')).toBeUndefined()
+    expect(run).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
+  it('restores an existing running card after page reload and does not start a probe', async () => {
+    get.mockResolvedValue({ ...snapshot(), results: [runningResult()] })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.channelIQ.results.runningDetail')
+    expect(wrapper.findAll('button').find(item => item.text().includes('admin.channelIQ.results.running'))!.attributes('disabled')).toBeDefined()
+    expect(run).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not let an older snapshot hide a newly accepted running card', async () => {
+    const stale = deferred<ChannelIQSnapshot>()
+    const wrapper = mountView()
+    await flushPromises()
+    get.mockReturnValueOnce(stale.promise)
+    await vi.advanceTimersByTimeAsync(30000)
+    run.mockResolvedValueOnce(runningResult())
+    await clickRun(wrapper)
+    stale.resolve(snapshot())
+    await flushPromises()
+    expect(wrapper.text()).toContain('admin.channelIQ.results.runningDetail')
+    wrapper.unmount()
+  })
+
+  it('reuses the request identity after a lost acknowledgement', async () => {
+    run.mockRejectedValueOnce({ status: 0, message: 'network disconnected' }).mockResolvedValueOnce(runningResult())
+    const wrapper = mountView()
+    await flushPromises()
+    await clickRun(wrapper)
+    const firstKey = run.mock.calls[0][0]
+    await clickRun(wrapper)
+    expect(firstKey).toEqual(expect.any(String))
+    expect(run.mock.calls[1][0]).toBe(firstKey)
+    wrapper.unmount()
+  })
+
   it('saves the selected interval and test note', async () => {
     const wrapper = mountView()
     await flushPromises()
@@ -93,6 +165,7 @@ describe('Channel IQ configuration', () => {
     await wrapper.findAll('button').find(item => item.text().includes('common.save'))!.trigger('click')
     await flushPromises()
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ interval_seconds: 5400, note: '90-minute primary route' }))
+    expect(run).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 

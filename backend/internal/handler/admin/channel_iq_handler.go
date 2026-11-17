@@ -58,9 +58,13 @@ func (h *ChannelIQHandler) SetVisibility(c *gin.Context) {
 // Run POST /admin/channel-iq/run. This is intentionally admin-only; public
 // users only see the persisted cards returned by the user handler.
 func (h *ChannelIQHandler) Run(c *gin.Context) {
-	result, err := h.service.RunNow(c.Request.Context())
+	result, err := h.service.RunNow(c.Request.Context(), c.GetHeader("Idempotency-Key"))
 	if err != nil {
 		response.ErrorFrom(c, err)
+		return
+	}
+	if result.Status == "running" {
+		response.Accepted(c, result)
 		return
 	}
 	response.Success(c, result)

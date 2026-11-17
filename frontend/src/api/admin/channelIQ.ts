@@ -75,9 +75,10 @@ export async function save(input: SaveChannelIQConfigRequest): Promise<ChannelIQ
   return data
 }
 
-export async function run(): Promise<ChannelIQResult> {
-  // Leave time for the 30-minute probe deadline and result persistence.
-  const { data } = await apiClient.post<ChannelIQResult>('/admin/channel-iq/run', undefined, { timeout: 30 * 60 * 1000 + 30 * 1000 })
+export async function run(requestKey: string): Promise<ChannelIQResult> {
+  const { data } = await apiClient.post<ChannelIQResult>('/admin/channel-iq/run', undefined, {
+    headers: { 'Idempotency-Key': requestKey },
+  })
   return data
 }
 

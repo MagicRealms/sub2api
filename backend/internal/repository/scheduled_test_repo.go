@@ -123,12 +123,70 @@ func (r *scheduledTestPlanRepository) ClaimDue(ctx context.Context, id int64, no
 	return rows == 1, err
 }
 
+func (r *scheduledTestPlanRepository) StartManualRun(ctx context.Context, id int64, run *service.ScheduledTestResult, keepCount int) (*service.ScheduledTestResult, bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	// Both manual starts and scheduler claims lock the same plan before checking
+	// running results. A second request sees the committed first attempt.
+	var enabled bool
+	if err := tx.QueryRowContext(ctx, `SELECT enabled FROM scheduled_test_plans WHERE id = $1 AND kind = 'channel_iq' FOR UPDATE`, id).Scan(&enabled); err != nil {
+		return nil, false, err
+	}
+	existing, err := scanTestResult(tx.QueryRowContext(ctx, `
+		SELECT id, plan_id, status, model_id, reasoning_effort, note, response_text, error_message,
+		       latency_ms, started_at, finished_at, created_at, request_key, deadline_at
+		FROM scheduled_test_results
+		WHERE plan_id = $1 AND (status = 'running' OR ($2 <> '' AND request_key = $2))
+		ORDER BY CASE WHEN request_key = $2 AND $2 <> '' THEN 0 ELSE 1 END, created_at DESC, id DESC
+		LIMIT 1
+	`, id, run.RequestKey))
+	if err == nil {
+		return existing, false, tx.Commit()
+	}
+	if err != sql.ErrNoRows {
+		return nil, false, err
+	}
+	if enabled {
+		return nil, false, fmt.Errorf("自动测试已启用，请暂停后再手动测试")
+	}
+	run.PlanID = id
+	run.Status = "running"
+	if err := tx.QueryRowContext(ctx, `
+		INSERT INTO scheduled_test_results (plan_id, status, model_id, reasoning_effort, note, started_at, finished_at, request_key, deadline_at)
+		VALUES ($1, 'running', $2, $3, $4, $5, $5, $6, $7)
+		RETURNING id, created_at
+	`, id, run.ModelID, run.ReasoningEffort, run.Note, run.StartedAt, run.RequestKey, run.DeadlineAt).Scan(&run.ID, &run.CreatedAt); err != nil {
+		return nil, false, err
+	}
+	if keepCount > 0 {
+		if _, err := tx.ExecContext(ctx, `
+			DELETE FROM scheduled_test_results WHERE plan_id = $1 AND status <> 'running' AND id IN (
+				SELECT id FROM scheduled_test_results WHERE plan_id = $1
+				ORDER BY created_at DESC, id DESC OFFSET $2
+			)
+		`, id, keepCount); err != nil {
+			return nil, false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, false, fmt.Errorf("commit channel IQ manual start: %w", err)
+	}
+	return run, true, nil
+}
+
 func (r *scheduledTestPlanRepository) ClaimDueWithResult(ctx context.Context, id int64, now time.Time, nextRunAt time.Time, run *service.ScheduledTestResult, keepCount int) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	var lockedID int64
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM scheduled_test_plans WHERE id = $1 AND kind = 'channel_iq' FOR UPDATE`, id).Scan(&lockedID); err != nil {
+		return false, err
+	}
 	claimed, err := tx.ExecContext(ctx, `
 		UPDATE scheduled_test_plans SET next_run_at = $3, updated_at = NOW()
 		WHERE id = $1 AND kind = 'channel_iq' AND enabled = true AND next_run_at <= $2
@@ -146,9 +204,9 @@ func (r *scheduledTestPlanRepository) ClaimDueWithResult(ctx context.Context, id
 	}
 	run.PlanID = id
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO scheduled_test_results (plan_id, status, model_id, reasoning_effort, note, response_text, error_message, latency_ms, started_at, finished_at, created_at)
-		VALUES ($1, 'running', $2, $3, $4, '', '', 0, $5, $5, NOW()) RETURNING id
-	`, id, run.ModelID, run.ReasoningEffort, run.Note, run.StartedAt).Scan(&run.ID)
+		INSERT INTO scheduled_test_results (plan_id, status, model_id, reasoning_effort, note, response_text, error_message, latency_ms, started_at, finished_at, created_at, deadline_at)
+		VALUES ($1, 'running', $2, $3, $4, '', '', 0, $5, $5, NOW(), $6) RETURNING id, created_at
+	`, id, run.ModelID, run.ReasoningEffort, run.Note, run.StartedAt, nextRunAt).Scan(&run.ID, &run.CreatedAt)
 	if err != nil {
 		return false, err
 	}
@@ -226,13 +284,12 @@ func (r *scheduledTestResultRepository) CompleteRunning(ctx context.Context, res
 func (r *scheduledTestResultRepository) FailStaleChannelIQRunning(ctx context.Context, now time.Time) (int64, error) {
 	updated, err := r.db.ExecContext(ctx, `
 		UPDATE scheduled_test_results AS result
-		SET status = 'failed', error_message = '测试进程中断，未在下次计划运行前完成', finished_at = NOW(),
+		SET status = 'failed', error_message = '测试未在执行期限内完成，可能已超时或服务重启', finished_at = NOW(),
 		    latency_ms = GREATEST(0, (EXTRACT(EPOCH FROM (NOW() - result.started_at)) * 1000)::bigint)
 		FROM scheduled_test_plans AS plan
 		WHERE result.plan_id = plan.id AND plan.kind = 'channel_iq'
 		  AND result.status = 'running'
-		  AND plan.next_run_at <= $1::timestamptz
-		  AND result.started_at < plan.next_run_at
+		  AND COALESCE(result.deadline_at, plan.next_run_at) <= $1::timestamptz
 	`, now)
 	if err != nil {
 		return 0, err
@@ -242,7 +299,7 @@ func (r *scheduledTestResultRepository) FailStaleChannelIQRunning(ctx context.Co
 
 func (r *scheduledTestResultRepository) ListByPlanID(ctx context.Context, planID int64, limit int) ([]*service.ScheduledTestResult, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, plan_id, status, model_id, reasoning_effort, note, response_text, error_message, latency_ms, started_at, finished_at, created_at
+		SELECT id, plan_id, status, model_id, reasoning_effort, note, response_text, error_message, latency_ms, started_at, finished_at, created_at, request_key, deadline_at
 		FROM scheduled_test_results
 		WHERE plan_id = $1
 		ORDER BY created_at DESC
@@ -255,11 +312,8 @@ func (r *scheduledTestResultRepository) ListByPlanID(ctx context.Context, planID
 
 	var results []*service.ScheduledTestResult
 	for rows.Next() {
-		r := &service.ScheduledTestResult{}
-		if err := rows.Scan(
-			&r.ID, &r.PlanID, &r.Status, &r.ModelID, &r.ReasoningEffort, &r.Note, &r.ResponseText, &r.ErrorMessage,
-			&r.LatencyMs, &r.StartedAt, &r.FinishedAt, &r.CreatedAt,
-		); err != nil {
+		r, err := scanTestResult(rows)
+		if err != nil {
 			return nil, err
 		}
 		results = append(results, r)
@@ -286,6 +340,17 @@ func (r *scheduledTestResultRepository) PruneOldResults(ctx context.Context, pla
 
 type scannable interface {
 	Scan(dest ...any) error
+}
+
+func scanTestResult(row scannable) (*service.ScheduledTestResult, error) {
+	r := &service.ScheduledTestResult{}
+	if err := row.Scan(
+		&r.ID, &r.PlanID, &r.Status, &r.ModelID, &r.ReasoningEffort, &r.Note, &r.ResponseText, &r.ErrorMessage,
+		&r.LatencyMs, &r.StartedAt, &r.FinishedAt, &r.CreatedAt, &r.RequestKey, &r.DeadlineAt,
+	); err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 func scanPlan(row scannable) (*service.ScheduledTestPlan, error) {

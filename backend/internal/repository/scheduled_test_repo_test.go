@@ -20,11 +20,13 @@ func TestChannelIQClaimPersistsRunningResultAtomically(t *testing.T) {
 	run := &service.ScheduledTestResult{ModelID: "gpt-6.1-sol", ReasoningEffort: "high", Note: "nightly probe", StartedAt: now}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id FROM scheduled_test_plans").WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectExec("UPDATE scheduled_test_plans SET next_run_at").
 		WithArgs(int64(1), now, next).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("INSERT INTO scheduled_test_results").
-		WithArgs(int64(1), run.ModelID, run.ReasoningEffort, run.Note, now).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(int64(51)))
+		WithArgs(int64(1), run.ModelID, run.ReasoningEffort, run.Note, now, next).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(int64(51), now))
 	mock.ExpectExec("DELETE FROM scheduled_test_results").
 		WithArgs(int64(1), 6).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -46,10 +48,12 @@ func TestChannelIQClaimRollsBackWhenResultCannotBeInserted(t *testing.T) {
 	run := &service.ScheduledTestResult{StartedAt: now}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id FROM scheduled_test_plans").WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectExec("UPDATE scheduled_test_plans SET next_run_at").
 		WithArgs(int64(1), now, next).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("INSERT INTO scheduled_test_results").
-		WithArgs(int64(1), "", "", "", now).WillReturnError(errors.New("insert failed"))
+		WithArgs(int64(1), "", "", "", now, next).WillReturnError(errors.New("insert failed"))
 	mock.ExpectRollback()
 
 	repo := &scheduledTestPlanRepository{db: db}
@@ -67,6 +71,8 @@ func TestChannelIQClaimDoesNotDuplicateAlreadyClaimedHour(t *testing.T) {
 	next := now.Add(time.Hour).Truncate(time.Hour)
 
 	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id FROM scheduled_test_plans").WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectExec("UPDATE scheduled_test_plans SET next_run_at").
 		WithArgs(int64(1), now, next).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectRollback()
@@ -124,8 +130,8 @@ func TestScheduledTestResultListPreservesNote(t *testing.T) {
 		WithArgs(int64(7), 6).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "plan_id", "status", "model_id", "reasoning_effort", "note", "response_text", "error_message",
-			"latency_ms", "started_at", "finished_at", "created_at",
-		}).AddRow(33, 7, "success", "gpt-6.1-sol", "high", "nightly check", "<html/>", "", 1000, startedAt, finishedAt, finishedAt))
+			"latency_ms", "started_at", "finished_at", "created_at", "request_key", "deadline_at",
+		}).AddRow(33, 7, "success", "gpt-6.1-sol", "high", "nightly check", "<html/>", "", 1000, startedAt, finishedAt, finishedAt, "", nil))
 
 	results, err := (&scheduledTestResultRepository{db: db}).ListByPlanID(context.Background(), 7, 6)
 	require.NoError(t, err)
