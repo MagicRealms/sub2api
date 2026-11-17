@@ -423,10 +423,8 @@ func (s *ChannelIQService) runManualTest(plan ScheduledTestPlan, pending Schedul
 			return
 		}
 		// Finishing a manual test must not skip an automatic slot enabled in the meantime.
-		if plan.NextRunAt != nil {
-			if err := s.planRepo.UpdateAfterRun(persistCtx, plan.ID, result.FinishedAt, *plan.NextRunAt); err != nil {
-				logger.LegacyPrintf("service.channel_iq", "[ChannelIQ] plan=%d update failed: %v", plan.ID, err)
-			}
+		if err := s.planRepo.UpdateLastRunAt(persistCtx, plan.ID, result.FinishedAt); err != nil {
+			logger.LegacyPrintf("service.channel_iq", "[ChannelIQ] plan=%d update failed: %v", plan.ID, err)
 		}
 	}()
 	var err error

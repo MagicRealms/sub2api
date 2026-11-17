@@ -39,7 +39,7 @@ func (r *iqManualPlanRepo) StartManualRun(_ context.Context, id int64, result *S
 	return result, true, nil
 }
 
-func (r *iqManualPlanRepo) UpdateAfterRun(context.Context, int64, time.Time, time.Time) error {
+func (r *iqManualPlanRepo) UpdateLastRunAt(context.Context, int64, time.Time) error {
 	return nil
 }
 

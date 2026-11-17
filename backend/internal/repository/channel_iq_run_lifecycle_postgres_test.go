@@ -142,4 +142,15 @@ func TestChannelIQRunLifecyclePostgres(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})
+
+	t.Run("finishing manual work preserves the current schedule", func(t *testing.T) {
+		id := newPlan(false)
+		next := time.Now().Add(5 * time.Minute).Truncate(time.Second)
+		_, err := db.Exec(`UPDATE scheduled_test_plans SET enabled = true, next_run_at = $2 WHERE id = $1`, id, next)
+		require.NoError(t, err)
+		require.NoError(t, plans.UpdateLastRunAt(ctx, id, time.Now()))
+		stored, err := plans.GetByID(ctx, id)
+		require.NoError(t, err)
+		require.True(t, next.Equal(*stored.NextRunAt))
+	})
 }

@@ -227,6 +227,11 @@ func (r *scheduledTestPlanRepository) ClaimDueWithResult(ctx context.Context, id
 	return true, nil
 }
 
+func (r *scheduledTestPlanRepository) UpdateLastRunAt(ctx context.Context, id int64, lastRunAt time.Time) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE scheduled_test_plans SET last_run_at = $2, updated_at = NOW() WHERE id = $1`, id, lastRunAt)
+	return err
+}
+
 func (r *scheduledTestPlanRepository) UpdateAfterRun(ctx context.Context, id int64, lastRunAt time.Time, nextRunAt time.Time) error {
 	_, err := r.db.ExecContext(ctx, `
 		UPDATE scheduled_test_plans SET last_run_at = $2, next_run_at = GREATEST(next_run_at, $3), updated_at = NOW() WHERE id = $1

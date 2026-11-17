@@ -64,6 +64,7 @@ type ScheduledTestPlanRepository interface {
 	StartManualRun(ctx context.Context, id int64, result *ScheduledTestResult, keepCount int) (*ScheduledTestResult, bool, error)
 	// ClaimDueWithResult atomically records a channel IQ attempt when claiming its slot.
 	ClaimDueWithResult(ctx context.Context, id int64, now time.Time, nextRunAt time.Time, result *ScheduledTestResult, keepCount int) (bool, error)
+	UpdateLastRunAt(ctx context.Context, id int64, lastRunAt time.Time) error
 	UpdateAfterRun(ctx context.Context, id int64, lastRunAt time.Time, nextRunAt time.Time) error
 }
 
