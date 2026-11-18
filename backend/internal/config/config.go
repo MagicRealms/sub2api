@@ -1615,7 +1615,8 @@ type GatewaySchedulingConfig struct {
 	SnapshotWriteChunkSize int `mapstructure:"snapshot_write_chunk_size"`
 
 	// 过期槽位清理周期（0 表示禁用）
-	SlotCleanupInterval time.Duration `mapstructure:"slot_cleanup_interval"`
+	SlotCleanupInterval    time.Duration `mapstructure:"slot_cleanup_interval"`
+	SkipStartupSlotCleanup bool          `mapstructure:"skip_startup_slot_cleanup"`
 
 	// 受控回源配置
 	DbFallbackEnabled bool `mapstructure:"db_fallback_enabled"`
@@ -2691,6 +2692,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.snapshot_mget_chunk_size", 128)
 	viper.SetDefault("gateway.scheduling.snapshot_write_chunk_size", 256)
 	viper.SetDefault("gateway.scheduling.slot_cleanup_interval", 30*time.Second)
+	viper.SetDefault("gateway.scheduling.skip_startup_slot_cleanup", false)
 	viper.SetDefault("gateway.scheduling.db_fallback_enabled", true)
 	viper.SetDefault("gateway.scheduling.db_fallback_timeout_seconds", 0)
 	viper.SetDefault("gateway.scheduling.db_fallback_max_qps", 0)

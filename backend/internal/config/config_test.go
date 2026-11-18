@@ -541,6 +541,7 @@ func TestLoadDefaultSchedulingConfig(t *testing.T) {
 	if cfg.Gateway.Scheduling.SlotCleanupInterval != 30*time.Second {
 		t.Fatalf("SlotCleanupInterval = %v, want 30s", cfg.Gateway.Scheduling.SlotCleanupInterval)
 	}
+	require.False(t, cfg.Gateway.Scheduling.SkipStartupSlotCleanup)
 }
 
 func TestLoadDefaultOpenAIFirstOutputTimeoutsDisabled(t *testing.T) {
@@ -880,6 +881,7 @@ func TestLoadIdempotencyConfigFromEnv(t *testing.T) {
 func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING", "5")
+	t.Setenv("GATEWAY_SCHEDULING_SKIP_STARTUP_SLOT_CLEANUP", "true")
 
 	cfg, err := Load()
 	if err != nil {
@@ -889,6 +891,7 @@ func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	if cfg.Gateway.Scheduling.StickySessionMaxWaiting != 5 {
 		t.Fatalf("StickySessionMaxWaiting = %d, want 5", cfg.Gateway.Scheduling.StickySessionMaxWaiting)
 	}
+	require.True(t, cfg.Gateway.Scheduling.SkipStartupSlotCleanup)
 }
 
 func TestLoadWeChatConnectConfigFromLegacyEnv(t *testing.T) {

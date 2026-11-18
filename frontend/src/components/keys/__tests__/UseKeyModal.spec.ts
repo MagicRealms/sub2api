@@ -93,7 +93,7 @@ describe('UseKeyModal', () => {
     wrapper.unmount()
     expect(signal.aborted).toBe(true)
   })
-  beforeEach(() => listTestModels.mockReset().mockResolvedValue(['gpt-6', 'gpt-6-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.4-mini']))
+  beforeEach(() => listTestModels.mockReset().mockResolvedValue(['gpt-6', 'gpt-6-astra', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.4-mini']))
   it.each(['/v1', '/v1/', '/v1///'])('switches a multi-group key from GPT to Claude and normalizes the Anthropic root URL (%s)', async (suffix) => {
     const wrapper = mount(UseKeyModal, {
       props: {
@@ -804,7 +804,7 @@ describe('UseKeyModal', () => {
     expect(codeBlock.text()).not.toContain('"name": "GPT-5.4 Nano"')
   })
 
-  it('renders GPT-5.6 and GPT-6 Astra capabilities in OpenCode config', async () => {
+  it('renders GPT-5.6 and GPT-6 series capabilities in OpenCode config', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {
         show: true,
@@ -833,12 +833,17 @@ describe('UseKeyModal', () => {
 
     const parsed = JSON.parse(wrapper.find('pre code').text())
     const models = parsed.provider.openai.models
-    for (const model of ['gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna']) {
+    for (const model of ['gpt-5.6', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna']) {
       expect(models[model]).toBeDefined()
       expect(models[model].variants).toHaveProperty('max')
       expect(models[model].variants).toHaveProperty('xhigh')
     }
     expect(models['gpt-5.6'].name).toBe('GPT-5.6 (Sol)')
+    for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra']) {
+      expect(models[model].variants).not.toHaveProperty('none')
+      expect(models[model].variants).not.toHaveProperty('minimal')
+      expect(models[model].limit).toEqual({ context: 1050000, output: 128000 })
+    }
     expect(models['gpt-6.1-sol'].variants).not.toHaveProperty('none')
     expect(models['gpt-6.1-terra']).toEqual({
       name: 'GPT-6.1 Terra',
