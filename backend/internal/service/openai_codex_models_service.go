@@ -504,8 +504,9 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 		descriptor.SupportsParallelToolCalls = true
 		descriptor.ServiceTiers = configuredCodexServiceTiersForModel(modelID)
 		if isOpenAICodexReasoningGPTModel(modelID) {
+			isGPT62 := isOpenAICodexGPT62Model(modelID)
 			defaultReasoningLevel := "medium"
-			if getNormalizedCodexModel(modelID) == "gpt-5.6-sol" || openai.IsGPT61SolModelSpelling(modelID) {
+			if isGPT62 || getNormalizedCodexModel(modelID) == "gpt-5.6-sol" || openai.IsGPT61SolModelSpelling(modelID) {
 				defaultReasoningLevel = "low"
 			}
 			descriptor.DefaultReasoningLevel = &defaultReasoningLevel
@@ -517,12 +518,14 @@ func newConfiguredCodexModelDescriptor(modelID string) configuredCodexModelDescr
 			if isOpenAIGPT56Model(modelID) || openai.IsGPT6SolOrLunaModelSpelling(modelID) || openai.IsGPT61SolModelSpelling(modelID) {
 				descriptor.MaxContextWindow = configuredCodexGPT56MaxContext
 			}
-			if isOpenAIGPT6AstraModel(modelID) {
+			if isGPT62 || isOpenAIGPT6AstraModel(modelID) {
 				// Codex resolves the Ultra workflow to this effort before inference.
 				// openai/codex a9896da3: codex-rs/models-manager/models.json.
 				multiAgentEffort := "xhigh"
 				descriptor.MultiAgentReasoningEffort = &multiAgentEffort
 				descriptor.MultiAgentVersion = "v2"
+			}
+			if isOpenAIGPT6AstraModel(modelID) {
 				descriptor.ContextWindow = configuredCodexGPT6AstraContext
 				descriptor.MaxContextWindow = configuredCodexGPT6AstraContext
 			}
@@ -646,13 +649,14 @@ func configuredCodexGPTReasoningLevels(modelID string) []configuredCodexReasonin
 		{Effort: "xhigh", Description: "Extra-high reasoning depth for difficult tasks"},
 	}
 	normalized := getNormalizedCodexModel(modelID)
-	if isOpenAIGPT56Model(modelID) || isOpenAIGPT6Model(modelID) {
+	isGPT62 := isOpenAICodexGPT62Model(modelID)
+	if isGPT62 || isOpenAIGPT56Model(modelID) || isOpenAIGPT6Model(modelID) {
 		levels = append(levels, configuredCodexReasoningLevel{
 			Effort:      "max",
 			Description: "Maximum reasoning depth for complex tasks",
 		})
 	}
-	if isOpenAIGPT6AstraModel(modelID) || openai.IsGPT61SolModelSpelling(modelID) || normalized == "gpt-5.6-sol" || normalized == "gpt-5.6-terra" {
+	if isGPT62 || isOpenAIGPT6AstraModel(modelID) || openai.IsGPT61SolModelSpelling(modelID) || normalized == "gpt-5.6-sol" || normalized == "gpt-5.6-terra" {
 		levels = append(levels, configuredCodexReasoningLevel{
 			Effort:      "ultra",
 			Description: "Maximum reasoning with automatic task delegation",
@@ -712,7 +716,16 @@ func isOpenAICodexGPTModel(modelID string) bool {
 
 func isOpenAICodexReasoningGPTModel(modelID string) bool {
 	normalized := canonicalizeOpenAIModelAliasSpelling(modelID)
-	return isOpenAIGPT6Model(normalized) || strings.HasPrefix(normalized, "gpt-5")
+	return isOpenAICodexGPT62Model(normalized) || isOpenAIGPT6Model(normalized) || strings.HasPrefix(normalized, "gpt-5")
+}
+
+func isOpenAICodexGPT62Model(modelID string) bool {
+	switch canonicalizeOpenAIModelAliasSpelling(modelID) {
+	case "gpt-6.2-sol", "gpt-6.2-astra":
+		return true
+	default:
+		return false
+	}
 }
 
 func isOpenAICodexImageInputModel(modelID string) bool {
