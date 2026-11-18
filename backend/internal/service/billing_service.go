@@ -972,6 +972,30 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown: false,
 	}
 
+	// Exact ShareLLM catalogue models with a verified vendor price card.
+	// Qwen CNY values use the repository's nominal RMB accounting convention: ¥1
+	// is stored as 1 USD-equivalent for billing; pricing_currency only controls
+	// the model plaza display unit.
+	// Source: https://help.aliyun.com/en/model-studio/qwen3-8-flash (2026-11-17).
+	s.fallbackPrices["qwen3.8-flash"] = &ModelPricing{
+		PricingCurrency:        "CNY",
+		InputPricePerToken:     0.80e-6,
+		OutputPricePerToken:    2.70e-6,
+		CacheReadPricePerToken: 0.10e-6,
+	}
+	// Source: https://mimo.mi.com/docs/en-US/pricing (2026-10-08; global API rates).
+	s.fallbackPrices["mimo-v2.6-flash"] = &ModelPricing{
+		InputPricePerToken:     0.14e-6,
+		OutputPricePerToken:    0.28e-6,
+		CacheReadPricePerToken: 0.0028e-6,
+	}
+	// Source: https://platform.stepfun.ai/docs/en/guides/pricing/details (2026-11-17).
+	s.fallbackPrices["step-3.7-flash"] = &ModelPricing{
+		InputPricePerToken:     0.20e-6,
+		OutputPricePerToken:    1.15e-6,
+		CacheReadPricePerToken: 0.04e-6,
+	}
+
 	// ---- 硅基流动 Qwen3-Embedding 系列（纯文本向量化）----
 	// /v1/embeddings 只按输入计费，无 output，OutputPricePerToken 置 0。
 	// 国际站 USD 官方价（https://www.siliconflow.com/models/qwen3-embedding-8b 及同站
@@ -1354,6 +1378,15 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	}
 	if strings.Contains(modelLower, "minimax-m2") || strings.Contains(modelLower, "minimax-m-2") {
 		return s.fallbackPrices["minimax-m2"]
+	}
+	if modelLower == "qwen3.8-flash" || strings.HasSuffix(modelLower, "/qwen3.8-flash") {
+		return s.fallbackPrices["qwen3.8-flash"]
+	}
+	if modelLower == "mimo-v2.6-flash" || strings.HasSuffix(modelLower, "/mimo-v2.6-flash") {
+		return s.fallbackPrices["mimo-v2.6-flash"]
+	}
+	if modelLower == "step-3.7-flash" || strings.HasSuffix(modelLower, "/step-3.7-flash") {
+		return s.fallbackPrices["step-3.7-flash"]
 	}
 
 	// 硅基流动 Qwen3-Embedding 系列（纯文本向量化）。

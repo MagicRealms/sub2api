@@ -4,6 +4,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"math"
 	"os"
@@ -128,6 +129,63 @@ func TestGetModelPricing_CaseInsensitive(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, p1.InputPricePerToken, p2.InputPricePerToken)
+}
+
+func TestShareLLMVerifiedCatalogModelsHaveExplicitPricing(t *testing.T) {
+	svc := newTestBillingService()
+	tests := []struct {
+		model, currency      string
+		input, output, cache float64
+	}{
+		{"qwen3.8-flash", "CNY", 0.80e-6, 2.70e-6, 0.10e-6},
+		{"Qwen3.8-Flash", "CNY", 0.80e-6, 2.70e-6, 0.10e-6},
+		{"mimo-v2.6-flash", "", 0.14e-6, 0.28e-6, 0.0028e-6},
+		{"step-3.7-flash", "", 0.20e-6, 1.15e-6, 0.04e-6},
+		// Versioned DeepSeek aliases and MiniMax M2.5 already have explicit
+		// provider fallback rules; keep them covered in the aggregator catalogue.
+		{"deepseek-v4.1-flash-1017", "", deepseekFlashOffPeakInputPrice, deepseekFlashOffPeakOutputPrice, deepseekFlashOffPeakCacheRead},
+		{"minimax-m2.5", "", 0.30e-6, 1.20e-6, 0.03e-6},
+	}
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			pricing, err := svc.GetModelPricing(tt.model)
+			require.NoError(t, err)
+			require.Equal(t, tt.currency, pricing.PricingCurrency)
+			require.InDelta(t, tt.input, pricing.InputPricePerToken, 1e-15)
+			require.InDelta(t, tt.output, pricing.OutputPricePerToken, 1e-15)
+			require.InDelta(t, tt.cache, pricing.CacheReadPricePerToken, 1e-15)
+		})
+	}
+	plaza := &ModelPlazaService{billingService: svc}
+	official := plaza.lookupOfficialPricing(context.Background(), "qwen3.8-flash", make(map[string]*PlazaOfficialPricing))
+	require.NotNil(t, official)
+	require.Equal(t, "CNY", official.Currency)
+	require.InDelta(t, 0.8, *official.InputPrice*1_000_000, 1e-9)
+	require.InDelta(t, 2.7, *official.OutputPrice*1_000_000, 1e-9)
+	require.InDelta(t, 0.1, *official.CacheReadPrice*1_000_000, 1e-9)
+}
+
+func TestShareLLMKarpoRequiresAnExplicitGroupPrice(t *testing.T) {
+	model := "Karpo Decision 31B"
+	billing := newTestBillingService()
+	_, err := billing.GetModelPricing(model)
+	require.ErrorIs(t, err, ErrModelPricingUnavailable, "the custom aggregator model has no verified public token price")
+
+	input, output, cache := 1e-6, 2e-6, 0.2e-6
+	group := &Group{ID: 34, Platform: PlatformComposite, RateMultiplier: 1, ModelPricing: []ChannelModelPricing{{
+		Models: []string{model}, BillingMode: BillingModeToken,
+		InputPrice: &input, OutputPrice: &output, CacheReadPrice: &cache,
+	}}}
+	resolver := NewModelPricingResolver(nil, billing)
+	resolved := resolver.Resolve(context.Background(), PricingInput{Model: model, Group: group})
+	require.Equal(t, PricingSourceGroup, resolved.Source)
+	cost, err := billing.CalculateTokenCostForRequest(TokenCostRequest{
+		Ctx: context.Background(), Model: model, Group: group, Resolver: resolver,
+		Tokens:         UsageTokens{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheReadTokens: 1_000_000},
+		RateMultiplier: 1,
+	})
+	require.NoError(t, err)
+	require.InDelta(t, 3.2, cost.TotalCost, 1e-9)
 }
 
 func TestGetModelPricing_JevLatestInputOnlyAndChannelOverride(t *testing.T) {

@@ -31,6 +31,7 @@ const commandCodeModelsSample = `{"object":"list","data":[
 
 const shareLLMModelsSample = `{"object":"list","data":[
 	{"id":"gpt-6.1-sol","supported_endpoint_types":["openai"]},
+	{"id":"Karpo Decision 31B","supported_endpoint_types":["openai"]},
 	{"id":"claude-sonnet-4-6","supported_endpoint_types":["anthropic","openai"]},
 	{"id":"grok-4.7","supported_endpoint_types":["openai","openai-response"]},
 	{"id":"unknown-types","supported_endpoint_types":["custom"]},
@@ -56,9 +57,10 @@ func TestParseModelProtocolCatalogEndpointTypes(t *testing.T) {
 	models, err := parseModelProtocolCatalog([]byte(shareLLMModelsSample))
 	require.NoError(t, err)
 	require.Equal(t, map[string][]string{
-		"gpt-6.1-sol":       {APIProtocolChatCompletions},
-		"claude-sonnet-4-6": {APIProtocolAnthropic, APIProtocolChatCompletions},
-		"grok-4.7":          {APIProtocolChatCompletions, APIProtocolResponses},
+		"gpt-6.1-sol":        {APIProtocolChatCompletions},
+		"karpo decision 31b": {APIProtocolChatCompletions},
+		"claude-sonnet-4-6":  {APIProtocolAnthropic, APIProtocolChatCompletions},
+		"grok-4.7":           {APIProtocolChatCompletions, APIProtocolResponses},
 	}, models)
 
 	account := &Account{
@@ -75,6 +77,7 @@ func TestParseModelProtocolCatalogEndpointTypes(t *testing.T) {
 		},
 	}
 	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "gpt-6.1-sol", models["gpt-6.1-sol"]))
+	require.Equal(t, APIProtocolChatCompletions, resolveUpstreamProtocol(account, APIProtocolChatCompletions, "Karpo Decision 31B", models["karpo decision 31b"]))
 	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "gpt-6.1-sol", models["gpt-6.1-sol"]))
 	require.Equal(t, APIProtocolResponses, resolveUpstreamProtocol(account, APIProtocolResponses, "grok-4.7", models["grok-4.7"]))
 	require.Equal(t, APIProtocolAnthropic, resolveUpstreamProtocol(account, APIProtocolAnthropic, "claude-sonnet-4-6", models["claude-sonnet-4-6"]))
