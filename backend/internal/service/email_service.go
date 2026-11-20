@@ -248,15 +248,20 @@ func smtpTLSConfig(host string) *tls.Config {
 
 // connectSMTP 按配置建立 SMTP 会话，发送与测试连接共用此路径，
 // 保证"测试连接成功 ⇔ 实际发信可用"：
-//   - UseTLS=true：先尝试隐式 TLS（465 语义）；若服务器以明文应答
-//     （587/25 等提交端口的 STARTTLS 语义），自动改走"明文连接 + 强制 STARTTLS"。
+//   - 587 端口直接使用强制 STARTTLS。
+//   - 其他端口且 UseTLS=true：先尝试隐式 TLS（465 语义）；若服务器以明文应答，
+//     自动改走"明文连接 + 强制 STARTTLS"。
 //     两种方式都无法建立加密连接时报错，绝不明文继续。
-//   - UseTLS=false：明文连接后若服务器支持 STARTTLS 则机会式升级，
+//   - 其他端口且 UseTLS=false：明文连接后若服务器支持 STARTTLS 则机会式升级，
 //     与 smtp.SendMail 的默认行为一致。
 func (s *EmailService) connectSMTP(config *SMTPConfig) (*smtp.Client, error) {
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	dialer := &net.Dialer{Timeout: smtpDialTimeout}
 	tlsConfig := smtpTLSConfig(config.Host)
+
+	if config.Port == 587 {
+		return s.connectSMTPStartTLS(dialer, addr, config.Host, tlsConfig, true)
+	}
 
 	if config.UseTLS {
 		conn, err := tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)

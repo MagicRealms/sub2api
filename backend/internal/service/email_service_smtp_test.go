@@ -64,15 +64,22 @@ type fakeSMTPServer struct {
 	wg       sync.WaitGroup
 }
 
-func startFakeSMTPServer(t *testing.T, implicitTLS, advertiseStartTLS bool) (*fakeSMTPServer, int) {
+func startFakeSMTPServer(t *testing.T, implicitTLS, advertiseStartTLS bool, bindAddress ...string) (*fakeSMTPServer, int) {
 	t.Helper()
 	cert, pool := newSMTPTestCert(t)
 	prevPool := smtpTestRootCAs
 	smtpTestRootCAs = pool
 	t.Cleanup(func() { smtpTestRootCAs = prevPool })
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	address := "127.0.0.1:0"
+	if len(bindAddress) > 0 {
+		address = bindAddress[0]
+	}
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
+		if len(bindAddress) > 0 {
+			t.Skipf("cannot bind %s: %v", address, err)
+		}
 		t.Fatalf("listen: %v", err)
 	}
 	srv := &fakeSMTPServer{
@@ -290,7 +297,37 @@ func TestSMTPConnectionImplicitTLS(t *testing.T) {
 	}
 }
 
-// 587 语义（#1470/#1488 核心场景）：UseTLS=true + 明文问候的 STARTTLS 服务器，
+func TestSMTPConnectionPort587(t *testing.T) {
+	t.Run("upgrades the first connection", func(t *testing.T) {
+		server, port := startFakeSMTPServer(t, false, true, "127.0.0.1:587")
+		service := &EmailService{}
+
+		if err := service.TestSMTPConnectionWithConfig(smtpTestConfig(port, true)); err != nil {
+			t.Fatalf("expected STARTTLS on port 587 to succeed, got: %v", err)
+		}
+		if connections := server.conns.Load(); connections != 1 {
+			t.Fatalf("expected one connection without an implicit TLS attempt, got %d", connections)
+		}
+		if !server.sawCommand("STARTTLS") || !server.sawCommand("AUTH") {
+			t.Fatal("expected STARTTLS and SMTP authentication")
+		}
+	})
+
+	t.Run("refuses plaintext", func(t *testing.T) {
+		server, port := startFakeSMTPServer(t, false, false, "127.0.0.1:587")
+		service := &EmailService{}
+
+		err := service.TestSMTPConnectionWithConfig(smtpTestConfig(port, false))
+		if err == nil || !strings.Contains(err.Error(), "does not support STARTTLS") {
+			t.Fatalf("expected mandatory STARTTLS on port 587, got: %v", err)
+		}
+		if server.sawCommand("AUTH") {
+			t.Fatal("credentials must not be sent over plaintext on port 587")
+		}
+	})
+}
+
+// 非 587 端口的 UseTLS=true 遇到明文问候的 STARTTLS 服务器时，
 // 隐式 TLS 失败后必须自动降级为强制 STARTTLS 并成功。
 func TestSMTPConnectionStartTLSFallbackWhenTLSEnabled(t *testing.T) {
 	srv, port := startFakeSMTPServer(t, false, true)
