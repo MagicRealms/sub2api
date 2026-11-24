@@ -84,16 +84,16 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if isMiMoVoiceModel(upstreamModel) && clientStream {
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", mimoVoiceProtocolError)
+		return nil, errors.New(mimoVoiceProtocolError)
+	}
 	if isMiMoASRModel(originalModel) && !isMiMoASRModel(upstreamModel) {
 		const message = "ASR requests must map to mimo-v2.5-asr"
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", message)
 		return nil, errors.New(message)
 	}
 	if isMiMoASRModel(upstreamModel) {
-		if clientStream {
-			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", mimoASRProtocolError)
-			return nil, errors.New(mimoASRProtocolError)
-		}
 		if _, ok := mimoASRHourlyPrice(ctx, s.resolver, getAPIKeyFromContext(c)); !ok {
 			writeChatCompletionsError(c, http.StatusServiceUnavailable, "model_pricing_unavailable", "Model pricing is unavailable. Please contact the administrator.")
 			return nil, ErrModelPricingUnavailable
@@ -550,6 +550,14 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		return nil, fmt.Errorf("read upstream body: %w", err)
 	}
 	var audioUsage *AudioUsage
+	if isMiMoTTSModel(upstreamModel) && (!gjson.ValidBytes(respBody) ||
+		gjson.GetBytes(respBody, "error").Type != gjson.Null ||
+		gjson.GetBytes(respBody, "choices.0.message.audio.data").Str == "") {
+		const message = "MiMo TTS response is missing audio"
+		setOpsUpstreamError(c, resp.StatusCode, message, "")
+		writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream speech synthesis failed")
+		return nil, errors.New(message)
+	}
 	if isMiMoASRModel(upstreamModel) {
 		audioUsage = mimoASRAudioUsage(respBody)
 		if audioUsage == nil {

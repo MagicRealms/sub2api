@@ -49,6 +49,7 @@ const (
 	PlatformZhipu       = domain.PlatformZhipu
 	PlatformDeepseek    = domain.PlatformDeepseek
 	PlatformMiniMax     = domain.PlatformMiniMax
+	PlatformMiMo        = domain.PlatformMiMo
 	PlatformOpenCodeGo  = domain.PlatformOpenCodeGo
 	PlatformShareLLM    = domain.PlatformShareLLM
 	PlatformTypeSafe    = domain.PlatformTypeSafe

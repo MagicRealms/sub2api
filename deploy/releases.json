@@ -54,5 +54,12 @@
     "sequence": 4,
     "date": "2026-11-24",
     "description": "适配 MiMo ASR 非流式 Chat Completions，保留音频请求格式并按上游报告的音频秒数和分组 STT 小时价计费"
+  },
+  {
+    "version": "v0.2.25-mr-261125w05",
+    "upstream": "0.2.25",
+    "sequence": 5,
+    "date": "2026-11-25",
+    "description": "新增 MiMo 独立 API Key 平台和分组，支持非流式 TTS 音频透传与按分组价卡计费"
   }
 ]

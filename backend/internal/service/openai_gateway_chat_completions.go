@@ -162,10 +162,11 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	// ShouldUseResponsesAPI：Anthropic 协议账号经 probe 落标
 	// openai_responses_supported=false，否则会命中 CC 直转。
 	routingModel := upstreamRoutingModel(account, body, defaultMappedModel)
-	if account.IsOpenAIApiKey() && isMiMoASRModel(gjson.GetBytes(body, "model").String()) {
+	if account.Type == AccountTypeAPIKey && (account.Platform == PlatformOpenAI || account.Platform == PlatformMiMo) &&
+		isMiMoVoiceModel(gjson.GetBytes(body, "model").String()) {
 		if isResponsesShape {
-			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", mimoASRProtocolError)
-			return nil, errors.New(mimoASRProtocolError)
+			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", mimoVoiceProtocolError)
+			return nil, errors.New(mimoVoiceProtocolError)
 		}
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel)
 	}

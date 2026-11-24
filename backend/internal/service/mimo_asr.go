@@ -8,10 +8,19 @@ import (
 )
 
 const mimoASRModel = "mimo-v2.5-asr"
-const mimoASRProtocolError = "mimo-v2.5-asr requires non-streaming Chat Completions"
+const mimoTTSModel = "mimo-v2.5-tts"
+const mimoVoiceProtocolError = "MiMo voice models require non-streaming Chat Completions"
 
 func isMiMoASRModel(model string) bool {
 	return strings.EqualFold(strings.TrimSpace(model), mimoASRModel)
+}
+
+func isMiMoTTSModel(model string) bool {
+	return strings.EqualFold(strings.TrimSpace(model), mimoTTSModel)
+}
+
+func isMiMoVoiceModel(model string) bool {
+	return isMiMoASRModel(model) || isMiMoTTSModel(model)
 }
 
 func mimoASRHourlyPrice(ctx context.Context, resolver *ModelPricingResolver, key *APIKey) (float64, bool) {

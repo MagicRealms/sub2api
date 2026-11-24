@@ -528,6 +528,7 @@ export function getModelsByPlatform(platform: string): string[] {
     case 'zhipu': return zhipuModels
     case 'qwen': return qwenModels
     case 'deepseek': return deepseekModels
+    case 'mimo': return ['mimo-v2.6-flash', 'mimo-v2.6-pro', 'mimo-v2.5-asr', 'mimo-v2.5-tts']
     case 'mistral': return mistralModels
     case 'meta': return metaModels
     case 'xai':

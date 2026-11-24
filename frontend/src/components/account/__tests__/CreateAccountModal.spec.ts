@@ -736,12 +736,30 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
     })
   })
 
-  it('groups the aggregators on their own row below the CN providers', () => {
+  it('lists additional API key platforms below the CN provider shortcuts', () => {
     const wrapper = mountModal()
     const labels = (testid: string) =>
       wrapper.get(`[data-testid="${testid}"]`).findAll('button').map(button => button.text().trim())
     expect(labels('platform-row-cn')).toEqual(['Kimi', 'Zhipu GLM', 'DeepSeek', 'MiniMax'])
-    expect(labels('platform-row-aggregators')).toEqual(['OpenCode', 'ShareLLM 聚合', 'Command Code', 'Cline'])
+    expect(labels('platform-row-aggregators')).toEqual(['OpenCode', 'ShareLLM 聚合', 'Command Code', 'Cline', 'MiMo'])
+  })
+
+  it('creates a MiMo API key account with the official Chat Completions base URL', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="platform-button-mimo"]').trigger('click')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('MiMo')
+    await wrapper.get('form#create-account-form input[type="password"]').setValue('sk-mimo')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'mimo',
+      type: 'apikey',
+      credentials: {
+        api_key: 'sk-mimo',
+        account_mode: 'payg',
+        api_base_urls: { chat_completions: 'https://api.xiaomimimo.com/v1' },
+      },
+    })
   })
 
   it('creates a ShareLLM aggregate account with editable protocol routing defaults', async () => {

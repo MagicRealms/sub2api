@@ -420,6 +420,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	if input.Platform == PlatformTypeSafe && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
 	}
+	if input.Platform == PlatformMiMo && input.Type != AccountTypeAPIKey {
+		return nil, errors.New("MiMo accounts only support API key credentials")
+	}
 	// Probe/session state is system-managed. Only explicit account settings can enable it.
 	delete(accountExtra, UpstreamBillingProbeEnabledExtraKey)
 	delete(accountExtra, UpstreamBillingRateSyncEnabledExtraKey)
@@ -626,6 +629,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if account.Platform == PlatformTypeSafe && input.Type != "" && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
+	}
+	if account.Platform == PlatformMiMo && input.Type != "" && input.Type != AccountTypeAPIKey {
+		return nil, errors.New("MiMo accounts only support API key credentials")
 	}
 	var normalizedExtra map[string]any
 	if input.Extra != nil {

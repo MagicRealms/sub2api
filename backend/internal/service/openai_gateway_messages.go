@@ -67,9 +67,9 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	// ShouldUseResponsesAPI：Anthropic 协议账号经 probe 落标
 	// openai_responses_supported=false，否则会命中 CC 直转。
 	routingModel := upstreamRoutingModel(account, body, defaultMappedModel)
-	if isMiMoASRModel(gjson.GetBytes(body, "model").String()) {
-		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", mimoASRProtocolError)
-		return nil, errors.New(mimoASRProtocolError)
+	if isMiMoVoiceModel(gjson.GetBytes(body, "model").String()) {
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", mimoVoiceProtocolError)
+		return nil, errors.New(mimoVoiceProtocolError)
 	}
 	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(routingModel) {
 		return nil, writeOpenCodeUnsupportedModelError(c, true, routingModel)
