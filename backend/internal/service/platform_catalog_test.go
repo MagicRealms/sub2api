@@ -6,11 +6,33 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPublicPlatformCatalogHidesOnlyPrivateProvider(t *testing.T) {
+	public := BuildPublicPlatformCatalog()
+	raw, err := json.Marshal(public)
+	require.NoError(t, err)
+	require.NotContains(t, strings.ToLower(string(raw)), "sharellm")
+	admin := BuildPlatformCatalog()
+	for i, entry := range admin.Platforms {
+		if entry.ID != domain.PlatformShareLLM {
+			require.Equal(t, entry, public.Platforms[i], entry.ID)
+			continue
+		}
+		require.Equal(t, errorprivacy.PublicRouteID, public.Platforms[i].ID)
+		require.Equal(t, errorprivacy.PublicRouteAlias, public.Platforms[i].DisplayName)
+		require.Equal(t, DefaultShareLLMBaseURL, entry.MultiProtocol.Modes[0].BaseURLs[APIProtocolChatCompletions])
+		require.Empty(t, public.Platforms[i].MultiProtocol.Modes[0].BaseURLs)
+	}
+	// Generating a public view must never change the real routing defaults.
+	require.Equal(t, DefaultShareLLMBaseURL, LookupProviderProfile(domain.PlatformShareLLM).DefaultBaseURL(AccountModePayG, APIProtocolChatCompletions))
+}
 
 func TestBuildPlatformCatalogMirrorsPlatformListAndProfiles(t *testing.T) {
 	catalog := BuildPlatformCatalog()
@@ -122,7 +144,7 @@ func TestBuildPlatformCatalogReturnsCopies(t *testing.T) {
 //	UPDATE_PLATFORM_CATALOG=1 go test -tags unit ./internal/service/ -run TestFrontendBuiltinPlatformCatalogInSync
 func TestFrontendBuiltinPlatformCatalogInSync(t *testing.T) {
 	const path = "../../../frontend/src/constants/platformCatalog.builtin.json"
-	want, err := json.MarshalIndent(BuildPlatformCatalog(), "", "  ")
+	want, err := json.MarshalIndent(BuildPublicPlatformCatalog(), "", "  ")
 	require.NoError(t, err)
 	want = append(want, '\n')
 

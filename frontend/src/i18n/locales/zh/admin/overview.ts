@@ -937,6 +937,9 @@ export default {
       accountsAvailable: '可用:',
       accountsRateLimited: '限流:',
       accountsTotal: '总量:',
+      accountsNormal: '正常:',
+      accountsFallback: '保底:',
+      accountsFallbackHint: '总量中仅参与最终保底的账号；正常渠道不可用后才会调用。',
       accountsUnit: '个账号',
       form: {
         name: '名称',

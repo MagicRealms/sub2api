@@ -13,6 +13,9 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { setPlatformCatalog, resetPlatformCatalog } from '@/constants/platformCatalog'
+import { getPlatformCatalog } from '@/api/admin/platformCatalog'
+import { i18n } from '@/i18n'
 
 /**
  * Route definitions with lazy loading
@@ -1003,6 +1006,24 @@ router.beforeEach(async (to, _from, next) => {
         }
       }
     }
+    // Admin forms must use authenticated provider defaults before mounting.
+    // Public pages always start from the redacted, embedded catalog.
+    if (['/admin/accounts', '/admin/groups', '/admin/users', '/admin/settings', '/admin/subscriptions', '/admin/ops'].includes(to.path) || to.path.startsWith('/admin/channels/')) {
+      try {
+        const catalog = await getPlatformCatalog()
+        if (!authStore.isAuthenticated || !authStore.isAdmin) {
+          next('/login')
+          return
+        }
+        setPlatformCatalog(catalog)
+      } catch {
+        appStore.showError(i18n.global.t('admin.accounts.platformCatalogLoadFailed'))
+        next(false)
+        return
+      }
+    }
+  } else {
+    resetPlatformCatalog()
   }
 
 

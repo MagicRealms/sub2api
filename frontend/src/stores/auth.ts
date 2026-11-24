@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { authAPI, isTotp2FARequired, passkeyAPI, type LoginResponse } from '@/api'
+import { resetPlatformCatalog } from '@/constants/platformCatalog'
 import type {
   User,
   LoginRequest,
@@ -465,6 +466,7 @@ export const useAuthStore = defineStore('auth', () => {
    * Internal helper function
    */
   function clearAuth(options?: { preservePendingAuthSession?: boolean }): void {
+    resetPlatformCatalog()
     // Stop auto-refresh
     stopAutoRefresh()
     // Stop token refresh

@@ -122,6 +122,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 	if err != nil {
 		return nil, err
 	}
+	RecordAccountFallbackPlatform(ctx, groupID, platform)
 
 	cacheKey := "gemini:" + sessionHash
 
@@ -224,6 +225,9 @@ func (s *GeminiMessagesCompatService) tryStickySessionHit(
 
 	account, err := s.getSchedulableAccount(ctx, accountID)
 	if err != nil {
+		return nil
+	}
+	if !AccountAllowedForSchedulingPhase(ctx, account, groupID) {
 		return nil
 	}
 
@@ -452,10 +456,18 @@ func (s *GeminiMessagesCompatService) hydrateSelectedAccount(ctx context.Context
 	if hydrated == nil {
 		return nil, fmt.Errorf("selected gemini account %d not found during hydration", account.ID)
 	}
+	if !accountAllowedForRoutingAttempt(ctx, hydrated) {
+		return nil, ErrNoAvailableAccounts
+	}
 	return hydrated, nil
 }
 
 func (s *GeminiMessagesCompatService) listSchedulableAccountsOnce(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]Account, error) {
+	accounts, err := s.listSchedulableAccountsBeforeFinalFallback(ctx, groupID, platform, hasForcePlatform)
+	return filterAccountsForSchedulingPhase(ctx, accounts, groupID, platform), err
+}
+
+func (s *GeminiMessagesCompatService) listSchedulableAccountsBeforeFinalFallback(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]Account, error) {
 	if s.schedulerSnapshot != nil {
 		accounts, _, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
 		return accounts, err

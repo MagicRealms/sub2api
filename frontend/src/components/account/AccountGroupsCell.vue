@@ -10,6 +10,7 @@
         :subscription-type="group.subscription_type"
         :rate-multiplier="group.rate_multiplier"
         :show-rate="false"
+        :fallback-only="fallbackGroupIds.includes(group.id)"
         :truncate="false"
         class="min-w-0 max-w-full"
       />
@@ -18,6 +19,7 @@
         v-if="hiddenCount > 0"
         ref="moreButtonRef"
         @click.stop="showPopover = !showPopover"
+        :title="t('admin.accounts.finalFallback.membershipSummary', { normal: normalGroups.length, fallback: fallbackGroups.length })"
         class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-300 dark:hover:bg-dark-500 transition-colors cursor-pointer whitespace-nowrap"
       >
         <span>+{{ hiddenCount }}</span>
@@ -39,18 +41,24 @@
               </svg>
             </button>
           </div>
-          <div class="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto">
-            <GroupBadge
-              v-for="group in groups"
-              :key="group.id"
-              :name="group.name"
-              :platform="group.platform"
-              :subscription-type="group.subscription_type"
-              :rate-multiplier="group.rate_multiplier"
-              :show-rate="false"
-              :truncate="false"
-              class="min-w-0 max-w-full"
-            />
+          <div class="max-h-64 space-y-3 overflow-y-auto">
+            <div v-for="section in groupSections" :key="section.role" class="space-y-1.5">
+              <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ section.label }} · {{ section.groups.length }}</p>
+              <div class="flex flex-wrap gap-1.5">
+                <GroupBadge
+                  v-for="group in section.groups"
+                  :key="group.id"
+                  :name="group.name"
+                  :platform="group.platform"
+                  :subscription-type="group.subscription_type"
+                  :rate-multiplier="group.rate_multiplier"
+                  :show-rate="false"
+                  :fallback-only="section.role === 'fallback'"
+                  :truncate="false"
+                  class="min-w-0 max-w-full"
+                />
+              </div>
+            </div>
           </div>
         </FloatingPanel>
 
@@ -70,16 +78,24 @@ import type { Group } from '@/types'
 interface Props {
   groups: Group[] | null | undefined
   maxDisplay?: number
+  fallbackGroupIds?: number[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  maxDisplay: 4
+  maxDisplay: 4,
+  fallbackGroupIds: () => []
 })
 
 const { t } = useI18n()
 
 const moreButtonRef = ref<HTMLElement | null>(null)
 const showPopover = ref(false)
+const normalGroups = computed(() => (props.groups ?? []).filter(group => !props.fallbackGroupIds.includes(group.id)))
+const fallbackGroups = computed(() => (props.groups ?? []).filter(group => props.fallbackGroupIds.includes(group.id)))
+const groupSections = computed(() => [
+  { role: 'normal', label: t('admin.accounts.finalFallback.normalGroups'), groups: normalGroups.value },
+  { role: 'fallback', label: t('admin.accounts.finalFallback.groups'), groups: fallbackGroups.value }
+].filter(section => section.groups.length > 0))
 
 // 显示的分组（最多显示 maxDisplay 个）
 const displayGroups = computed(() => {

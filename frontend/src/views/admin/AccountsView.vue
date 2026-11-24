@@ -14,7 +14,7 @@
           <AccountTableActions
             :loading="loading"
             @refresh="handleManualRefresh"
-            @create="showCreate = true"
+            @create="handleCreate"
           >
             <template #after>
               <!-- Auto Refresh Dropdown -->
@@ -187,7 +187,7 @@
           @select-all-results="handleSelectAllResults"
           @toggle-schedulable="handleBulkToggleSchedulable"
         />
-        <div ref="accountTableRef" class="flex min-h-0 flex-1 flex-col overflow-hidden" :aria-busy="loading" :inert="loading && accounts.length > 0">
+        <div ref="accountTableRef" class="flex min-h-0 flex-1 flex-col overflow-hidden" :aria-busy="loading" :inert="loading && accounts.length > 0 ? true : undefined">
         <DataTable
           ref="dataTableRef"
           :columns="cols"
@@ -220,24 +220,37 @@
           </template>
           <template #cell-name="{ row, value }">
             <div class="flex flex-col">
-              <HelpTooltip
-                v-if="accountHomepageUrl(row)"
-                :content="accountHomepageUrl(row)"
-                width-class="w-max max-w-sm break-all"
-                class="-ml-1 self-start"
-              >
-                <template #trigger>
-                  <a
-                    :href="accountHomepageUrl(row)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="border-b border-dotted border-gray-300 font-medium text-gray-900 dark:border-dark-600 dark:text-white"
-                  >
-                    {{ value }}
-                  </a>
-                </template>
-              </HelpTooltip>
-              <span v-else class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+              <div class="flex items-center gap-1">
+                <HelpTooltip
+                  v-if="accountHomepageUrl(row)"
+                  :content="accountHomepageUrl(row)"
+                  width-class="w-max max-w-sm break-all"
+                  class="-ml-1 self-start"
+                >
+                  <template #trigger>
+                    <a
+                      :href="accountHomepageUrl(row)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="border-b border-dotted border-gray-300 font-medium text-gray-900 dark:border-dark-600 dark:text-white"
+                    >
+                      {{ value }}
+                    </a>
+                  </template>
+                </HelpTooltip>
+                <span v-else class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
+                <button
+                  v-if="row.type === 'apikey' || (row.platform === 'antigravity' && row.type === 'upstream')"
+                  type="button"
+                  class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                  :title="t('admin.accounts.upstreamBilling.saveGroup')"
+                  :aria-label="t('admin.accounts.upstreamBilling.saveGroup')"
+                  :disabled="syncingUpstreamGroup.has(row.id)"
+                  @click.stop="syncUpstreamGroup(row)"
+                >
+                  <Icon name="refresh" size="xs" :class="{ 'animate-spin': syncingUpstreamGroup.has(row.id) }" />
+                </button>
+              </div>
               <span
                 v-if="accountDisplayEmail(row)"
                 class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]"
@@ -300,7 +313,7 @@
             />
           </template>
           <template #cell-groups="{ row }">
-            <AccountGroupsCell :groups="accountGroupsForRow(row)" :max-display="4" />
+            <AccountGroupsCell :groups="accountGroupsForRow(row)" :fallback-group-ids="accountFallbackGroupIds(row)" :max-display="4" />
           </template>
           <template #header-usage="{ column }">
             <div class="flex items-center">
@@ -450,8 +463,8 @@
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
-    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
-    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
+    <CreateAccountModal v-if="catalogReady" :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
+    <EditAccountModal v-if="catalogReady" :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="handleAccountUpdated" />
     <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="handleAccountUpdated" />
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
@@ -494,6 +507,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
+import { setPlatformCatalog } from '@/constants/platformCatalog'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
@@ -520,6 +534,7 @@ import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
 import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
+import { readAccountFinalFallback } from '@/components/account/finalFallback'
 import AccountCapacityCell from '@/components/account/AccountCapacityCell.vue'
 import UpstreamBillingRateCell from '@/components/account/UpstreamBillingRateCell.vue'
 import AccountPriorityCell from '@/components/account/AccountPriorityCell.vue'
@@ -543,6 +558,10 @@ const authStore = useAuthStore()
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
 const groupsByID = computed(() => new Map(groups.value.map(group => [group.id, group])))
+const accountFallbackGroupIds = (account: Pick<AccountListItem, 'extra'>): number[] => {
+  const config = readAccountFinalFallback(account.extra)
+  return config.enabled ? config.groupIds : []
+}
 const accountGroupsForRow = (account: Pick<AccountListItem, 'group_ids'>): AdminGroup[] => {
   const groupIDs = account.group_ids ?? []
   if (groupIDs.length === 0) return []
@@ -591,6 +610,28 @@ const selTypes = computed<AccountType[]>(() => {
 })
 const showCreate = ref(false)
 const showEdit = ref(false)
+const catalogReady = ref(false)
+let catalogPageActive = true
+let catalogLoad: Promise<boolean> | undefined
+const loadPlatformCatalog = (): Promise<boolean> => {
+  if (catalogReady.value) return Promise.resolve(true)
+  if (catalogLoad) return catalogLoad
+  if (typeof adminAPI.platformCatalog?.getPlatformCatalog !== 'function') return Promise.resolve(false)
+  catalogLoad = Promise.resolve().then(() => adminAPI.platformCatalog.getPlatformCatalog()).then(catalog => {
+    if (!catalogPageActive) return false
+    setPlatformCatalog(catalog)
+    catalogReady.value = true
+    return true
+  }).catch(error => {
+    console.error('Failed to load administrator platform catalog:', error)
+    appStore.showError(t('admin.accounts.platformCatalogLoadFailed'))
+    return false
+  }).finally(() => { catalogLoad = undefined })
+  return catalogLoad
+}
+const handleCreate = async () => {
+  if (await loadPlatformCatalog()) showCreate.value = true
+}
 const showSync = ref(false)
 const showImportData = ref(false)
 const showExportDataDialog = ref(false)
@@ -621,6 +662,7 @@ const menu = reactive<{show:boolean, acc:Account|null, anchorRect:DOMRect|null}>
 const exportingData = ref(false)
 const probingUpstreamBilling = reactive(new Set<number>())
 const syncingUpstreamModels = ref(false)
+const syncingUpstreamGroup = reactive(new Set<number>())
 const upstreamBillingProbeGloballyEnabled = ref<boolean | undefined>(undefined)
 const upstreamBillingNow = ref(Date.now())
 const upstreamBillingRateETag = ref<string | null>(null)
@@ -1852,6 +1894,7 @@ const loadAccountDetails = async (account: Pick<AccountListItem, 'id'>): Promise
 }
 
 const handleEdit = async (a: AccountListItem) => {
+  if (!await loadPlatformCatalog()) return
   const account = await loadAccountDetails(a)
   if (!account) return
   edAcc.value = account
@@ -2305,6 +2348,27 @@ const handleAccountUpdated = (updatedAccount: Account) => {
   patchAccountInList(updatedAccount)
   enterAutoRefreshSilentWindow()
 }
+const syncUpstreamGroup = async (account: AccountListItem) => {
+  if (syncingUpstreamGroup.has(account.id)) return
+  syncingUpstreamGroup.add(account.id)
+  try {
+    const fields = await adminAPI.accounts.previewUpstreamGroup({ account_id: account.id })
+    if (!fields.name && !fields.notes) {
+      appStore.showInfo(t('admin.accounts.upstreamBilling.groupUnavailable'))
+      return
+    }
+    if (fields.name === account.name) delete fields.name
+    if (fields.notes === account.notes) delete fields.notes
+    if (fields.name || fields.notes) {
+      handleAccountUpdated(await adminAPI.accounts.update(account.id, fields))
+    }
+    appStore.showSuccess(t('admin.accounts.upstreamBilling.groupSynced'))
+  } catch (error) {
+    appStore.showError(extractApiErrorMessage(error, t('admin.accounts.upstreamBilling.groupFailed')))
+  } finally {
+    syncingUpstreamGroup.delete(account.id)
+  }
+}
 const formatExportTimestamp = () => {
   const now = new Date()
   const pad2 = (value: number) => String(value).padStart(2, '0')
@@ -2576,6 +2640,7 @@ const handleClickOutside = (event: MouseEvent) => {
 }
 
 onMounted(async () => {
+  void loadPlatformCatalog()
   if (typeof window !== 'undefined') {
     desktopViewportMediaQuery = window.matchMedia(desktopViewportQuery)
     isDesktopViewport.value = desktopViewportMediaQuery.matches
@@ -2617,6 +2682,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  catalogPageActive = false
   upstreamBillingRateAbortController?.abort()
   if (usageBatchFlushTimer !== null) {
     clearTimeout(usageBatchFlushTimer)

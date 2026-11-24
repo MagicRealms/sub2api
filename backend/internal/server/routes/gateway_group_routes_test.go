@@ -45,6 +45,11 @@ func (r orderedRouteGroupRepo) GetByID(_ context.Context, id int64) (*service.Gr
 
 func orderedTestEngine(t *testing.T, groups []*service.Group, handler gin.HandlerFunc, support ...func(context.Context, *service.Group, string, string) (bool, error)) *gin.Engine {
 	t.Helper()
+	return orderedTestEngineWithFallback(t, groups, handler, nil, support...)
+}
+
+func orderedTestEngineWithFallback(t *testing.T, groups []*service.Group, handler gin.HandlerFunc, fallback func(context.Context, []int64) (bool, error), support ...func(context.Context, *service.Group, string, string) (bool, error)) *gin.Engine {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 	ids := make([]int64, 0, len(groups))
 	byID := make(map[int64]*service.Group)
@@ -56,13 +61,18 @@ func orderedTestEngine(t *testing.T, groups []*service.Group, handler gin.Handle
 	cfg := &config.Config{RunMode: config.RunModeStandard}
 	keys := service.NewAPIKeyService(orderedRouteKeyRepo{key: key}, nil, orderedRouteGroupRepo{groups: byID}, nil, nil, nil, cfg)
 	engine := gin.New()
+	engine.Use(middleware.PublicErrorPrivacy())
 	supports := func(_ context.Context, g *service.Group, model, path string) (bool, error) {
 		return g.ModelAllowlist.Allows(model), nil
 	}
 	if len(support) > 0 {
 		supports = support[0]
 	}
-	engine.Use(orderedKeyGroupRoutingWithSupport(engine, keys, supports))
+	if fallback == nil {
+		engine.Use(orderedKeyGroupRoutingWithSupport(engine, keys, supports))
+	} else {
+		engine.Use(orderedKeyGroupRoutingWithSupport(engine, keys, supports, fallback))
+	}
 	engine.POST("/v1/responses", gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(keys, nil, cfg)), handler)
 	engine.POST("/v1/images/generations", gin.HandlerFunc(middleware.NewAPIKeyAuthMiddleware(keys, nil, cfg)), handler)
 	return engine

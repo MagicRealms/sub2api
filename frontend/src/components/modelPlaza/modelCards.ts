@@ -4,7 +4,7 @@ import { resolveIntervalPrices, type PricingCurrency } from '@/utils/pricing'
 import { platformLabel } from '@/utils/platformColors'
 
 export function modelPlazaPlatformLabel(platform: string): string {
-  return platform === 'sharellm' ? '聚合站' : platformLabel(platform)
+  return platform === 'route_relay' ? '路由中转' : platformLabel(platform)
 }
 
 export interface PlazaModelVariant {

@@ -1372,7 +1372,7 @@ function generateRoutedCodexFiles(
     deepseek: 'deepseek-v4-pro',
     minimax: 'MiniMax-M3',
     opencode_go: 'glm-5.3',
-    sharellm: 'gpt-6.1-sol',
+    route_relay: 'gpt-6.1-sol',
     composite: 'gpt-6.1-sol'
   }
   const preferredModel = preferredModels[platform] || ''
@@ -1391,7 +1391,7 @@ function generateRoutedCodexFiles(
     typesafe: 'TypeSafe / Jev',
     command_code: 'Command Code',
     cline: 'Cline',
-    sharellm: 'ShareLLM 聚合',
+    route_relay: '路由中转',
     composite: 'Composite'
   }
   const label = labels[platform]

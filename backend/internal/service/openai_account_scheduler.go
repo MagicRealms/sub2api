@@ -1809,6 +1809,9 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	if account == nil {
 		return false, "account_nil"
 	}
+	if !AccountAllowedForSchedulingPhase(ctx, account, req.GroupID) {
+		return false, "final_fallback_phase_mismatch"
+	}
 	if source, ok := CompositeRouteSourceFromContext(ctx); ok && source == CompositeRouteSourceAccount {
 		if publicModel, modelOK := RequestedPublicModelFromContext(ctx); modelOK && !explicitModelMappingClaims(*account, publicModel) {
 			return false, "account_model_not_owned"
@@ -2427,6 +2430,7 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 		ctx = s.withOpenAIProfitControlGate(ctx, groupID)
 	}
 	platform = NormalizeOpenAICompatiblePlatform(platform)
+	RecordAccountFallbackPlatform(ctx, groupID, platform)
 	strictPriority := s.useOpenAIStrictPriority(ctx, groupID, platform, requiredImageCapability, useUpstreamTokenCost)
 	decision := OpenAIAccountScheduleDecision{}
 	preserveStickyBinding := preserveOpenAIGuardianParentBinding(ctx, sessionHash) || openAIImageSizeSpilloverPass(ctx)

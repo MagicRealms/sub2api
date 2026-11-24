@@ -9,6 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func (h *GatewayHandler) HasGroupFinalFallback(ctx context.Context, groupIDs []int64) (bool, error) {
+	return h.gatewayService.HasGroupFinalFallback(ctx, groupIDs)
+}
+
 // GroupRouteModels uses the same catalog and allowlist as normal discovery.
 // A temporarily unhealthy account must not change the request's billing floor.
 func (h *GatewayHandler) GroupRouteModels(ctx context.Context, group *service.Group) ([]string, error) {

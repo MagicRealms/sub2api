@@ -185,8 +185,10 @@ func (s *APIKeyService) ResolveAPIKeyGroupRoute(ctx context.Context, key *APIKey
 	routeGroup := *attempt.Group
 	// Explicit key routes own cross-group ordering. A group's legacy fallback
 	// must not jump to an unselected or differently priced group behind the key.
-	routeGroup.FallbackGroupID = nil
-	routeGroup.FallbackGroupIDOnInvalidRequest = nil
+	if len(key.OrderedGroupIDs()) > 1 {
+		routeGroup.FallbackGroupID = nil
+		routeGroup.FallbackGroupIDOnInvalidRequest = nil
+	}
 	copyKey.Group = &routeGroup
 	copyKey.GroupID = firstAPIKeyGroupID([]int64{attempt.Group.ID})
 	copyKey.RoutingBillingFloor = attempt.BillingFloor

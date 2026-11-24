@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	coderws "github.com/coder/websocket"
 )
 
@@ -88,6 +89,7 @@ func readOpenAIWSClientMessageWithTimeoutStart(
 	}()
 
 	closeAndJoin := func(status coderws.StatusCode, reason string, cause error) (coderws.MessageType, []byte, error) {
+		reason = errorprivacy.CloseReason(reason)
 		_ = conn.Close(status, reason)
 		_ = conn.CloseNow()
 		<-readDone

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	coderws "github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
@@ -538,11 +539,17 @@ func (s *OpenAIGatewayService) ProxyLiveSideband(
 		}
 	}()
 	go func() {
+		var publicProjector errorprivacy.Projector
 		for {
 			messageType, payload, readErr := upstream.ReadFrame(proxyCtx)
 			if readErr != nil {
 				errCh <- liveSidebandReadError(readErr)
 				return
+			}
+			if messageType == coderws.MessageText {
+				if projected, changed := publicProjector.JSON(payload, true); changed {
+					payload = projected
+				}
 			}
 			if writeErr := downstream.Write(proxyCtx, messageType, payload); writeErr != nil {
 				errCh <- writeErr

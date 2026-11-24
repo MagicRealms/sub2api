@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -86,7 +87,7 @@ func (s *OpenAIGatewayService) ForwardGrokVoice(ctx context.Context, c *gin.Cont
 	if account.IsGrokOAuth() && isGrokCLIProxyTarget(targetURL) {
 		applyGrokCLIHeaders(req.Header)
 	}
-	account.ApplyHeaderOverrides(req.Header)
+	account.ApplyHeaderOverrides(req.Context(), req.Header)
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
@@ -177,7 +178,7 @@ func (s *OpenAIGatewayService) OpenGrokRealtime(ctx context.Context, account *Ac
 	if account.IsGrokOAuth() && isGrokCLIProxyTarget(u.String()) {
 		applyGrokCLIHeaders(headers)
 	}
-	account.ApplyHeaderOverrides(headers)
+	account.ApplyHeaderOverrides(ctx, headers)
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
@@ -211,6 +212,7 @@ func (s *OpenAIGatewayService) ProxyGrokRealtimeConn(ctx context.Context, c *gin
 
 	// Upstream → client
 	go func() {
+		var publicProjector errorprivacy.Projector
 		for {
 			msg, readErr := conn.ReadMessage(ctx)
 			if readErr != nil {
@@ -219,6 +221,9 @@ func (s *OpenAIGatewayService) ProxyGrokRealtimeConn(ctx context.Context, c *gin
 			}
 			if grokRealtimeEventHasAudio(msg) {
 				audioObserved.Store(true)
+			}
+			if projected, changed := publicProjector.JSON(msg, true); changed {
+				msg = projected
 			}
 			if writeErr := client.Write(ctx, coderws.MessageText, msg); writeErr != nil {
 				errCh <- writeErr
@@ -282,7 +287,7 @@ func (s *OpenAIGatewayService) ProbeGrokRealtime(ctx context.Context, account *A
 	if account.IsGrokOAuth() && isGrokCLIProxyTarget(u.String()) {
 		applyGrokCLIHeaders(headers)
 	}
-	account.ApplyHeaderOverrides(headers)
+	account.ApplyHeaderOverrides(ctx, headers)
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()

@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/requestmodel"
 	openaiwsv2 "github.com/Wei-Shaw/sub2api/internal/service/openai_ws_v2"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -30,6 +31,7 @@ type openAIWSClientFrameConn struct {
 	// model identifier they supplied for the current turn.
 	restoreResponseModel func([]byte) []byte
 	restoreToolNames     func([]byte) []byte
+	publicProjector      errorprivacy.Projector
 }
 
 // openAIWSPolicyEnforcingFrameConn wraps a client-side FrameConn and runs
@@ -650,6 +652,9 @@ func (c *openAIWSClientFrameConn) WriteFrame(ctx context.Context, msgType coderw
 		}
 		if c.restoreToolNames != nil {
 			payload = c.restoreToolNames(payload)
+		}
+		if projected, changed := c.publicProjector.JSON(payload, true); changed {
+			payload = projected
 		}
 	}
 	return c.conn.Write(ctx, msgType, payload)
@@ -1279,7 +1284,7 @@ func (s *OpenAIGatewayService) proxyResponsesWebSocketV2Passthrough(
 				// Match the handler close path and stay within the WebSocket control
 				// frame limit; an oversized reason makes coder/websocket skip the
 				// close frame, leaving the client with EOF instead of the status code.
-				reason = truncateString(reason, 120)
+				reason = errorprivacy.CloseReason(reason)
 				_ = clientConn.Close(status, reason)
 				_ = clientConn.CloseNow()
 			},

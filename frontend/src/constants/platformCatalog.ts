@@ -6,7 +6,7 @@ import builtinCatalog from './platformCatalog.builtin.json'
  *
  * 平台选项、展示名、多协议账号表单的默认端点与分流规则都从这里读取。清单文件
  * platformCatalog.builtin.json 由后端测试 TestFrontendBuiltinPlatformCatalogInSync
- * 生成并校验与后端一致；前端随后端一同构建发布，无需运行时拉取。
+ * 生成公开投影；完整账号预设仅在管理员鉴权后从接口加载。
  */
 
 export type PlatformGateway = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
@@ -57,7 +57,7 @@ export const BUILTIN_PLATFORM_CATALOG: PlatformCatalog = builtinCatalog as Platf
 
 const catalogState = shallowRef<PlatformCatalog>(BUILTIN_PLATFORM_CATALOG)
 
-/** 替换当前清单（测试用于模拟新登记的平台）。 */
+/** 安装管理员目录，或在测试中替换清单。 */
 export function setPlatformCatalog(catalog: PlatformCatalog): void {
   catalogState.value = catalog
 }

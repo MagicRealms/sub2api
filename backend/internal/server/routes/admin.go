@@ -33,6 +33,10 @@ func RegisterAdminRoutes(
 	// 受限密钥的账户操作走独立资源校验，普通管理员保持原处理器。
 	admin.Use(h.Admin.Account.ScopedAdminKeyAccounts)
 	{
+		admin.GET("/platform-catalog", func(c *gin.Context) {
+			c.Header("Cache-Control", "private, no-store")
+			response.Success(c, service.BuildPlatformCatalog())
+		})
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)
 
@@ -369,6 +373,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/upstream-billing-probe/settings", h.Admin.Account.GetUpstreamBillingProbeSettings)
 		accounts.PUT("/upstream-billing-probe/settings", h.Admin.Account.UpdateUpstreamBillingProbeSettings)
 		accounts.POST("/upstream-billing-probe/batch", h.Admin.Account.ProbeUpstreamBillingBatch)
+		accounts.POST("/upstream-billing-probe/group-preview", h.Admin.Account.PreviewUpstreamGroup)
 		accounts.GET("/ollama-cloud-usage/settings", h.Admin.Account.GetOllamaCloudUsageSettings)
 		accounts.PUT("/ollama-cloud-usage/settings", h.Admin.Account.UpdateOllamaCloudUsageSettings)
 		accounts.GET("/opencode-go-usage/settings", h.Admin.Account.GetOpenCodeGoUsageSettings)
@@ -397,7 +402,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.PUT("/:id/opencode-go-usage/auto-refresh", h.Admin.Account.SetOpenCodeGoUsageAutoRefresh)
 		accounts.POST("/:id/opencode-go-usage/refresh", h.Admin.Account.RefreshOpenCodeGoUsage)
 		accounts.DELETE("/:id", h.Admin.Account.Delete)
-		accounts.POST("/:id/test", h.Admin.Account.Test)
+		accounts.POST("/:id/test", middleware.PublicErrorPrivacy(true), h.Admin.Account.Test)
 		accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 		accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
 		accounts.POST("/:id/apply-oauth-credentials", h.Admin.Account.ApplyOAuthCredentials)

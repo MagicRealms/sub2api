@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	"go.uber.org/zap"
 )
 
@@ -1206,6 +1207,9 @@ func BatchImageItemToPublic(item *BatchImageItem) BatchImagePublicItem {
 		Message: sanitizeBatchImagePublicMessage(batchImageDerefString(item.ErrorMessage)),
 		Source:  batchImageItemErrorSource(item),
 	}
+	if out.Error.Source == "provider" {
+		out.Error.Message = errorprivacy.UpstreamMessage(batchImageDerefString(item.ErrorMessage))
+	}
 	return out
 }
 
@@ -1411,7 +1415,7 @@ func sanitizeBatchImageMetadata(in map[string]string) map[string]string {
 }
 
 func sanitizeBatchImagePublicMessage(message string) string {
-	message = strings.TrimSpace(message)
+	message = errorprivacy.ScrubText(errorprivacy.Text(strings.TrimSpace(message)))
 	for _, marker := range []string{"gs://", "files/", "projects/"} {
 		if strings.Contains(message, marker) {
 			message = "upstream provider operation failed"

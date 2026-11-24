@@ -8,8 +8,8 @@ if [[ -n $(git status --porcelain --untracked-files=normal) ]]; then
   echo 'Commit or stash local changes before building a deployment image.' >&2
   exit 1
 fi
-version=${1:-$(cat backend/cmd/server/VERSION)-mr.${commit:0:12}}
-[[ "$version" =~ ^[A-Za-z0-9][A-Za-z0-9.+-]*$ ]] || exit 2
+version=${1:-$(cat backend/cmd/server/VERSION)}
+python3 deploy/validate-fork-version.py "$version"
 image="magicrealms/sub2api:$version"
 python3 deploy/tests/test_fork_deploy.py
 cache=${SUB2API_BUILD_CACHE:-$HOME/.cache/sub2api-fork}

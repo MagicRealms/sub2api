@@ -1,8 +1,8 @@
+import { ADMIN_PLATFORM_CATALOG as BUILTIN_PLATFORM_CATALOG } from '@/constants/__tests__/adminPlatformCatalog'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { AUTO_UPSTREAM_MODEL_SYNC_ONE_MINUTE_HOURS } from '@/constants/autoUpstreamModelSync'
 import {
-  BUILTIN_PLATFORM_CATALOG,
   resetPlatformCatalog,
   setPlatformCatalog
 } from '@/constants/platformCatalog'
@@ -102,6 +102,7 @@ function findModelRow(wrapper: ReturnType<typeof mountSelector>, modelId: string
 
 describe('ModelWhitelistSelector', () => {
   beforeEach(() => {
+    setPlatformCatalog(BUILTIN_PLATFORM_CATALOG)
     copyToClipboard.mockClear()
     showError.mockReset()
     showSuccess.mockReset()

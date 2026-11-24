@@ -1,3 +1,4 @@
+import { ADMIN_PLATFORM_CATALOG } from '@/constants/__tests__/adminPlatformCatalog'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
@@ -14,7 +15,10 @@ const {
   getUpstreamBillingProbeSettings,
   getAllProxies,
   getAllGroups,
+  getPlatformCatalog,
   refreshCredentials,
+  previewUpstreamGroup,
+  updateAccount,
   showError,
   showWarning
 } = vi.hoisted(() => ({
@@ -26,7 +30,10 @@ const {
   getUpstreamBillingProbeSettings: vi.fn(),
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
+  getPlatformCatalog: vi.fn(),
   refreshCredentials: vi.fn(),
+  previewUpstreamGroup: vi.fn(),
+  updateAccount: vi.fn(),
   showError: vi.fn(),
   showWarning: vi.fn()
 }))
@@ -44,10 +51,13 @@ vi.mock('@/api/admin', () => ({
       batchClearError: vi.fn(),
       batchRefresh: vi.fn(),
       toggleSchedulable: vi.fn(),
-      refreshCredentials
+      refreshCredentials,
+      previewUpstreamGroup,
+      update: updateAccount
     },
     proxies: { getAll: getAllProxies },
-    groups: { getAll: getAllGroups }
+    groups: { getAll: getAllGroups },
+    platformCatalog: { getPlatformCatalog }
   }
 }))
 
@@ -69,6 +79,7 @@ const DataTableStub = defineComponent({
   template: `
     <div>
       <template v-if="!loading"><div v-for="row in data" :key="row.id" :data-account-name="row.name">
+        <slot name="cell-name" :row="row" :value="row.name" />
         <slot name="cell-groups" :row="row" />
         <slot name="cell-usage" :row="row" />
         <slot name="cell-actions" :row="row" />
@@ -78,7 +89,7 @@ const DataTableStub = defineComponent({
 })
 
 const AccountGroupsCellStub = defineComponent({
-  props: { groups: { type: Array, default: () => [] } },
+  props: { groups: { type: Array, default: () => [] }, fallbackGroupIds: { type: Array, default: () => [] } },
   template: '<span data-test="account-groups">{{ groups.map(group => group.name).join(",") }}</span>'
 })
 
@@ -170,6 +181,7 @@ describe('admin AccountsView lite account list', () => {
     getBatchUsage.mockReset().mockResolvedValue({ usage: { '42': { five_hour: { utilization: 21 }, seven_day: { utilization: 31 } } }, errors: {} })
     getUpstreamBillingProbeSettings.mockReset().mockResolvedValue({ enabled: true })
     getAllProxies.mockReset().mockResolvedValue([])
+    getPlatformCatalog.mockReset().mockResolvedValue(ADMIN_PLATFORM_CATALOG)
     getAllGroups.mockReset().mockResolvedValue([{ id: 7, name: 'codex', platform: 'openai' }])
     refreshCredentials.mockReset()
     showError.mockReset()
@@ -179,6 +191,25 @@ describe('admin AccountsView lite account list', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
+  })
+
+  it('syncs the selected row without clearing notes missing from the upstream', async () => {
+    const account = { ...listRow, type: 'apikey', notes: 'local notes' }
+    listAccounts.mockResolvedValue({ items: [account], total: 1, page: 1, page_size: 20, pages: 1 })
+    previewUpstreamGroup.mockResolvedValueOnce({}).mockResolvedValueOnce({ name: 'New group' })
+    updateAccount.mockReset().mockResolvedValue({ ...account, name: 'New group' })
+    const wrapper = mountView()
+    await flushPromises()
+    const sync = wrapper.get('button[aria-label="admin.accounts.upstreamBilling.saveGroup"]')
+    await sync.trigger('click')
+    await flushPromises()
+    expect(updateAccount).not.toHaveBeenCalled()
+    await sync.trigger('click')
+    await flushPromises()
+    expect(previewUpstreamGroup).toHaveBeenLastCalledWith({ account_id: account.id })
+    expect(updateAccount).toHaveBeenCalledWith(account.id, { name: 'New group' })
+    expect(wrapper.find('[data-account-name="New group"]').exists()).toBe(true)
+    wrapper.unmount()
   })
 
   it.each([
@@ -270,12 +301,27 @@ describe('admin AccountsView lite account list', () => {
     wrapper.unmount()
   })
 
+  it('passes only enabled fallback memberships to the group labels', async () => {
+    const extra = { account_final_fallback_enabled: true, account_final_fallback_group_ids: [7] }
+    listAccounts.mockResolvedValue({ items: [{ ...listRow, extra }], total: 1, page: 1, page_size: 20, pages: 1 })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.getComponent(AccountGroupsCellStub).props('fallbackGroupIds')).toEqual([7])
+    wrapper.unmount()
+    listAccounts.mockResolvedValue({ items: [{ ...listRow, extra: { ...extra, account_final_fallback_enabled: false } }], total: 1, page: 1, page_size: 20, pages: 1 })
+    const disabled = mountView()
+    await flushPromises()
+    expect(disabled.getComponent(AccountGroupsCellStub).props('fallbackGroupIds')).toEqual([])
+    disabled.unmount()
+  })
+
   it('keeps the action menu open during internal scrolling but closes it on table scrolling', async () => {
     const wrapper = mountView(false)
     await flushPromises()
 
-    const trigger = wrapper.findAll('button').find(button => button.text() === 'common.more')!
+    const trigger = wrapper.get('[data-testid="account-action-trigger"]')
     await trigger.trigger('click')
+    await flushPromises()
     const menu = new DOMWrapper(document.body.querySelector('.action-menu-content')!)
     menu.element.dispatchEvent(new Event('scroll'))
     await flushPromises()

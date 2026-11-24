@@ -186,7 +186,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		UserAgent: c.GetHeader("User-Agent"),
 		APIKeyID:  apiKey.ID,
 	}
-	sessionHash := h.gatewayService.GenerateSessionHash(parsedReq)
+	sessionHash := service.FinalFallbackSessionHash(c.Request.Context(), h.gatewayService.GenerateSessionHash(parsedReq))
 	groupPlatform := effectiveAPIKeyPlatform(c, apiKey)
 	selectionSessionHash := sessionHash
 	if groupPlatform == service.PlatformGemini && selectionSessionHash != "" {

@@ -271,6 +271,7 @@ func (r *groupRepository) GetByID(ctx context.Context, id int64) (*service.Group
 		out.AccountCount = c.Total
 		out.ActiveAccountCount = c.Active
 		out.RateLimitedAccountCount = c.RateLimited
+		out.FallbackAccountCount = c.Fallback
 	}
 	return out, nil
 }
@@ -553,6 +554,7 @@ func (r *groupRepository) listWithFiltersQuery(ctx context.Context, q *dbent.Gro
 			outGroups[i].AccountCount = c.Total
 			outGroups[i].ActiveAccountCount = c.Active
 			outGroups[i].RateLimitedAccountCount = c.RateLimited
+			outGroups[i].FallbackAccountCount = c.Fallback
 		}
 	}
 
@@ -638,6 +640,7 @@ func (r *groupRepository) listWithAccountCountSort(ctx context.Context, q *dbent
 		g.AccountCount = c.Total
 		g.ActiveAccountCount = c.Active
 		g.RateLimitedAccountCount = c.RateLimited
+		g.FallbackAccountCount = c.Fallback
 		if idx, ok := pageIdx[g.ID]; ok {
 			outGroups[idx] = *g
 		}
@@ -724,6 +727,7 @@ func (r *groupRepository) ListActive(ctx context.Context) ([]service.Group, erro
 			outGroups[i].AccountCount = c.Total
 			outGroups[i].ActiveAccountCount = c.Active
 			outGroups[i].RateLimitedAccountCount = c.RateLimited
+			outGroups[i].FallbackAccountCount = c.Fallback
 		}
 	}
 
@@ -797,6 +801,7 @@ func (r *groupRepository) ListActiveByPlatform(ctx context.Context, platform str
 			outGroups[i].AccountCount = c.Total
 			outGroups[i].ActiveAccountCount = c.Active
 			outGroups[i].RateLimitedAccountCount = c.RateLimited
+			outGroups[i].FallbackAccountCount = c.Fallback
 		}
 	}
 
@@ -1029,6 +1034,7 @@ type groupAccountCounts struct {
 	Total       int64
 	Active      int64
 	RateLimited int64
+	Fallback    int64
 }
 
 const (
@@ -1064,7 +1070,10 @@ func (r *groupRepository) loadAccountCounts(ctx context.Context, groupIDs []int6
 		fmt.Sprintf(`SELECT ag.group_id,
 			COUNT(*) FILTER (WHERE a.deleted_at IS NULL) AS total,
 			COUNT(*) FILTER (WHERE %s) AS active,
-			COUNT(*) FILTER (WHERE %s) AS rate_limited
+			COUNT(*) FILTER (WHERE %s) AS rate_limited,
+			COUNT(*) FILTER (WHERE a.deleted_at IS NULL
+				AND a.extra @> '{"account_final_fallback_enabled":true}'::jsonb
+				AND (a.extra -> 'account_final_fallback_group_ids') @> jsonb_build_array(ag.group_id)) AS fallback
 		FROM account_groups ag
 		JOIN accounts a ON a.id = ag.account_id
 		WHERE ag.group_id = ANY($1)
@@ -1084,7 +1093,7 @@ func (r *groupRepository) loadAccountCounts(ctx context.Context, groupIDs []int6
 	for rows.Next() {
 		var groupID int64
 		var c groupAccountCounts
-		if err = rows.Scan(&groupID, &c.Total, &c.Active, &c.RateLimited); err != nil {
+		if err = rows.Scan(&groupID, &c.Total, &c.Active, &c.RateLimited, &c.Fallback); err != nil {
 			return nil, err
 		}
 		counts[groupID] = c

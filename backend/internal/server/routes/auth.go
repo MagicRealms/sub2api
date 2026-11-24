@@ -241,6 +241,7 @@ func RegisterAuthRoutes(
 	// 公开设置（无需认证）：每次请求都会查询 DB，按客户端 IP 兜底限流，
 	// 防止匿名高频刷接口打爆数据库（反代内部地址会被自动跳过，不会误伤）。
 	settings := v1.Group("/settings")
+	settings.Use(servermiddleware.PublicIdentity())
 	settings.Use(panelRateLimiter.PublicIP())
 	{
 		settings.GET("/public", h.Setting.GetPublicSettings)

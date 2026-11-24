@@ -1513,6 +1513,8 @@ func filterSchedulerExtra(extra map[string]any) map[string]any {
 		return nil
 	}
 	keys := []string{
+		service.AccountFinalFallbackEnabledKey,
+		service.AccountFinalFallbackGroupsKey,
 		// Anthropic shared-window and Fable-only threshold checks run on this
 		// projection. UpdateExtra refreshes both payloads without a bucket rebuild.
 		"session_window_utilization",

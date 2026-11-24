@@ -1,6 +1,10 @@
 package service
 
-import "time"
+import (
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
+)
 
 // UserErrorRequest 是面向终端用户的"错误请求"精简脱敏视图（白名单）。
 // 严禁包含 account / api_key_prefix / upstream_endpoint / user_email 等
@@ -102,19 +106,23 @@ func ToUserErrorRequest(e *OpsErrorLog) *UserErrorRequest {
 	if e.ClientIP != nil {
 		clientIP = *e.ClientIP
 	}
+	message := errorprivacy.Text(e.Message)
+	if e.Phase == "upstream" || e.Phase == "network" || e.Phase == "account_auth" || e.UpstreamEndpoint != "" {
+		message = errorprivacy.UpstreamMessage(e.Message)
+	}
 	return &UserErrorRequest{
 		ID:              e.ID,
 		CreatedAt:       e.CreatedAt,
-		Model:           model,
+		Model:           errorprivacy.ScrubText(model),
 		InboundEndpoint: e.InboundEndpoint,
 		StatusCode:      e.StatusCode,
 		Category:        MapUserErrorCategory(e.Phase, e.Type),
-		Platform:        e.Platform,
-		Message:         e.Message,
+		Platform:        errorprivacy.PublicPlatform(e.Platform),
+		Message:         message,
 		KeyName:         e.APIKeyName,
 		KeyDeleted:      e.APIKeyDeleted,
 		ClientIP:        clientIP,
-		GroupName:       e.GroupName,
+		GroupName:       errorprivacy.ScrubText(e.GroupName),
 		RequestType:     e.RequestType,
 		Stream:          e.Stream,
 		UserAgent:       e.UserAgent,
@@ -138,7 +146,7 @@ func ToUserErrorRequestDetail(e *OpsErrorLogDetail) *UserErrorRequestDetail {
 	base := ToUserErrorRequest(&e.OpsErrorLog)
 	return &UserErrorRequestDetail{
 		UserErrorRequest:   *base,
-		ErrorBody:          e.ErrorBody,
+		ErrorBody:          errorprivacy.Body(e.ErrorBody, true),
 		UpstreamStatusCode: e.UpstreamStatusCode,
 	}
 }

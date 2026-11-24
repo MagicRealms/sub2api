@@ -220,8 +220,8 @@
       }
     },
     {
-      "id": "sharellm",
-      "display_name": "ShareLLM 聚合",
+      "id": "route_relay",
+      "display_name": "路由中转",
       "gateway": "openai",
       "cn_provider": false,
       "multi_protocol": {
@@ -231,11 +231,7 @@
         "modes": [
           {
             "mode": "payg",
-            "base_urls": {
-              "anthropic": "https://sharellm.net",
-              "chat_completions": "https://sharellm.net/v1",
-              "responses": "https://sharellm.net/v1"
-            },
+            "base_urls": {},
             "protocol_rules": [
               {
                 "pattern": "claude-*",
@@ -322,7 +318,7 @@
     "deepseek",
     "minimax",
     "opencode_go",
-    "sharellm",
+    "route_relay",
     "typesafe",
     "command_code",
     "cline"

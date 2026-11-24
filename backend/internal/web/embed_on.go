@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 	"github.com/gin-gonic/gin"
 )
 
@@ -209,6 +210,7 @@ func (s *FrontendServer) serveIndexHTML(c *gin.Context) {
 }
 
 func (s *FrontendServer) injectSettings(settingsJSON []byte) []byte {
+	settingsJSON, _ = errorprivacy.ScrubJSON(settingsJSON)
 	// Create the script tag to inject with nonce placeholder
 	// The placeholder will be replaced with actual nonce at request time
 	script := []byte(`<script nonce="` + NonceHTMLPlaceholder + `">window.__APP_CONFIG__=` + string(settingsJSON) + `;</script>`)

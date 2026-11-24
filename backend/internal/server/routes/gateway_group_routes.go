@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -25,10 +26,10 @@ const orderedRouteResponseLimit = 64 << 10
 // deliberate: group permission, subscription, RPM, channel policy and admission
 // must all run again. No credential or group override is accepted from headers.
 func orderedKeyGroupRouting(engine *gin.Engine, keys *service.APIKeyService, gateway *handler.GatewayHandler) gin.HandlerFunc {
-	return orderedKeyGroupRoutingWithSupport(engine, keys, gateway.GroupRouteSupportsModel)
+	return orderedKeyGroupRoutingWithSupport(engine, keys, gateway.GroupRouteSupportsModel, gateway.HasGroupFinalFallback)
 }
 
-func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyService, supportsModel func(context.Context, *service.Group, string, string) (bool, error)) gin.HandlerFunc {
+func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyService, supportsModel func(context.Context, *service.Group, string, string) (bool, error), fallbackChecks ...func(context.Context, []int64) (bool, error)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if keys == nil || service.IsAPIKeyGroupRouteAttempt(c.Request.Context()) {
 			c.Next()
@@ -61,8 +62,16 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 		}
 		probeGroupID, pinnedProbe := service.InternalMonitorProbeGroup(c.Request.Context(), key.ID)
 		if len(key.OrderedGroupIDs()) < 2 && !pinnedProbe {
-			c.Next()
-			return
+			// Keep unconfigured single-group keys on their original path. Only
+			// configured reserve accounts require buffering a final error response.
+			configured := false
+			if c.Request.Method == http.MethodPost && len(fallbackChecks) > 0 {
+				configured, _ = fallbackChecks[0](c.Request.Context(), key.OrderedGroupIDs())
+			}
+			if !configured {
+				c.Next()
+				return
+			}
 		}
 		// Let normal authentication report disabled keys/users before performing
 		// any group or model queries on their behalf.
@@ -121,17 +130,22 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 		}
 		c.Request = c.Request.WithContext(service.WithAPIKeyGroupRoutePricingAt(c.Request.Context(), time.Now()))
 		replay := orderedRouteCanReplay(path)
+		finalFallback := replay && !pinnedProbe && len(fallbackChecks) > 0 && accountFinalFallbackCanReplay(path, body)
 		var floor *service.Group
 		var pending *orderedRouteResponse
+		fallbackState := service.NewAccountFinalFallbackState()
+		fallbackEligible := false
+		eligibleGroups := make([]*service.Group, 0, len(groups))
 		for _, group := range groups {
 			if c.Request.Context().Err() != nil {
 				break
 			}
 			// Capability is loaded only as a group is reached. A successful first
 			// route must not depend on every unused fallback's account catalog.
-			if !isModels {
+			if !isModels && len(key.OrderedGroupIDs()) > 1 {
 				supports, catalogErr := supportsModel(c.Request.Context(), group, model, path)
 				if catalogErr != nil {
+					fallbackEligible = false
 					pending = newOrderedRouteResponse(c.Writer)
 					pending.Header().Set("Content-Type", "application/json")
 					pending.WriteHeader(http.StatusServiceUnavailable)
@@ -152,6 +166,7 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 			}
 			ctx, release := pkghttputil.WithRequestBodyMemoryScope(c.Request.Context())
 			if err := pkghttputil.ReserveRequestBodyMemory(ctx, int64(len(body))); err != nil {
+				fallbackEligible = false
 				release()
 				pending = newOrderedRouteResponse(c.Writer)
 				pending.Header().Set("Content-Type", "application/json")
@@ -160,6 +175,9 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 				break
 			}
 			ctx = service.WithAPIKeyGroupRoute(ctx, key.ID, group, floor, model)
+			if finalFallback {
+				ctx = service.WithAccountFinalFallbackAttempt(ctx, fallbackState, group, false)
+			}
 			if isModels {
 				ctx = service.WithAPIKeyRouteDiscovery(ctx, groups)
 			}
@@ -171,7 +189,56 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 			release()
 			pending = response
 			if !replay || service.APIKeyGroupRouteBilled(ctx) || isModels || !response.canRetry() {
+				fallbackEligible = false
 				break
+			}
+			fallbackEligible = service.AccountFinalFallbackEligible(ctx)
+			if fallbackEligible {
+				eligibleGroups = append(eligibleGroups, group)
+			}
+		}
+		// Every normal group keeps its existing account retries and switch limit.
+		// Reserve attempts have a separate, shared, three-account request budget.
+		if fallbackEligible && finalFallback && len(eligibleGroups) > 0 && c.Request.Context().Err() == nil {
+			for _, group := range eligibleGroups {
+				if c.Request.Context().Err() != nil || fallbackState.Attempts() >= service.MaxAccountFinalFallbackAttempts {
+					break
+				}
+				hasReserve, lookupErr := fallbackChecks[0](c.Request.Context(), []int64{group.ID})
+				if lookupErr != nil {
+					break
+				}
+				if !hasReserve {
+					continue
+				}
+				supports, supportErr := supportsModel(c.Request.Context(), group, model, path)
+				if supportErr != nil {
+					break
+				}
+				if !supports {
+					continue
+				}
+				ctx, release := pkghttputil.WithRequestBodyMemoryScope(c.Request.Context())
+				if pkghttputil.ReserveRequestBodyMemory(ctx, int64(len(body))) != nil {
+					release()
+					break
+				}
+				ctx = service.WithAPIKeyGroupRoute(ctx, key.ID, group, floor, model)
+				ctx = service.WithAccountFinalFallbackAttempt(ctx, fallbackState, group, true)
+				req := c.Request.Clone(ctx)
+				req.Body = pkghttputil.NewPrereadBody(bytes.Clone(body))
+				req.ContentLength = int64(len(body))
+				response := newOrderedRouteResponse(c.Writer)
+				before := fallbackState.Attempts()
+				engine.ServeHTTP(response, req)
+				release()
+				if fallbackState.Attempts() > before || !response.canRetry() || service.APIKeyGroupRouteBilled(ctx) {
+					pending = response
+					slog.InfoContext(ctx, "gateway.account_final_fallback", "group_id", group.ID, "attempts", fallbackState.Attempts()-before, "status", response.status)
+				}
+				if service.APIKeyGroupRouteBilled(ctx) || !response.canRetry() {
+					break
+				}
 			}
 		}
 		if pending != nil {
@@ -225,6 +292,34 @@ func orderedRouteCanReplay(path string) bool {
 		}
 	}
 	return false
+}
+
+func accountFinalFallbackCanReplay(path string, body []byte) bool {
+	// A successful retry must be able to carry the whole request to a different
+	// upstream account. Avoid replaying requests tied to remote state.
+	if strings.HasSuffix(path, "/responses/input_tokens") || strings.HasSuffix(path, "/count_tokens") || strings.HasSuffix(path, ":countTokens") {
+		return false
+	}
+	for _, field := range []string{"previous_response_id", "conversation", "cachedContent", "cached_content"} {
+		if value := gjson.GetBytes(body, field); value.Exists() && value.Type != gjson.Null && value.String() != "" {
+			return false
+		}
+	}
+	for _, field := range []string{"input", "messages"} {
+		bound := false
+		gjson.GetBytes(body, field).ForEach(func(_, item gjson.Result) bool {
+			switch item.Get("type").String() {
+			case "function_call_output", "custom_tool_call_output", "computer_call_output", "mcp_approval_response":
+				bound = true
+				return false
+			}
+			return true
+		})
+		if bound {
+			return false
+		}
+	}
+	return true
 }
 
 type orderedRouteResponse struct {

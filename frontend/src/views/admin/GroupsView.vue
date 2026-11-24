@@ -277,6 +277,13 @@
 
           <template #cell-account_count="{ row }">
             <div class="space-y-0.5 text-xs">
+              <div v-if="row.fallback_account_count" class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span class="text-gray-500 dark:text-gray-400">{{ t('admin.groups.accountsNormal') }} {{ Math.max(0, (row.account_count || 0) - row.fallback_account_count) }}</span>
+                <span
+                  class="rounded border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-300"
+                  :title="t('admin.groups.accountsFallbackHint')"
+                >{{ t('admin.groups.accountsFallback') }} {{ row.fallback_account_count }}</span>
+              </div>
               <div>
                 <span class="text-gray-500 dark:text-gray-400">{{
                   t("admin.groups.accountsAvailable")

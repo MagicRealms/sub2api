@@ -27,6 +27,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -3610,6 +3611,9 @@ func (h *OpenAIGatewayHandler) handleConcurrencyError(c *gin.Context, err error,
 }
 
 func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, streamStarted bool) {
+	if c.Request != nil {
+		service.MarkAccountFinalFallbackUpstreamFailure(c.Request.Context(), failoverErr)
+	}
 	if failoverErr == nil {
 		h.handleFailoverExhaustedSimple(c, http.StatusBadGateway, streamStarted)
 		return
@@ -4101,10 +4105,7 @@ func closeOpenAIClientWS(conn *coderws.Conn, status coderws.StatusCode, reason s
 	if conn == nil {
 		return
 	}
-	reason = strings.TrimSpace(reason)
-	if len(reason) > 120 {
-		reason = reason[:120]
-	}
+	reason = errorprivacy.CloseReason(reason)
 	_ = conn.Close(status, reason)
 	_ = conn.CloseNow()
 }

@@ -13,7 +13,7 @@
         ]"
         :title="versionWarning ? t('version.checkFailed') : hasUpdate ? t(isReleaseBuild ? 'version.updateAvailable' : 'version.upstreamUpdateAvailable') : t('version.upToDate')"
       >
-        <span v-if="currentVersion" class="truncate font-medium" :title="`v${currentVersion}`">v{{ currentVersion }}</span>
+        <span v-if="currentVersion" class="truncate font-medium" :title="displayVersion">{{ displayVersion }}</span>
         <span
           v-else
           class="h-3 w-12 animate-pulse rounded bg-gray-200 font-medium dark:bg-dark-600"
@@ -82,7 +82,7 @@
                   <span
                     v-if="currentVersion"
                     class="text-2xl font-bold text-gray-900 dark:text-white"
-                    >v{{ currentVersion }}</span
+                    >{{ displayVersion }}</span
                   >
                   <span v-else class="text-2xl font-bold text-gray-400 dark:text-dark-500">--</span>
                   <!-- Show check mark when up to date -->
@@ -686,6 +686,7 @@ const versionTrigger = ref<HTMLElement | null>(null)
 // Use store's cached version state
 const loading = computed(() => appStore.versionLoading)
 const currentVersion = computed(() => appStore.currentVersion || props.version || '')
+const displayVersion = computed(() => currentVersion.value ? `v${currentVersion.value.replace(/^v/, '')}` : '')
 const latestVersion = computed(() => appStore.latestVersion)
 const hasUpdate = computed(() => appStore.hasUpdate)
 const releaseInfo = computed(() => appStore.releaseInfo)

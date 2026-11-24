@@ -3,7 +3,6 @@
 package service
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -37,7 +36,7 @@ func TestBuildBalanceLowEmailBody_WithRechargeURL(t *testing.T) {
 
 	// The recharge anchor element should appear with the URL.
 	require.Contains(t, body, `href="https://example.com/pay"`)
-	require.Contains(t, body, "立即充值")
+	require.Contains(t, body, "查看余额并充值")
 	require.NotContains(t, body, "%!")
 }
 
@@ -126,22 +125,13 @@ func TestBuildQuotaAlertEmailBody_RemainingClampedAtZero(t *testing.T) {
 	require.Contains(t, body, "$0.00")
 }
 
-// ---------- sanity checks on the CSS `%%` escape ----------
-
-func TestBuildBalanceLowEmailBody_NoCSSFormatError(t *testing.T) {
+func TestBalanceEmailsUseSunworldBrand(t *testing.T) {
 	s := &BalanceNotifyService{}
-	body := s.buildBalanceLowEmailBody("u", 1.0, 5.0, "Site", "")
-	// CSS `linear-gradient(135deg, #f59e0b 0%, #d97706 100%)` should appear with
-	// literal percent signs (from the %% escape in the template).
-	require.True(t,
-		strings.Contains(body, "0%") && strings.Contains(body, "100%"),
-		"CSS gradient percentages not rendered; got: %s", body)
-}
-
-func TestBuildQuotaAlertEmailBody_NoCSSFormatError(t *testing.T) {
-	s := &BalanceNotifyService{}
-	body := s.buildQuotaAlertEmailBody(1, "n", "p", "d", 0, 0, 0, "$0.00", "Site")
-	require.True(t,
-		strings.Contains(body, "0%") && strings.Contains(body, "100%"),
-		"CSS gradient percentages not rendered; got: %s", body)
+	lowBalance := s.buildBalanceLowEmailBody("u", 1.0, 5.0, "Site", "")
+	quota := s.buildQuotaAlertEmailBody(1, "n", "p", "d", 0, 0, 0, "$0.00", "Site")
+	for _, body := range []string{lowBalance, quota} {
+		require.Contains(t, body, "SUNWORLD")
+		require.Contains(t, body, "太阳新世界")
+		require.Contains(t, body, "#edf7f3")
+	}
 }

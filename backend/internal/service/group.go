@@ -144,6 +144,7 @@ type Group struct {
 	AccountCount            int64
 	ActiveAccountCount      int64
 	RateLimitedAccountCount int64
+	FallbackAccountCount    int64
 }
 
 // IsGroupBindableInSimpleMode is the shared policy for groups that may be

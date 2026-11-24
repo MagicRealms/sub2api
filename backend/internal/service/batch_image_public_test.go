@@ -658,7 +658,7 @@ func TestBatchImagePublicService_StatusItemsAndCancel(t *testing.T) {
 		require.Len(t, filtered.Data, 1)
 		require.Equal(t, "failed", filtered.Data[0].Status)
 		require.NotNil(t, filtered.Data[0].Error)
-		require.Equal(t, "upstream provider operation failed", filtered.Data[0].Error.Message)
+		require.Contains(t, filtered.Data[0].Error.Message, "codex.magicrealms.top")
 
 		body, err := json.Marshal(filtered)
 		require.NoError(t, err)

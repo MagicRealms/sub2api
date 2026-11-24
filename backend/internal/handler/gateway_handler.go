@@ -295,7 +295,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		UserAgent: c.GetHeader("User-Agent"),
 		APIKeyID:  apiKey.ID,
 	}
-	sessionHash := h.gatewayService.GenerateSessionHash(parsedReq)
+	sessionHash := service.FinalFallbackSessionHash(c.Request.Context(), h.gatewayService.GenerateSessionHash(parsedReq))
 
 	// [DEBUG-STICKY] 打印会话 hash 生成结果
 	reqLog.Info("sticky.session_hash_generated",
@@ -1943,6 +1943,9 @@ func (h *GatewayHandler) handleConcurrencyError(c *gin.Context, err error, slotT
 }
 
 func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, platform string, streamStarted bool) {
+	if c.Request != nil {
+		service.MarkAccountFinalFallbackUpstreamFailure(c.Request.Context(), failoverErr)
+	}
 	copyFailoverRetryAfter(c, failoverErr.ResponseHeaders)
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody

@@ -111,6 +111,10 @@ func TestNotificationEmailAuthTemplatesAreListedAndPreviewable(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, verifyPreview.Subject, "邮箱验证码")
 	require.Contains(t, verifyPreview.HTML, "654321")
+	require.Contains(t, verifyPreview.HTML, "SUNWORLD")
+	require.Contains(t, verifyPreview.HTML, "太阳新世界")
+	require.Contains(t, verifyPreview.HTML, "#edf7f3")
+	require.Contains(t, verifyPreview.HTML, "https://codex.magicrealms.top/sunworld-email-avatar.png")
 
 	resetPreview, err := svc.PreviewTemplate(ctx, NotificationEmailPreviewInput{
 		Event:  NotificationEmailEventAuthPasswordReset,
@@ -123,6 +127,31 @@ func TestNotificationEmailAuthTemplatesAreListedAndPreviewable(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, resetPreview.Subject, "Password reset")
 	require.Contains(t, resetPreview.HTML, "https://example.com/reset?token=abc")
+	require.Contains(t, resetPreview.HTML, "SUNWORLD")
+}
+
+func TestCustomerEmailTemplatesUseSunworldFrame(t *testing.T) {
+	ctx := context.Background()
+	svc := NewNotificationEmailService(newNotificationEmailMemorySettingRepo(), nil)
+	events := []string{
+		NotificationEmailEventAuthVerifyCode,
+		NotificationEmailEventAuthPasswordReset,
+		NotificationEmailEventNotificationEmailVerifyCode,
+		NotificationEmailEventSubscriptionPurchaseSuccess,
+		NotificationEmailEventSubscriptionExpiryReminder,
+		NotificationEmailEventBalanceLow,
+		NotificationEmailEventBalanceRechargeSuccess,
+	}
+	for _, locale := range []string{"zh", "en"} {
+		for _, event := range events {
+			preview, err := svc.PreviewTemplate(ctx, NotificationEmailPreviewInput{Event: event, Locale: locale})
+			require.NoErrorf(t, err, "%s/%s", event, locale)
+			require.Containsf(t, preview.HTML, "SUNWORLD", "%s/%s", event, locale)
+			require.Containsf(t, preview.HTML, "太阳新世界", "%s/%s", event, locale)
+			require.Containsf(t, preview.HTML, "#edf7f3", "%s/%s", event, locale)
+			require.Containsf(t, preview.HTML, "sunworld-email-avatar.png", "%s/%s", event, locale)
+		}
+	}
 }
 
 func TestNotificationEmailAdditionalEventsAreListedAndPreviewable(t *testing.T) {

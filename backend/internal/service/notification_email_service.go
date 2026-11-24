@@ -1157,139 +1157,140 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 var notificationEmailOfficialTemplates = map[string]map[string]notificationEmailOfficialTemplate{
 	NotificationEmailEventAuthVerifyCode: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Email verification code",
+			Subject: "[Sunworld] Email verification code",
 			HTML: notificationEmailCard("#4f46e5", "Email verification code", `
-<p>Hello {{recipient_name}},</p>
-<p>Your verification code is:</p>
-<p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center;">{{verification_code}}</p>
-<p>This code expires in <strong>{{expires_in_minutes}}</strong> minutes.</p>
-<p>If you did not request this code, please ignore this email.</p>`),
+			<p>Hello {{recipient_name}},</p>
+			<p>Use this code to finish verifying your email address.</p>
+			<p style="margin:24px 0;padding:17px 20px;border-radius:8px;background:#f4f8f6;color:#164f49;text-align:center;font-size:30px;font-weight:800;letter-spacing:7px;">{{verification_code}}</p>
+			<p>This code expires in <strong>{{expires_in_minutes}} minutes</strong>. For your security, do not share it with anyone.</p>
+			<p class="muted">If you did not request this code, you can safely ignore this email.</p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 邮箱验证码",
+			Subject: "{{site_name}}｜邮箱验证码",
 			HTML: notificationEmailCard("#4f46e5", "邮箱验证码", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的验证码是：</p>
-<p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center;">{{verification_code}}</p>
-<p>验证码将在 <strong>{{expires_in_minutes}}</strong> 分钟后失效。</p>
-<p>如果不是您本人操作，请忽略此邮件。</p>`),
+<p>请输入以下验证码，完成本次邮箱验证。</p>
+<p style="margin:24px 0;padding:17px 20px;border-radius:8px;background:#f4f8f6;color:#164f49;text-align:center;font-size:30px;font-weight:800;letter-spacing:7px;">{{verification_code}}</p>
+<p>验证码将在 <strong>{{expires_in_minutes}} 分钟</strong>后失效。为保障账号安全，请勿向任何人透露。</p>
+<p class="muted">如果不是您本人操作，请忽略此邮件。</p>`),
 		},
 	},
 	NotificationEmailEventAuthPasswordReset: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Password reset request",
+			Subject: "[Sunworld] Password reset link",
 			HTML: notificationEmailCard("#7c3aed", "Password reset", `
 <p>Hello {{recipient_name}},</p>
-<p>We received a request to reset your password. Click the button below to set a new password.</p>
-<p><a class="button" href="{{reset_url}}">Reset password</a></p>
-<p>This link expires in <strong>{{expires_in_minutes}}</strong> minutes.</p>
-<p class="muted">If the button does not work, copy this link into your browser:<br>{{reset_url}}</p>
-<p>If you did not request this, you can safely ignore this email.</p>`),
+			<p>We received a request to change the password for your Sunworld account.</p>
+			<p style="margin:24px 0;"><a class="button" href="{{reset_url}}">Choose a new password</a></p>
+			<p>This secure link expires in <strong>{{expires_in_minutes}} minutes</strong> and can only be used once.</p>
+			<p class="muted">If the button does not open, copy this address into your browser:<br>{{reset_url}}</p>
+			<p class="muted">If you did not request a password change, ignore this message. Your current password remains unchanged.</p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 密码重置请求",
+			Subject: "{{site_name}}｜密码重置",
 			HTML: notificationEmailCard("#7c3aed", "密码重置", `
 <p>{{recipient_name}}，您好：</p>
-<p>我们收到了您的密码重置请求，请点击下方按钮设置新密码。</p>
-<p><a class="button" href="{{reset_url}}">重置密码</a></p>
-<p>此链接将在 <strong>{{expires_in_minutes}}</strong> 分钟后失效。</p>
-<p class="muted">如果按钮无法点击，请复制以下链接到浏览器中打开：<br>{{reset_url}}</p>
-<p>如果不是您本人操作，请忽略此邮件。</p>`),
+			<p>我们收到了您的密码重置请求。请通过下方安全链接设置新密码。</p>
+			<p style="margin:24px 0;"><a class="button" href="{{reset_url}}">设置新密码</a></p>
+			<p>此链接将在 <strong>{{expires_in_minutes}} 分钟</strong>后失效，且仅可使用一次。</p>
+			<p class="muted">如果按钮无法打开，请复制以下地址到浏览器：<br>{{reset_url}}</p>
+			<p class="muted">如果不是您本人操作，请忽略此邮件；您的当前密码不会因此改变。</p>`),
 		},
 	},
 	NotificationEmailEventNotificationEmailVerifyCode: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Notification email verification code",
+			Subject: "[Sunworld] Verify your notification email",
 			HTML: notificationEmailCard("#0ea5e9", "Notification email verification", `
 <p>Hello {{recipient_name}},</p>
-<p>You are adding this address as an extra notification email.</p>
-<p>Your verification code is:</p>
-<p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center;">{{verification_code}}</p>
-<p>This code expires in <strong>{{expires_in_minutes}}</strong> minutes.</p>
-<p>If you did not request this code, please ignore this email.</p>`),
+			<p>You are adding this address to receive account notifications.</p>
+			<p style="margin:24px 0;padding:17px 20px;border-radius:8px;background:#f4f8f6;color:#164f49;text-align:center;font-size:30px;font-weight:800;letter-spacing:7px;">{{verification_code}}</p>
+			<p>This code expires in <strong>{{expires_in_minutes}} minutes</strong>. Do not share it with anyone.</p>
+			<p class="muted">If you did not request this change, ignore this email.</p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 通知邮箱验证码",
+			Subject: "{{site_name}}｜验证通知邮箱",
 			HTML: notificationEmailCard("#0ea5e9", "通知邮箱验证", `
 <p>{{recipient_name}}，您好：</p>
-<p>您正在添加额外的通知邮箱，请输入以下验证码完成验证。</p>
-<p style="font-size: 32px; font-weight: 700; letter-spacing: 8px; text-align: center;">{{verification_code}}</p>
-<p>验证码将在 <strong>{{expires_in_minutes}}</strong> 分钟后失效。</p>
-<p>如果不是您本人操作，请忽略此邮件。</p>`),
+			<p>您正在添加此邮箱用于接收账号通知，请输入下方验证码完成验证。</p>
+			<p style="margin:24px 0;padding:17px 20px;border-radius:8px;background:#f4f8f6;color:#164f49;text-align:center;font-size:30px;font-weight:800;letter-spacing:7px;">{{verification_code}}</p>
+			<p>验证码将在 <strong>{{expires_in_minutes}} 分钟</strong>后失效，请勿向他人透露。</p>
+			<p class="muted">如果不是您本人操作，请忽略此邮件。</p>`),
 		},
 	},
 	NotificationEmailEventSubscriptionPurchaseSuccess: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Subscription purchase successful",
+			Subject: "[Sunworld] Your subscription is ready",
 			HTML: notificationEmailCard("#2563eb", "Subscription activated", `
 <p>Hello {{recipient_name}},</p>
-<p>Your subscription for <strong>{{subscription_group}}</strong> has been activated for <strong>{{subscription_days}}</strong> days.</p>
-<p>Expiry time: <strong>{{expiry_time}}</strong></p>
-<p>Order ID: {{order_id}}</p>`),
+			<p>Your <strong>{{subscription_group}}</strong> subscription is active. You are all set to continue.</p>
+			<p style="padding:16px 18px;border-radius:8px;background:#f4f8f6;">Term: <strong>{{subscription_days}} days</strong><br>Expires: <strong>{{expiry_time}}</strong></p>
+			<p class="muted">Order reference: {{order_id}}</p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 订阅购买成功",
+			Subject: "{{site_name}}｜订阅已开通",
 			HTML: notificationEmailCard("#2563eb", "订阅已开通", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的 <strong>{{subscription_group}}</strong> 订阅已成功开通，有效期 <strong>{{subscription_days}}</strong> 天。</p>
-<p>到期时间：<strong>{{expiry_time}}</strong></p>
-<p>订单号：{{order_id}}</p>`),
+			<p>您的 <strong>{{subscription_group}}</strong> 服务已开通，可以开始使用了。</p>
+			<p style="padding:16px 18px;border-radius:8px;background:#f4f8f6;">有效期：<strong>{{subscription_days}} 天</strong><br>到期时间：<strong>{{expiry_time}}</strong></p>
+			<p class="muted">订单编号：{{order_id}}</p>`),
 		},
 	},
 	NotificationEmailEventSubscriptionExpiryReminder: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Subscription expires in {{days_remaining}} day(s)",
+			Subject: "[Sunworld] Subscription expiry reminder",
 			HTML: notificationEmailCard("#f97316", "Subscription expiry reminder", `
 <p>Hello {{recipient_name}},</p>
-<p>Your <strong>{{subscription_group}}</strong> subscription will expire in <strong>{{days_remaining}}</strong> day(s).</p>
-<p>Expiry time: <strong>{{expiry_time}}</strong></p>
-<p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from optional subscription reminders</a></p>`),
+			<p>Your <strong>{{subscription_group}}</strong> subscription is approaching its expiry date.</p>
+			<p style="padding:16px 18px;border-radius:8px;background:#fff8e8;">Time remaining: <strong>{{days_remaining}} days</strong><br>Expires: <strong>{{expiry_time}}</strong></p>
+			<p>Please review your plan before it expires to avoid an interruption.</p>
+			<p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from optional subscription reminders</a></p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 订阅将在 {{days_remaining}} 天后到期",
+			Subject: "{{site_name}}｜订阅到期提醒",
 			HTML: notificationEmailCard("#f97316", "订阅到期提醒", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的 <strong>{{subscription_group}}</strong> 订阅将在 <strong>{{days_remaining}}</strong> 天后到期。</p>
-<p>到期时间：<strong>{{expiry_time}}</strong></p>
-<p class="muted"><a href="{{unsubscribe_url}}">退订此类订阅提醒</a></p>`),
+			<p>您的 <strong>{{subscription_group}}</strong> 服务即将到期。</p>
+			<p style="padding:16px 18px;border-radius:8px;background:#fff8e8;">剩余时间：<strong>{{days_remaining}} 天</strong><br>到期时间：<strong>{{expiry_time}}</strong></p>
+			<p>建议您提前查看订阅状态，避免服务中断。</p>
+			<p class="muted"><a href="{{unsubscribe_url}}">退订此类订阅提醒</a></p>`),
 		},
 	},
 	NotificationEmailEventBalanceLow: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Low balance alert",
+			Subject: "[Sunworld] Balance running low",
 			HTML: notificationEmailCard("#d97706", "Low balance alert", `
 <p>Hello {{recipient_name}},</p>
-<p>Your current balance is <strong>${{current_balance}}</strong>, below the configured alert threshold of <strong>${{threshold}}</strong>.</p>
-<p>Please recharge in time to avoid service interruption.</p>
-<p><a class="button" href="{{recharge_url}}">Recharge now</a></p>
+<p>Your available balance is <strong>${{current_balance}}</strong>, below your alert threshold of <strong>${{threshold}}</strong>.</p>
+<p>Top up when convenient to keep your service running without interruption.</p>
+<p><a class="button" href="{{recharge_url}}">View balance and recharge</a></p>
 <p class="muted"><a href="{{unsubscribe_url}}">Unsubscribe from optional balance alerts</a></p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 余额不足提醒",
+			Subject: "{{site_name}}｜余额提醒",
 			HTML: notificationEmailCard("#d97706", "余额不足提醒", `
 <p>{{recipient_name}}，您好：</p>
-<p>您当前余额为 <strong>${{current_balance}}</strong>，已低于提醒阈值 <strong>${{threshold}}</strong>。</p>
-<p>请及时充值以免服务中断。</p>
-<p><a class="button" href="{{recharge_url}}">立即充值</a></p>
+<p>您当前可用余额为 <strong>${{current_balance}}</strong>，已低于设定的提醒阈值 <strong>${{threshold}}</strong>。</p>
+<p>您可以在方便时充值，避免后续使用受到影响。</p>
+<p><a class="button" href="{{recharge_url}}">查看余额并充值</a></p>
 <p class="muted"><a href="{{unsubscribe_url}}">退订此类余额提醒</a></p>`),
 		},
 	},
 	NotificationEmailEventBalanceRechargeSuccess: {
 		notificationEmailDefaultLocale: {
-			Subject: "[{{site_name}}] Balance recharge successful",
+			Subject: "[Sunworld] Balance recharge complete",
 			HTML: notificationEmailCard("#16a34a", "Recharge successful", `
 <p>Hello {{recipient_name}},</p>
-<p>Your balance recharge of <strong>${{recharge_amount}}</strong> has been completed.</p>
-<p>Current balance: <strong>${{current_balance}}</strong></p>
-<p>Order ID: {{order_id}}</p>`),
+			<p>Your recharge of <strong>${{recharge_amount}}</strong> has been completed successfully.</p>
+			<p style="padding:16px 18px;border-radius:8px;background:#f4f8f6;">Available balance: <strong>${{current_balance}}</strong></p>
+			<p class="muted">Order reference: {{order_id}}</p>`),
 		},
 		notificationEmailLocaleChinese: {
-			Subject: "[{{site_name}}] 余额充值成功",
+			Subject: "{{site_name}}｜充值已到账",
 			HTML: notificationEmailCard("#16a34a", "余额充值成功", `
 <p>{{recipient_name}}，您好：</p>
-<p>您的余额充值 <strong>${{recharge_amount}}</strong> 已完成。</p>
-<p>当前余额：<strong>${{current_balance}}</strong></p>
-			<p>订单号：{{order_id}}</p>`),
+			<p>您的 <strong>${{recharge_amount}}</strong> 充值已成功到账。</p>
+			<p style="padding:16px 18px;border-radius:8px;background:#f4f8f6;">当前可用余额：<strong>${{current_balance}}</strong></p>
+			<p class="muted">订单编号：{{order_id}}</p>`),
 		},
 	},
 	NotificationEmailEventAccountQuotaAlert: {
@@ -1446,12 +1447,12 @@ func notificationEmailOpsScheduledReportTemplate(locale string) string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; padding: 24px 12px; background: #f4f6f8; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
-    .container { width: 100%; max-width: 680px; margin: 0 auto; background: #ffffff; border: 1px solid #dfe7ea; border-radius: 8px; overflow: hidden; }
-    .header { padding: 28px 32px 24px; background: #0f766e; color: #ffffff; }
-    .eyebrow { margin: 0 0 8px; color: #ccfbf1; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
-    h1 { margin: 0; font-size: 26px; line-height: 1.3; }
-    .header p { margin: 8px 0 0; color: #e6fffb; font-size: 14px; }
+    body { margin: 0; padding: 24px 12px; background: #f5f9f8; color: #30494b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .container { width: 100%; max-width: 680px; margin: 0 auto; background: #ffffff; border: 1px solid #dfeae6; border-radius: 14px; overflow: hidden; }
+    .header { padding: 26px 32px 24px; background: #edf7f3; color: #29484a; border-top: 4px solid #e8c778; }
+    .eyebrow { margin: 0 0 8px; color: #628984; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+    h1 { margin: 0; color: #29484a; font-size: 25px; line-height: 1.3; }
+    .header p { margin: 8px 0 0; color: #718987; font-size: 14px; }
     .content { padding: 28px 32px 32px; }
     .meta { width: 100%; margin: 0 0 20px; border-collapse: collapse; background: #f8fafc; border: 1px solid #e2e8f0; }
     .meta td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; vertical-align: top; }
@@ -1483,6 +1484,7 @@ func notificationEmailOpsScheduledReportTemplate(locale string) string {
 <body>
   <div class="container">
     <div class="header">
+      <p style="margin:0 0 18px;color:#29484a;font-size:13px;font-weight:700;"><img src="https://codex.magicrealms.top/sunworld-email-avatar.png" width="38" height="38" alt="太阳新世界" style="width:38px;height:38px;margin-right:10px;vertical-align:middle;border:0;border-radius:10px;">SUNWORLD <span style="color:#718987;font-weight:500;">· 太阳新世界</span></p>
       <p class="eyebrow">运维报表</p>
       <h1>{{report_name}}</h1>
       <p>{{site_name}} 的运行概览</p>
@@ -1541,12 +1543,12 @@ func notificationEmailOpsScheduledReportTemplate(locale string) string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; padding: 24px 12px; background: #f4f6f8; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    .container { width: 100%; max-width: 680px; margin: 0 auto; background: #ffffff; border: 1px solid #dfe7ea; border-radius: 8px; overflow: hidden; }
-    .header { padding: 28px 32px 24px; background: #0f766e; color: #ffffff; }
-    .eyebrow { margin: 0 0 8px; color: #ccfbf1; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
-    h1 { margin: 0; font-size: 26px; line-height: 1.3; }
-    .header p { margin: 8px 0 0; color: #e6fffb; font-size: 14px; }
+    body { margin: 0; padding: 24px 12px; background: #f5f9f8; color: #30494b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .container { width: 100%; max-width: 680px; margin: 0 auto; background: #ffffff; border: 1px solid #dfeae6; border-radius: 14px; overflow: hidden; }
+    .header { padding: 26px 32px 24px; background: #edf7f3; color: #29484a; border-top: 4px solid #e8c778; }
+    .eyebrow { margin: 0 0 8px; color: #628984; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+    h1 { margin: 0; color: #29484a; font-size: 25px; line-height: 1.3; }
+    .header p { margin: 8px 0 0; color: #718987; font-size: 14px; }
     .content { padding: 28px 32px 32px; }
     .meta { width: 100%; margin: 0 0 20px; border-collapse: collapse; background: #f8fafc; border: 1px solid #e2e8f0; }
     .meta td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; vertical-align: top; }
@@ -1578,6 +1580,7 @@ func notificationEmailOpsScheduledReportTemplate(locale string) string {
 <body>
   <div class="container">
     <div class="header">
+      <p style="margin:0 0 18px;color:#29484a;font-size:13px;font-weight:700;"><img src="https://codex.magicrealms.top/sunworld-email-avatar.png" width="38" height="38" alt="太阳新世界" style="width:38px;height:38px;margin-right:10px;vertical-align:middle;border:0;border-radius:10px;">SUNWORLD <span style="color:#718987;font-weight:500;">· 太阳新世界</span></p>
       <p class="eyebrow">Operations report</p>
       <h1>{{report_name}}</h1>
       <p>{{site_name}} runtime overview</p>
@@ -1630,29 +1633,6 @@ func notificationEmailOpsScheduledReportTemplate(locale string) string {
 </html>`
 }
 
-func notificationEmailCard(accent, title, content string) string {
-	return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { margin: 0; padding: 24px; background: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #18181b; }
-    .container { max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 30px rgba(15, 23, 42, 0.10); }
-    .header { background: ` + accent + `; color: #ffffff; padding: 28px 32px; }
-    .header h1 { margin: 0; font-size: 24px; line-height: 1.25; }
-    .content { padding: 32px; font-size: 15px; line-height: 1.7; }
-    .button { display: inline-block; margin-top: 12px; padding: 11px 18px; border-radius: 8px; background: ` + accent + `; color: #ffffff; text-decoration: none; font-weight: 600; }
-    .muted { color: #71717a; font-size: 13px; }
-    .footer { padding: 18px 32px; background: #fafafa; color: #a1a1aa; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header"><h1>` + title + `</h1></div>
-    <div class="content">` + content + `</div>
-    <div class="footer">This email was sent by {{site_name}}. Please do not reply directly.</div>
-  </div>
-</body>
-</html>`
+func notificationEmailCard(_ string, title, content string) string {
+	return sunworldEmailFrame("{{site_name}}", title, content, "")
 }

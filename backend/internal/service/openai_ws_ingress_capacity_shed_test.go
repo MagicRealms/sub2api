@@ -55,9 +55,9 @@ func TestProxyResponsesWebSocketFromClient_RewritesCapacityShedCodeForClient(t *
 			},
 			wantContains: []string{
 				`"code":"server_error"`,
-				"Our servers are currently overloaded",
+				"codex.magicrealms.top",
 			},
-			wantAbsent: []string{"server_is_overloaded"},
+			wantAbsent: []string{"server_is_overloaded", "Our servers are currently overloaded"},
 		},
 		{
 			name: "non_capacity_error_code_is_passed_through",
@@ -67,9 +67,9 @@ func TestProxyResponsesWebSocketFromClient_RewritesCapacityShedCodeForClient(t *
 			},
 			wantContains: []string{
 				`"code":"workspace_suspended"`,
-				"workspace is suspended",
+				"codex.magicrealms.top",
 			},
-			wantAbsent: []string{"server_error"},
+			wantAbsent: []string{"server_error", "workspace is suspended"},
 		},
 	}
 

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 )
 
 func TestMapUserErrorCategory(t *testing.T) {
@@ -140,11 +142,11 @@ func TestToUserErrorRequestDetail_WhitelistAndRedacts(t *testing.T) {
 	if out.ID != 999 {
 		t.Errorf("want ID=999, got %d", out.ID)
 	}
-	if out.Message != "upstream error" {
-		t.Errorf("want message=%q, got %q", "upstream error", out.Message)
+	if out.Message != errorprivacy.UpstreamMessage(src.Message) {
+		t.Errorf("unexpected public message=%q", out.Message)
 	}
-	if out.ErrorBody != src.ErrorBody {
-		t.Errorf("ErrorBody mismatch")
+	if !strings.Contains(out.ErrorBody, "codex.magicrealms.top") || !strings.Contains(out.ErrorBody, `"type":"server_error"`) {
+		t.Errorf("unexpected public ErrorBody=%s", out.ErrorBody)
 	}
 	if out.UpstreamStatusCode == nil || *out.UpstreamStatusCode != 503 {
 		t.Errorf("UpstreamStatusCode mismatch")
@@ -174,6 +176,18 @@ func TestToUserErrorRequestDetail_WhitelistAndRedacts(t *testing.T) {
 		if strings.Contains(raw, forbidden) {
 			t.Errorf("sensitive field %q leaked in JSON output: %s", forbidden, raw)
 		}
+	}
+}
+
+func TestToUserErrorRequestHistoricalSupplierRedaction(t *testing.T) {
+	src := &OpsErrorLogDetail{OpsErrorLog: OpsErrorLog{Phase: "network", Message: `Post "https://sharellm.net/v1/responses": timeout`, StatusCode: 502}, ErrorBody: `{"error":{"type":"server_error","code":"timeout","message":"private-vendor at https://sharellm.net failed","details":{"provider":"private-vendor"}}}`}
+	out := ToUserErrorRequestDetail(src)
+	encoded, _ := json.Marshal(out)
+	if strings.Contains(string(encoded), "sharellm") || strings.Contains(string(encoded), "private-vendor") || !strings.Contains(string(encoded), "codex.magicrealms.top") {
+		t.Fatal(string(encoded))
+	}
+	if !strings.Contains(src.Message, "sharellm.net") || !strings.Contains(src.ErrorBody, "private-vendor") {
+		t.Fatal("raw admin record was mutated")
 	}
 }
 

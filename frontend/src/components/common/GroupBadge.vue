@@ -1,5 +1,6 @@
 <template>
   <span
+    :title="fallbackOnly ? t('admin.accounts.finalFallback.badgeHint') : undefined"
     :class="[
       'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
       badgeClass
@@ -9,6 +10,11 @@
     <PlatformIcon v-if="platform" :platform="platform" size="sm" />
     <!-- Group name -->
     <span :class="truncate ? 'truncate' : 'min-w-0 whitespace-normal [overflow-wrap:anywhere]'">{{ name }}</span>
+    <span
+      v-if="fallbackOnly"
+      class="shrink-0 rounded border border-dashed border-amber-400 bg-amber-50 px-1 py-0.5 text-[10px] font-semibold leading-none text-amber-700 dark:border-amber-500 dark:bg-amber-950/40 dark:text-amber-300"
+      data-fallback-badge
+    >{{ t('admin.accounts.finalFallback.badge') }}</span>
     <!-- Right side label -->
     <span v-if="showLabel" :class="labelClass">
       <template v-if="hasCustomRate">
@@ -35,6 +41,7 @@ import { formatPeakRateWindow, serverTimezoneLabel } from '@/utils/peak-rate'
 import PlatformIcon from './PlatformIcon.vue'
 
 interface Props {
+  fallbackOnly?: boolean
   name: string
   platform?: GroupPlatform
   subscriptionType?: SubscriptionType

@@ -40,4 +40,15 @@ describe('GroupSelector simple-mode binding policy', () => {
     const wrapper = mountSelector([1, 2])
     expect(wrapper.emitted('update:modelValue')).toEqual([[[1]]])
   })
+
+  it('identifies fallback memberships without allowing them to be selected as normal memberships', async () => {
+    const wrapper = mountSelector([1, 2])
+    await wrapper.setProps({ fallbackGroupIds: [2] })
+    expect(wrapper.get<HTMLInputElement>('input[value="1"]').element.checked).toBe(true)
+    const fallback = wrapper.get<HTMLInputElement>('input[value="2"]')
+    expect(fallback.element.disabled).toBe(true)
+    expect(fallback.element.checked).toBe(false)
+    expect(fallback.element.closest('label')?.title).toBe('admin.accounts.finalFallback.badgeHint')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
 })

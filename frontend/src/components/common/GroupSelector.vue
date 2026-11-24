@@ -1,8 +1,8 @@
 <template>
   <div>
     <label class="input-label">
-      {{ t('admin.users.groups') }}
-      <span class="font-normal text-gray-400">{{ t('common.selectedCount', { count: modelValue.length }) }}</span>
+      {{ label || t('admin.users.groups') }}
+      <span class="font-normal text-gray-400">{{ t('common.selectedCount', { count: modelValue.filter(id => !fallbackGroupIds.includes(id)).length }) }}</span>
     </label>
     <div
       v-if="isSearchable"
@@ -28,12 +28,13 @@
         v-for="group in filteredGroups"
         :key="group.id"
         class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 transition-colors hover:bg-white dark:hover:bg-dark-700"
-        :title="group.rate_multiplier == null ? group.name : t('admin.groups.rateAndAccounts', { rate: group.rate_multiplier, count: group.account_count || 0 })"
+        :title="fallbackGroupIds.includes(group.id) ? t('admin.accounts.finalFallback.badgeHint') : group.rate_multiplier == null ? group.name : t('admin.groups.rateAndAccounts', { rate: group.rate_multiplier, count: group.account_count || 0 })"
       >
         <input
           type="checkbox"
           :value="group.id"
-          :checked="modelValue.includes(group.id)"
+          :checked="modelValue.includes(group.id) && !fallbackGroupIds.includes(group.id)"
+          :disabled="fallbackGroupIds.includes(group.id)"
           @change="handleChange(group.id, ($event.target as HTMLInputElement).checked)"
           class="h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-primary-500 focus:ring-primary-500 dark:border-dark-500"
         />
@@ -42,6 +43,7 @@
           :platform="group.platform"
           :subscription-type="group.subscription_type || undefined"
           :rate-multiplier="group.rate_multiplier == null ? undefined : group.rate_multiplier"
+          :fallback-only="fallbackGroupIds.includes(group.id)"
           class="min-w-0 flex-1"
         />
         <span class="shrink-0 text-xs text-gray-400">{{ group.account_count || 0 }}</span>
@@ -68,15 +70,18 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 
 interface Props {
+  label?: string
   modelValue: number[]
   groups: (Group & { account_count?: number })[]
   platform?: GroupPlatform // Optional platform filter
   mixedScheduling?: boolean // For antigravity accounts: allow anthropic/gemini groups
   searchable?: boolean | 'auto'
+  fallbackGroupIds?: number[] // In a normal-membership selector these are managed by the fallback selector.
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  searchable: 'auto'
+  searchable: 'auto',
+  fallbackGroupIds: () => []
 })
 const emit = defineEmits<{
   'update:modelValue': [value: number[]]
@@ -126,6 +131,7 @@ watch(
 )
 
 const handleChange = (groupId: number, checked: boolean) => {
+  if (props.fallbackGroupIds.includes(groupId)) return
   const newValue = checked
     ? [...props.modelValue, groupId]
     : props.modelValue.filter((id) => id !== groupId)

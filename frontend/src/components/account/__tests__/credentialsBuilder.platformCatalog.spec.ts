@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { ADMIN_PLATFORM_CATALOG as BUILTIN_PLATFORM_CATALOG } from '@/constants/__tests__/adminPlatformCatalog'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
-  BUILTIN_PLATFORM_CATALOG,
   resetPlatformCatalog,
   setPlatformCatalog,
   type PlatformCatalog
@@ -136,6 +136,8 @@ const probePlatforms = [
 ]
 const probeTypes = ['apikey', 'oauth', 'setup-token', 'upstream', 'bedrock', '']
 const protocols: CnApiProtocol[] = ['adaptive', 'chat_completions', 'anthropic', 'responses']
+
+beforeEach(() => { setPlatformCatalog(BUILTIN_PLATFORM_CATALOG) })
 
 afterEach(() => {
   resetPlatformCatalog()

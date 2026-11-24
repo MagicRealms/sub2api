@@ -139,6 +139,9 @@ func (s *OpenAIGatewayService) GenerateExplicitSessionHash(c *gin.Context, body 
 		return ""
 	}
 
+	if c.Request != nil {
+		sessionID = FinalFallbackSessionHash(c.Request.Context(), sessionID)
+	}
 	currentHash, legacyHash := deriveOpenAISessionHashes(sessionID)
 	attachOpenAILegacySessionHashToGin(c, legacyHash)
 	return currentHash
@@ -178,6 +181,9 @@ func (s *OpenAIGatewayService) GenerateSessionHash(c *gin.Context, body []byte) 
 		sessionID = grokStickyAffinitySeed(sessionID, body)
 	}
 
+	if c.Request != nil {
+		sessionID = FinalFallbackSessionHash(c.Request.Context(), sessionID)
+	}
 	currentHash, legacyHash := deriveOpenAISessionHashes(sessionID)
 	attachOpenAILegacySessionHashToGin(c, legacyHash)
 	return currentHash
@@ -212,6 +218,9 @@ func (s *OpenAIGatewayService) GenerateSessionHashWithFallback(c *gin.Context, b
 	seed := strings.TrimSpace(fallbackSeed)
 	if seed == "" {
 		return ""
+	}
+	if c != nil && c.Request != nil {
+		seed = FinalFallbackSessionHash(c.Request.Context(), seed)
 	}
 
 	currentHash, legacyHash := deriveOpenAISessionHashes(seed)
@@ -1016,7 +1025,7 @@ func (s *OpenAIGatewayService) tryStickySessionHit(ctx context.Context, groupID 
 		return nil
 	}
 	account = s.recheckSelectedOpenAIAccountFromDB(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability)
-	if account == nil || !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
+	if !AccountAllowedForSchedulingPhase(ctx, account, groupID) || !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
 		_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 		return nil
 	}
@@ -1239,7 +1248,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 					account = s.recheckSelectedOpenAIAccountFromDB(ctx, account, groupID, platform, requestedModel, requireCompact, requiredCapability)
 					if account == nil {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
-					} else if !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
+					} else if !AccountAllowedForSchedulingPhase(ctx, account, groupID) || !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else if s.isOpenAIAccountRequestRuntimeBlocked(account, requestedModel) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
@@ -1518,6 +1527,11 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 }
 
 func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, groupID *int64, platform string) ([]Account, error) {
+	accounts, err := s.listSchedulableAccountsBeforeFinalFallback(ctx, groupID, platform)
+	return filterAccountsForSchedulingPhase(ctx, accounts, groupID, platform), err
+}
+
+func (s *OpenAIGatewayService) listSchedulableAccountsBeforeFinalFallback(ctx context.Context, groupID *int64, platform string) ([]Account, error) {
 	platform = NormalizeOpenAICompatiblePlatform(platform)
 	if s.schedulerSnapshot != nil {
 		accounts, _, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, false)
@@ -1582,6 +1596,9 @@ func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccountBeforeProfit(
 		fresh = current
 	}
 
+	if !accountAllowedForRoutingAttempt(ctx, fresh) {
+		return nil
+	}
 	if !isOpenAICompatibleAccountEligibleForRequestBeforeProfit(ctx, fresh, platform, requestedModel, requireCompact, requiredCapability) {
 		return nil
 	}
@@ -1653,7 +1670,7 @@ func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDBBeforeProfit(ct
 	if err != nil || latest == nil {
 		return nil
 	}
-	if !s.openAIAccountMatchesSchedulingGroup(latest, groupID) {
+	if !AccountAllowedForSchedulingPhase(ctx, latest, groupID) || !s.openAIAccountMatchesSchedulingGroup(latest, groupID) {
 		return nil
 	}
 	if s.openAIGroupRequiresPrivacySet(ctx, groupID) && !latest.IsPrivacySet() {
@@ -1696,6 +1713,9 @@ func (s *OpenAIGatewayService) getSchedulableAccount(ctx context.Context, accoun
 	}
 	if err != nil || account == nil {
 		return account, err
+	}
+	if !accountAllowedForRoutingAttempt(ctx, account) {
+		return nil, nil
 	}
 	if s.isOpenAIAccountBlockedBySchedulingThreshold(ctx, account) {
 		return nil, nil

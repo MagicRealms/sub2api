@@ -470,6 +470,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		// 其他客户端：按 API Key + 模型 + tools + systemInstruction + 第一条 user contents 的 parts 生成内容哈希
 		sessionHash = service.GenerateGeminiContentSessionHash(apiKey.ID, reqModel, body)
 	}
+	sessionHash = service.FinalFallbackSessionHash(c.Request.Context(), sessionHash)
 	sessionKey := sessionHash
 	if sessionHash != "" {
 		sessionKey = "gemini:" + sessionHash
@@ -879,6 +880,9 @@ func parseGeminiModelAction(rest string) (model string, action string, err error
 }
 
 func (h *GatewayHandler) handleGeminiFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError) {
+	if c.Request != nil {
+		service.MarkAccountFinalFallbackUpstreamFailure(c.Request.Context(), failoverErr)
+	}
 	if failoverErr == nil {
 		googleError(c, http.StatusBadGateway, "Upstream request failed")
 		return

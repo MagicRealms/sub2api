@@ -81,9 +81,9 @@ describe('Model Plaza cards and filters', () => {
     }
   })
 
-  it('labels ShareLLM models as 聚合站 in the plaza', () => {
-    const wrapper = render([group(1, { models: [{ ...model('aggregate-model'), platform: 'sharellm' }] })])
-    expect(wrapper.text()).toContain('聚合站')
+  it('labels the private route as 路由中转 in the plaza', () => {
+    const wrapper = render([group(1, { models: [{ ...model('aggregate-model'), platform: 'route_relay' }] })])
+    expect(wrapper.text()).toContain('路由中转')
     expect(wrapper.text()).not.toContain('ShareLLM')
   })
 

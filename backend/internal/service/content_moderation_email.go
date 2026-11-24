@@ -21,33 +21,16 @@ func buildContentModerationViolationEmailBody(siteName string, log *ContentModer
 	}
 	statusBlock := ""
 	if log.AutoBanned {
-		statusBlock = `<div style="margin-top:24px;padding:18px 20px;border-radius:10px;background:#ff3b30;color:#fff;font-size:18px;font-weight:700;text-align:center;line-height:1.6;">账户当前处于封禁状态，所有 API 请求将被拒绝</div>`
+		statusBlock = `<p style="margin-top:20px;padding:14px 16px;border-left:3px solid #b65d50;background:#fff5f1;color:#87483f;font-weight:700;">账户当前处于封禁状态，所有 API 请求将被拒绝。</p>`
 	}
-	return fmt.Sprintf(`<!doctype html>
-<html>
-<body style="margin:0;padding:0;background:#f5f6fb;color:#222;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
-    <div style="height:8px;background:#ef4444;border-radius:14px 14px 0 0;"></div>
-    <div style="background:#fff;border-radius:0 0 14px 14px;padding:40px 48px;box-shadow:0 8px 28px rgba(15,23,42,.08);">
-      <div style="letter-spacing:4px;color:#999;font-size:14px;text-transform:uppercase;">Risk Control / 风控提醒</div>
-      <h1 style="margin:20px 0 28px;font-size:30px;line-height:1.25;">账户触发内容审计规则</h1>
-      <p style="font-size:17px;line-height:1.9;margin:0 0 24px;">尊敬的用户 <strong>%s</strong>，您的 API 请求在内容审计中触发平台风控策略。详情如下。</p>
-      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:22px 28px;margin:28px 0;">
-        <h2 style="margin:0 0 18px;color:#b91c1c;font-size:18px;">触发详情</h2>
-        <table style="width:100%%;border-collapse:collapse;font-size:16px;">
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">触发时间</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">触发来源</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">内容审核</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">所属分组</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">命中类别</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s / %.3f</td></tr>
-          <tr><td style="padding:12px 0;color:#888;">累计触发次数</td><td style="padding:12px 0;color:#dc2626;font-weight:700;">%d 次（阈值 %d）</td></tr>
-        </table>
-      </div>
-      %s
-      <p style="font-size:14px;line-height:1.8;color:#777;margin-top:28px;">此邮件由 %s 自动发送，请勿回复。</p>
-    </div>
-  </div>
-</body>
-</html>`,
+	content := fmt.Sprintf(`<p>用户 <strong>%s</strong>，您的 API 请求触发了内容审核策略。请查看本次事件信息。</p>
+<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:18px;">
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;">触发时间</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;text-align:right;">%s</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;">所属分组</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;text-align:right;">%s</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;">命中类别 / 分数</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;text-align:right;">%s / %.3f</td></tr>
+  <tr><td style="padding:10px 12px;color:#687b79;">累计触发</td><td style="padding:10px 12px;text-align:right;">%d 次（封禁阈值 %d）</td></tr>
+</table>%s
+<p class="muted">请检查请求内容；如需协助或认为此结果有误，请通过平台支持渠道联系管理员。</p>`,
 		html.EscapeString(userName),
 		html.EscapeString(time.Now().Format("2006-01-02 15:04:05")),
 		html.EscapeString(defaultContentModerationString(log.GroupName, "-")),
@@ -56,8 +39,8 @@ func buildContentModerationViolationEmailBody(siteName string, log *ContentModer
 		log.ViolationCount,
 		threshold,
 		statusBlock,
-		html.EscapeString(siteName),
 	)
+	return sunworldEmailFrame(siteName, "账户风控提醒", content, "#b65d50")
 }
 
 func buildContentModerationAccountDisabledEmailBody(siteName string, log *ContentModerationLog, cfg *ContentModerationConfig) string {
@@ -72,32 +55,16 @@ func buildContentModerationAccountDisabledEmailBody(siteName string, log *Conten
 	if threshold <= 0 {
 		threshold = defaultContentModerationBanThreshold
 	}
-	return fmt.Sprintf(`<!doctype html>
-<html>
-<body style="margin:0;padding:0;background:#f5f6fb;color:#222;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
-    <div style="height:8px;background:#ef4444;border-radius:14px 14px 0 0;"></div>
-    <div style="background:#fff;border-radius:0 0 14px 14px;padding:40px 48px;box-shadow:0 8px 28px rgba(15,23,42,.08);">
-      <div style="letter-spacing:4px;color:#999;font-size:14px;text-transform:uppercase;">Risk Control / 账户封禁</div>
-      <h1 style="margin:20px 0 28px;font-size:30px;line-height:1.25;">账户已被自动禁用</h1>
-      <p style="font-size:17px;line-height:1.9;margin:0 0 24px;">尊敬的用户 <strong>%s</strong>，您的账户在计数周期内多次触发平台风控策略，系统已自动禁用该账户。详情如下。</p>
-      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:22px 28px;margin:28px 0;">
-        <h2 style="margin:0 0 18px;color:#b91c1c;font-size:18px;">封禁详情</h2>
-        <table style="width:100%%;border-collapse:collapse;font-size:16px;">
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">封禁时间</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">触发来源</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">内容审核</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">所属分组</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">命中类别</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s / %.3f</td></tr>
-          <tr><td style="padding:12px 0;color:#888;">累计触发次数</td><td style="padding:12px 0;color:#dc2626;font-weight:700;">%d 次（阈值 %d）</td></tr>
-        </table>
-      </div>
-      <div style="margin-top:24px;padding:18px 20px;border-radius:10px;background:#ff3b30;color:#fff;font-size:18px;font-weight:700;text-align:center;line-height:1.6;">账户当前处于封禁状态，所有 API 请求将被拒绝</div>
-      <p style="font-size:15px;line-height:1.8;color:#666;margin-top:24px;">如需申诉或恢复账号，请联系平台管理员处理。</p>
-      <p style="font-size:14px;line-height:1.8;color:#777;margin-top:28px;">此邮件由 %s 自动发送，请勿回复。</p>
-    </div>
-  </div>
-</body>
-</html>`,
+	content := fmt.Sprintf(`<p>用户 <strong>%s</strong>，您的账户因在统计周期内多次触发内容审核规则，已被系统自动禁用。</p>
+<h2 style="margin:22px 0 8px;color:#284a47;font-size:16px;">封禁详情</h2>
+<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:18px;">
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;">禁用时间</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;text-align:right;">%s</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;">所属分组</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;text-align:right;">%s</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;">命中类别 / 分数</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;text-align:right;">%s / %.3f</td></tr>
+  <tr><td style="padding:10px 12px;color:#687b79;">累计触发</td><td style="padding:10px 12px;text-align:right;">%d 次（阈值 %d）</td></tr>
+</table>
+<p style="margin-top:20px;padding:14px 16px;border-left:3px solid #b65d50;background:#fff5f1;color:#87483f;font-weight:700;">账户当前处于封禁状态，所有 API 请求将被拒绝</p>
+<p class="muted">如需申诉或申请恢复，请通过平台支持渠道联系管理员。</p>`,
 		html.EscapeString(userName),
 		html.EscapeString(time.Now().Format("2006-01-02 15:04:05")),
 		html.EscapeString(defaultContentModerationString(log.GroupName, "-")),
@@ -105,8 +72,8 @@ func buildContentModerationAccountDisabledEmailBody(siteName string, log *Conten
 		log.HighestScore,
 		log.ViolationCount,
 		threshold,
-		html.EscapeString(siteName),
 	)
+	return sunworldEmailFrame(siteName, "账户已被自动禁用", content, "#a95147")
 }
 
 func defaultContentModerationString(value string, fallback string) string {
@@ -116,8 +83,7 @@ func defaultContentModerationString(value string, fallback string) string {
 	return strings.TrimSpace(value)
 }
 
-// buildCyberPolicyNoticeEmailBody 是 cyber_policy 通知邮件的内置兜底正文，
-// 当 notification email 模板渲染失败时使用（与 sendViolationEmail 的兜底同理）。
+// buildCyberPolicyNoticeEmailBody 是 cyber_policy 通知邮件的内置兜底正文。
 func buildCyberPolicyNoticeEmailBody(siteName string, log *ContentModerationLog) string {
 	if log == nil {
 		return ""
@@ -126,30 +92,17 @@ func buildCyberPolicyNoticeEmailBody(siteName string, log *ContentModerationLog)
 	if userName == "" && log.UserID != nil {
 		userName = fmt.Sprintf("UID %d", *log.UserID)
 	}
-	return fmt.Sprintf(`<!doctype html>
-<html><body style="margin:0;padding:0;background:#f5f6fb;color:#222;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
-    <div style="height:8px;background:#ef4444;border-radius:14px 14px 0 0;"></div>
-    <div style="background:#fff;border-radius:0 0 14px 14px;padding:40px 48px;box-shadow:0 8px 28px rgba(15,23,42,.08);">
-      <div style="letter-spacing:4px;color:#999;font-size:14px;text-transform:uppercase;">Risk Control / 网络安全策略</div>
-      <h1 style="margin:20px 0 28px;font-size:30px;line-height:1.25;">请求被网络安全策略拦截</h1>
-      <p style="font-size:17px;line-height:1.9;margin:0 0 24px;">尊敬的用户 <strong>%s</strong>，您的请求被上游网络安全策略（cyber policy）拦截。</p>
-      <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:22px 28px;margin:28px 0;">
-        <table style="width:100%%;border-collapse:collapse;font-size:16px;">
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">触发时间</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s</td></tr>
-          <tr><td style="padding:12px 0;color:#888;border-bottom:1px solid #fee2e2;">模型</td><td style="padding:12px 0;border-bottom:1px solid #fee2e2;">%s</td></tr>
-          <tr><td style="padding:12px 0;color:#888;">上游说明</td><td style="padding:12px 0;">%s</td></tr>
-        </table>
-      </div>
-      <p style="font-size:15px;line-height:1.8;color:#666;">如认为系误判，可调整请求措辞后重试，或申请获得授权的安全访问权限。</p>
-      <p style="font-size:14px;line-height:1.8;color:#777;margin-top:28px;">此邮件由 %s 自动发送，请勿回复。</p>
-    </div>
-  </div>
-</body></html>`,
+	content := fmt.Sprintf(`<p>用户 <strong>%s</strong>，您的请求被上游服务商的网络安全策略拦截。</p>
+<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:18px;table-layout:fixed;">
+  <tr><td style="width:120px;padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;vertical-align:top;">触发时间</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;overflow-wrap:anywhere;">%s</td></tr>
+  <tr><td style="width:120px;padding:10px 12px;border-bottom:1px solid #e5eeea;color:#687b79;vertical-align:top;">模型</td><td style="padding:10px 12px;border-bottom:1px solid #e5eeea;overflow-wrap:anywhere;">%s</td></tr>
+  <tr><td style="width:120px;padding:10px 12px;color:#687b79;vertical-align:top;">上游说明</td><td style="padding:10px 12px;overflow-wrap:anywhere;word-break:break-all;white-space:pre-wrap;">%s</td></tr>
+</table>
+<p class="muted">如认为系误判，可调整请求内容后重试，或联系平台支持。</p>`,
 		html.EscapeString(userName),
 		html.EscapeString(log.CreatedAt.Format("2006-01-02 15:04:05")),
 		html.EscapeString(defaultContentModerationString(log.Model, "-")),
 		html.EscapeString(defaultContentModerationString(log.Error, "-")),
-		html.EscapeString(siteName),
 	)
+	return sunworldEmailFrame(siteName, "网络安全策略提醒", content, "#b65d50")
 }

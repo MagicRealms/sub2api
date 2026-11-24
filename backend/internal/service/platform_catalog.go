@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/util/errorprivacy"
 )
 
 // PlatformCatalog 是前端使用的平台清单：domain 平台清单加上多协议供应商的
@@ -53,6 +54,29 @@ func BuildPlatformCatalog() PlatformCatalog {
 			PlatformSpec:  spec,
 			MultiProtocol: providerProfileInfo(LookupProviderProfile(spec.ID)),
 		})
+	}
+	return catalog
+}
+
+// BuildPublicPlatformCatalog returns the catalog safe to embed in the public
+// frontend. Internal account routing keeps the full catalog; customer-facing
+// assets must not contain the ShareLLM hostname or vendor label.
+func BuildPublicPlatformCatalog() PlatformCatalog {
+	catalog := BuildPlatformCatalog()
+	for i := range catalog.Platforms {
+		if catalog.Platforms[i].ID != domain.PlatformShareLLM {
+			continue
+		}
+		catalog.Platforms[i].DisplayName = "路由中转"
+		catalog.Platforms[i].ID = errorprivacy.PublicRouteID
+		if profile := catalog.Platforms[i].MultiProtocol; profile != nil {
+			for mode := range profile.Modes {
+				profile.Modes[mode].BaseURLs = map[string]string{}
+			}
+		}
+	}
+	for i, platform := range catalog.CompositePrecedence {
+		catalog.CompositePrecedence[i] = errorprivacy.PublicPlatform(platform)
 	}
 	return catalog
 }

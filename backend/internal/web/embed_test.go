@@ -23,6 +23,15 @@ func init() {
 	gin.SetMode(gin.TestMode)
 }
 
+func TestInjectedPublicSettingsHidePrivateProvider(t *testing.T) {
+	server := &FrontendServer{baseHTML: []byte(`<html><head><title>Site</title></head></html>`)}
+	result := server.injectSettings([]byte(`{"site_name":"ShareLLM","api_base_url":"https://sharellm.net","other":"https://api.deepseek.com"}`))
+	require.NotContains(t, strings.ToLower(string(result)), "sharellm")
+	require.Contains(t, string(result), "路由中转")
+	require.Contains(t, string(result), "codex.magicrealms.top")
+	require.Contains(t, string(result), "https://api.deepseek.com")
+}
+
 func TestInjectSiteTitle(t *testing.T) {
 	t.Run("replaces_title_with_site_name", func(t *testing.T) {
 		html := []byte(`<html><head><title>Sub2API - AI API Gateway</title></head><body></body></html>`)

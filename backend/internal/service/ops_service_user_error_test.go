@@ -125,14 +125,17 @@ func TestGetUserErrorRequestDetail_OwnershipEnforced(t *testing.T) {
 	if got2.ID != 42 {
 		t.Errorf("want ID=42, got %d", got2.ID)
 	}
-	if got2.ErrorBody != `{"error":"upstream"}` {
-		t.Errorf("want ErrorBody=%q, got %q", `{"error":"upstream"}`, got2.ErrorBody)
+	if got2.ErrorBody != `{"error":"太阳新世界（codex.magicrealms.top）请求暂时无法完成，请稍后重试。"}` {
+		t.Errorf("expected public error body, got %q", got2.ErrorBody)
 	}
 	if got2.UpstreamStatusCode == nil || *got2.UpstreamStatusCode != 503 {
 		t.Errorf("want UpstreamStatusCode=503, got %v", got2.UpstreamStatusCode)
 	}
-	if got2.Message != "upstream failed" {
-		t.Errorf("want Message=%q, got %q", "upstream failed", got2.Message)
+	if got2.Message != "太阳新世界（codex.magicrealms.top）请求暂时无法完成，请稍后重试。" {
+		t.Errorf("expected public message, got %q", got2.Message)
+	}
+	if detail.Message != "upstream failed" || detail.ErrorBody != `{"error":"upstream"}` {
+		t.Fatal("internal diagnostics changed")
 	}
 }
 

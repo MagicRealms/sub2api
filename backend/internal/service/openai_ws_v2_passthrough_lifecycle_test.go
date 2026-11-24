@@ -280,11 +280,11 @@ func TestPassthroughLifecycle_CyberTerminalEventsMarkBeforeAfterTurn(t *testing.
 		{
 			name: "error",
 			events: []string{
-				`{"type":"error","error":{"code":"cyber_policy","message":"blocked by error event"},"usage":{"input_tokens":5,"output_tokens":1}}`,
+				`{"type":"error","error":{"code":"cyber_policy","message":"blocked by error event at https://sharellm.net"},"usage":{"input_tokens":5,"output_tokens":1}}`,
 				`{"type":"response.failed","response":{"id":"resp_error","error":{"code":"cyber_policy","message":"blocked by paired failed event"},"usage":{"input_tokens":9,"output_tokens":2}}}`,
 			},
 			wantBody:    `"type":"error"`,
-			wantMessage: "blocked by error event",
+			wantMessage: "blocked by error event at https://sharellm.net",
 			wantInput:   5,
 			wantOutput:  1,
 		},
@@ -333,8 +333,10 @@ func TestPassthroughLifecycle_CyberTerminalEventsMarkBeforeAfterTurn(t *testing.
 			defer func() { _ = clientConn.CloseNow() }()
 
 			for range tt.events {
-				_, err := readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
+				frame, err := readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
 				require.NoError(t, err)
+				require.NotContains(t, string(frame), "sharellm.net")
+				require.Contains(t, string(frame), "codex.magicrealms.top")
 			}
 
 			select {

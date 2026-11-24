@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -100,6 +101,8 @@ func cloneAccountJSONMap(value map[string]any) (map[string]any, error) {
 var duplicateAccountDiscardedExtraKeys = map[string]struct{}{
 	// A retry identity belongs to the operation that created one copy, not to later copies.
 	duplicateAccountOperationIDExtraKey: {},
+	// Keep the copy's local name until its administrator opts into group sync.
+	UpstreamBillingGroupSyncEnabledExtraKey: {},
 	// External sync identity belongs to one local account only.
 	"crs_account_id": {},
 	"crs_kind":       {},
@@ -323,6 +326,9 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
+	if err := ValidateHeaderOverrideVariableUsage(input.Type, input.Credentials); err != nil {
+		return nil, err
+	}
 	if err := NormalizeProtocolRulesCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
@@ -414,9 +420,10 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 	if input.Platform == PlatformTypeSafe && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
 	}
-	// Probe/session state is system-managed. New accounts always start with automatic refresh disabled.
+	// Probe/session state is system-managed. Only explicit account settings can enable it.
 	delete(accountExtra, UpstreamBillingProbeEnabledExtraKey)
 	delete(accountExtra, UpstreamBillingRateSyncEnabledExtraKey)
+	delete(accountExtra, UpstreamBillingGroupSyncEnabledExtraKey)
 	delete(accountExtra, UpstreamBillingProbeExtraKey)
 	delete(accountExtra, OllamaCloudUsageSessionExtraKey)
 	delete(accountExtra, OllamaCloudUsageAutoRefreshExtraKey)
@@ -437,7 +444,11 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		Status:      StatusActive,
 		Schedulable: true,
 	}
-	if input.ProbeEnabled != nil && *input.ProbeEnabled {
+	groupSync := input.GroupSyncEnabled != nil && *input.GroupSyncEnabled
+	if groupSync && input.ProbeEnabled != nil && !*input.ProbeEnabled {
+		return nil, ErrUpstreamBillingGroupSyncRequiresProbe
+	}
+	if groupSync || (input.ProbeEnabled != nil && *input.ProbeEnabled) {
 		if !isUpstreamBillingProbeAccount(account) {
 			return nil, ErrUpstreamBillingProbeAccountInvalid
 		}
@@ -445,6 +456,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 			account.Extra = make(map[string]any)
 		}
 		account.Extra[UpstreamBillingProbeEnabledExtraKey] = true
+		if groupSync {
+			account.Extra[UpstreamBillingGroupSyncEnabledExtraKey] = true
+		}
 	}
 	// 预计算固定时间重置的下次重置时间
 	if account.Extra != nil {
@@ -479,6 +493,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
+	if err := validateAccountFinalFallbackEditor(ctx, input.Extra); err != nil {
+		return nil, err
+	}
 	accountExtra, err := normalizeOpenAILongContextBillingExtra(input.Platform, input.Extra)
 	if err != nil {
 		return nil, err
@@ -498,7 +515,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	// 绑定分组
 	groupIDs := input.GroupIDs
 	// 如果没有指定分组,自动绑定对应平台的默认分组
-	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind {
+	if len(groupIDs) == 0 && !input.SkipDefaultGroupBind && accountExtra[AccountFinalFallbackEnabledKey] != true {
 		defaultGroupName := input.Platform + "-default"
 		groups, err := s.groupRepo.ListActiveByPlatform(ctx, input.Platform)
 		if err == nil {
@@ -522,6 +539,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
+	if err := ValidateHeaderOverrideVariableUsage(input.Type, input.Credentials); err != nil {
+		return nil, err
+	}
 	if err := NormalizeProtocolRulesCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
@@ -535,14 +555,27 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 	if err := s.ValidateAccountGroupBindings(ctx, groupIDs); err != nil {
 		return nil, err
 	}
-	if err := s.accountRepo.Create(ctx, account); err != nil {
+	groupIDs, err = s.prepareAccountFinalFallbackBindings(ctx, account, groupIDs)
+	if err != nil {
 		return nil, err
 	}
-
-	// 绑定分组
-	if len(groupIDs) > 0 {
-		if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
+	groupWriter, atomicGroups := s.accountRepo.(AccountDuplicateRepository)
+	if len(account.FinalFallbackGroupIDs()) > 0 && atomicGroups {
+		groups := make([]AccountGroup, len(groupIDs))
+		for i, groupID := range groupIDs {
+			groups[i] = AccountGroup{GroupID: groupID, Priority: i + 1}
+		}
+		if err := groupWriter.CreateWithAccountGroups(ctx, account, groups); err != nil {
 			return nil, err
+		}
+	} else {
+		if err := s.accountRepo.Create(ctx, account); err != nil {
+			return nil, err
+		}
+		if len(groupIDs) > 0 {
+			if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -577,9 +610,19 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
+	if err := validateAccountFinalFallbackEditor(ctx, input.Extra); err != nil {
+		return nil, err
+	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	previousFallbackGroups := account.FinalFallbackGroupIDs()
+	if s.needsFinalFallbackTransaction(ctx) && (hasAccountFinalFallbackSettings(input.Extra) || (input.GroupIDs != nil && len(previousFallbackGroups) > 0)) {
+		return s.scopedAdminTransaction(ctx, id, false, func(txctx context.Context) (*Account, error) {
+			copyInput := *input
+			return s.UpdateAccount(txctx, id, &copyInput)
+		})
 	}
 	if account.Platform == PlatformTypeSafe && input.Type != "" && input.Type != AccountTypeAPIKey {
 		return nil, errors.New("typesafe accounts only support apikey credentials")
@@ -590,6 +633,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		if err != nil {
 			return nil, err
 		}
+		preserveAccountFinalFallbackSettings(account.Extra, normalizedExtra)
 		normalizedExtra, err = normalizeGrokMediaEligibilityUpdateExtra(account, input, normalizedExtra)
 		if err != nil {
 			return nil, err
@@ -666,10 +710,16 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		// Strip SSO/password residue that must never sit next to OAuth tokens.
 		account.Credentials = SanitizeStoredCredentials(account.Platform, account.Credentials)
 	}
+	// 放在 credentials 分支之外：只改账号类型（不带 credentials）的更新同样要拦，
+	// 否则 api_key 账号改成 OAuth 后会把带变量的覆写值留在 OAuth 账号上。
+	if err := ValidateHeaderOverrideVariableUsage(account.Type, account.Credentials); err != nil {
+		return nil, err
+	}
 	// Extra 使用 map：需要区分“未提供(nil)”与“显式清空({})”。
 	// 关闭配额限制时前端会删除 quota_* 键并提交 extra:{}，此时也必须落库。
 	requestedProbeEnabledUpdate := input.ProbeEnabled
 	requestedRateSyncEnabledUpdate := input.RateSyncEnabled
+	groupSyncUpdate := input.GroupSyncEnabled
 	if input.Extra != nil {
 		requestedProbeEnabled, hasRequestedProbeEnabled := normalizedExtra[UpstreamBillingProbeEnabledExtraKey]
 		if hasRequestedProbeEnabled {
@@ -684,6 +734,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 		delete(normalizedExtra, UpstreamBillingProbeEnabledExtraKey)
 		delete(normalizedExtra, UpstreamBillingRateSyncEnabledExtraKey)
+		delete(normalizedExtra, UpstreamBillingGroupSyncEnabledExtraKey)
 		delete(normalizedExtra, UpstreamBillingProbeExtraKey)
 		delete(normalizedExtra, OllamaCloudUsageSessionExtraKey)
 		delete(normalizedExtra, OllamaCloudUsageAutoRefreshExtraKey)
@@ -705,6 +756,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 			UpstreamModelMetadataExtraKey,
 			UpstreamBillingProbeEnabledExtraKey,
 			UpstreamBillingRateSyncEnabledExtraKey,
+			UpstreamBillingGroupSyncEnabledExtraKey,
 			UpstreamBillingProbeExtraKey,
 			OllamaCloudUsageSessionExtraKey,
 			OllamaCloudUsageAutoRefreshExtraKey,
@@ -741,6 +793,12 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if input.Extra == nil {
 		account.Extra = prepareCodexFingerprintExtraForUpdate(account, account.Extra)
 	}
+	if groupSyncUpdate != nil && *groupSyncUpdate {
+		if requestedProbeEnabledUpdate != nil && !*requestedProbeEnabledUpdate {
+			return nil, ErrUpstreamBillingGroupSyncRequiresProbe
+		}
+		requestedProbeEnabledUpdate = groupSyncUpdate
+	}
 	if requestedRateSyncEnabledUpdate != nil && *requestedRateSyncEnabledUpdate {
 		if requestedProbeEnabledUpdate != nil && !*requestedProbeEnabledUpdate {
 			return nil, infraerrors.BadRequest(
@@ -754,6 +812,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if requestedProbeEnabledUpdate != nil && !*requestedProbeEnabledUpdate {
 		disabled := false
 		requestedRateSyncEnabledUpdate = &disabled
+		groupSyncUpdate = &disabled
 	}
 	if (requestedProbeEnabledUpdate != nil && *requestedProbeEnabledUpdate) ||
 		(requestedRateSyncEnabledUpdate != nil && *requestedRateSyncEnabledUpdate) {
@@ -761,7 +820,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 			return nil, ErrUpstreamBillingProbeAccountInvalid
 		}
 	}
-	if account.Extra == nil && (requestedProbeEnabledUpdate != nil || requestedRateSyncEnabledUpdate != nil) {
+	if account.Extra == nil && (requestedProbeEnabledUpdate != nil || requestedRateSyncEnabledUpdate != nil || groupSyncUpdate != nil) {
 		account.Extra = make(map[string]any)
 	}
 	if requestedProbeEnabledUpdate != nil {
@@ -769,6 +828,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if requestedRateSyncEnabledUpdate != nil {
 		account.Extra[UpstreamBillingRateSyncEnabledExtraKey] = *requestedRateSyncEnabledUpdate
+	}
+	if groupSyncUpdate != nil {
+		account.Extra[UpstreamBillingGroupSyncEnabledExtraKey] = *groupSyncUpdate
 	}
 	// 影子代理恒继承母账号(由 propagateProxyToShadows 同步),不接受独立编辑——外审 B/P1;
 	// 否则要等母账号下次改 proxy 才被覆盖,期间影子会出现"有时继承、有时独立"的漂移。
@@ -793,6 +855,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		if !isUpstreamBillingProbeAccount(account) {
 			delete(account.Extra, UpstreamBillingProbeEnabledExtraKey)
 			delete(account.Extra, UpstreamBillingRateSyncEnabledExtraKey)
+			delete(account.Extra, UpstreamBillingGroupSyncEnabledExtraKey)
 		}
 	}
 	if account.Extra != nil {
@@ -862,6 +925,25 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		account.AutoPauseOnExpired = *input.AutoPauseOnExpired
 	}
 
+	// Preserve normal edges and atomically validate the additional fallback scope
+	// before any persistence. Disabling fallback never promotes old reserve edges.
+	if input.GroupIDs != nil || hasAccountFinalFallbackSettings(input.Extra) {
+		normalGroups := make([]int64, 0, len(account.GroupIDs))
+		if input.GroupIDs != nil {
+			normalGroups = append(normalGroups, (*input.GroupIDs)...)
+		} else {
+			for _, gid := range account.GroupIDs {
+				if !slices.Contains(previousFallbackGroups, gid) {
+					normalGroups = append(normalGroups, gid)
+				}
+			}
+		}
+		bindings, err := s.prepareAccountFinalFallbackBindings(ctx, account, normalGroups)
+		if err != nil {
+			return nil, err
+		}
+		input.GroupIDs = &bindings
+	}
 	// 先验证分组是否存在（在任何写操作之前）
 	if input.GroupIDs != nil {
 		if err := s.validateGroupIDsExist(ctx, *input.GroupIDs); err != nil {
@@ -889,11 +971,11 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if updater != nil {
 		if err := updater.UpdateWithAccountBillingSettings(
-			ctx,
-			account,
-			requestedProbeEnabledUpdate,
-			requestedRateSyncEnabledUpdate,
-			input.RateMultiplier,
+			ctx, account, AccountBillingSettingsUpdate{
+				ProbeEnabled: requestedProbeEnabledUpdate, RateSyncEnabled: requestedRateSyncEnabledUpdate,
+				GroupSyncEnabled: groupSyncUpdate, RateMultiplier: input.RateMultiplier,
+				SetName: input.Name != "", SetNotes: input.Notes != nil,
+			},
 		); err != nil {
 			return nil, err
 		}
@@ -903,14 +985,17 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		if err := s.accountRepo.Update(ctx, account); err != nil {
 			return nil, err
 		}
-		if (requestedProbeEnabledUpdate != nil || requestedRateSyncEnabledUpdate != nil) &&
+		if (requestedProbeEnabledUpdate != nil || requestedRateSyncEnabledUpdate != nil || groupSyncUpdate != nil) &&
 			isUpstreamBillingProbeAccount(account) {
-			settings := make(map[string]any, 2)
+			settings := make(map[string]any, 3)
 			if requestedProbeEnabledUpdate != nil {
 				settings[UpstreamBillingProbeEnabledExtraKey] = *requestedProbeEnabledUpdate
 			}
 			if requestedRateSyncEnabledUpdate != nil {
 				settings[UpstreamBillingRateSyncEnabledExtraKey] = *requestedRateSyncEnabledUpdate
+			}
+			if groupSyncUpdate != nil {
+				settings[UpstreamBillingGroupSyncEnabledExtraKey] = *groupSyncUpdate
 			}
 			if err := s.accountRepo.UpdateExtra(ctx, account.ID, settings); err != nil {
 				return nil, err
@@ -944,10 +1029,14 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 // UpdateAccountExtra 仅对 Extra JSONB 做 key 级合并，避免覆盖其它运行态键
 // （如 model_rate_limits / passive_usage_* 等）。
 func (s *adminServiceImpl) UpdateAccountExtra(ctx context.Context, id int64, updates map[string]any) error {
+	if hasAccountFinalFallbackSettings(updates) {
+		return infraerrors.BadRequest("ACCOUNT_FINAL_FALLBACK_SINGLE_EDIT", "configure final fallback in the account editor")
+	}
 	updates = sanitizedCodexFingerprintExtraUpdates(updates)
 	updates = stripOpenAIAutoResetCreditManagedExtra(updates, true)
 	delete(updates, UpstreamBillingProbeEnabledExtraKey)
 	delete(updates, UpstreamBillingRateSyncEnabledExtraKey)
+	delete(updates, UpstreamBillingGroupSyncEnabledExtraKey)
 	delete(updates, UpstreamBillingProbeExtraKey)
 	delete(updates, OllamaCloudUsageSessionExtraKey)
 	delete(updates, OllamaCloudUsageAutoRefreshExtraKey)
@@ -982,11 +1071,15 @@ func (s *adminServiceImpl) UpdateAccountModelMapping(ctx context.Context, id int
 // BulkUpdateAccounts updates multiple accounts in one request.
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
+	if hasAccountFinalFallbackSettings(input.Extra) {
+		return nil, infraerrors.BadRequest("ACCOUNT_FINAL_FALLBACK_SINGLE_EDIT", "configure final fallback on an individual account")
+	}
 	// Managed probe/session state may only enter through dedicated typed endpoints.
 	input.Extra = sanitizedCodexFingerprintExtraUpdates(input.Extra)
 	input.Extra = stripOpenAIAutoResetCreditManagedExtra(input.Extra, true)
 	delete(input.Extra, UpstreamBillingProbeEnabledExtraKey)
 	delete(input.Extra, UpstreamBillingRateSyncEnabledExtraKey)
+	delete(input.Extra, UpstreamBillingGroupSyncEnabledExtraKey)
 	delete(input.Extra, UpstreamBillingProbeExtraKey)
 	delete(input.Extra, OllamaCloudUsageSessionExtraKey)
 	delete(input.Extra, OllamaCloudUsageAutoRefreshExtraKey)
@@ -1028,7 +1121,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// 预取所有目标账号，供凭据守卫/代理守卫/混合渠道检查共用，避免多次 DB 查询。
 	var cachedTargets []*Account
-	if len(input.Credentials) > 0 || input.ProxyID != nil || needMixedChannelCheck || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
+	if len(input.Credentials) > 0 || input.ProxyID != nil || input.GroupIDs != nil || openAISettings.any() || input.ProbeEnabled != nil || input.RateMultiplier != nil {
 		loaded, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
 		if err != nil {
 			return nil, err
@@ -1130,6 +1223,14 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
+	for _, account := range cachedTargets {
+		if account == nil {
+			continue
+		}
+		if err := ValidateHeaderOverrideVariableUsage(account.Type, input.Credentials); err != nil {
+			return nil, err
+		}
+	}
 	if err := NormalizeProtocolRulesCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
@@ -1153,6 +1254,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		repoUpdates.Extra[UpstreamBillingProbeEnabledExtraKey] = *input.ProbeEnabled
 		if !*input.ProbeEnabled {
 			repoUpdates.Extra[UpstreamBillingRateSyncEnabledExtraKey] = false
+			repoUpdates.Extra[UpstreamBillingGroupSyncEnabledExtraKey] = false
 		}
 	}
 	if updatesUpstreamBillingProbeIdentity(input.Credentials) || input.ProxyID != nil {
@@ -1217,7 +1319,11 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		entry := BulkUpdateAccountResult{AccountID: accountID}
 
 		if input.GroupIDs != nil {
-			if err := s.accountRepo.BindGroups(ctx, accountID, *input.GroupIDs); err != nil {
+			groups := *input.GroupIDs
+			if account := targetsByID[accountID]; account != nil {
+				groups = mergeFinalFallbackBindings(groups, account.FinalFallbackGroupIDs())
+			}
+			if err := s.accountRepo.BindGroups(ctx, accountID, groups); err != nil {
 				entry.Success = false
 				entry.Error = err.Error()
 				result.Failed++

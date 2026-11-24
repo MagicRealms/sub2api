@@ -168,6 +168,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 		AccountCount:                g.AccountCount,
 		ActiveAccountCount:          g.ActiveAccountCount,
 		RateLimitedAccountCount:     g.RateLimitedAccountCount,
+		FallbackAccountCount:        g.FallbackAccountCount,
 		SortOrder:                   g.SortOrder,
 	}
 	if len(g.AccountGroups) > 0 {

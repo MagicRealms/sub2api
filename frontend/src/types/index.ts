@@ -669,6 +669,7 @@ export interface AdminGroup extends Group {
   account_count?: number
   active_account_count?: number
   rate_limited_account_count?: number
+  fallback_account_count?: number
 
   // OpenAI Messages 调度配置（仅 openai 平台使用）
   default_mapped_model?: string
@@ -953,7 +954,7 @@ export interface UpdateGroupRequest {
 // ==================== Account & Proxy Types ====================
 
 /** 前端内置专属界面（图标、配色、表单等）的平台。 */
-export type KnownAccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'opencode_go' | 'sharellm' | 'typesafe' | 'command_code' | 'cline'
+export type KnownAccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'opencode_go' | 'route_relay' | 'typesafe' | 'command_code' | 'cline'
 /**
  * 账号平台：内置平台，或后端平台清单中新登记的平台（任意字符串）。
  * `string & {}` 保留内置平台的字面量补全。
@@ -1289,9 +1290,12 @@ export interface Account {
   opencode_go_usage?: OpenCodeGoUsageState
   // Extra fields including Codex usage, OpenAI compact capability, and model-level rate limits.
   extra?: (CodexUsageSnapshot & OpenAICompactState & {
+    account_final_fallback_enabled?: boolean
+    account_final_fallback_group_ids?: number[]
     model_rate_limits?: Record<string, { rate_limited_at: string; rate_limit_reset_at: string }>
     antigravity_credits_overages?: Record<string, { activated_at: string; active_until: string }>
     upstream_billing_probe_enabled?: boolean
+    upstream_billing_group_sync_enabled?: boolean
     upstream_billing_rate_sync_enabled?: boolean
     upstream_billing_probe?: UpstreamBillingProbeSnapshot
     codex_reset_credit_snapshot?: {
@@ -1629,6 +1633,7 @@ export interface CreateAccountRequest {
   expires_at?: number | null
   auto_pause_on_expired?: boolean
   upstream_billing_probe_enabled?: boolean
+  upstream_billing_group_sync_enabled?: boolean
   confirm_mixed_channel_risk?: boolean
 }
 
@@ -1649,6 +1654,7 @@ export interface UpdateAccountRequest {
   expires_at?: number | null
   auto_pause_on_expired?: boolean
   upstream_billing_probe_enabled?: boolean
+  upstream_billing_group_sync_enabled?: boolean
   upstream_billing_rate_sync_enabled?: boolean
   confirm_mixed_channel_risk?: boolean
 }

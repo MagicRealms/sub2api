@@ -1,4 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ADMIN_PLATFORM_CATALOG } from '@/constants/__tests__/adminPlatformCatalog'
+import { listPlatformIds, resetPlatformCatalog } from '@/constants/platformCatalog'
+
+const getPlatformCatalog = vi.hoisted(() => vi.fn())
+vi.mock('@/api/admin/platformCatalog', () => ({ getPlatformCatalog }))
 
 type NavigationGuard = (
   to: Record<string, any>,
@@ -29,6 +34,7 @@ const appStore = vi.hoisted(() => ({
     custom_menu_items?: []
   },
   fetchPublicSettings: vi.fn(),
+  showError: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -118,6 +124,9 @@ describe('feature route guard', () => {
     appStore.publicSettingsLoaded = false
     appStore.cachedPublicSettings = null
     appStore.fetchPublicSettings.mockReset()
+    appStore.showError.mockReset()
+    getPlatformCatalog.mockReset().mockResolvedValue(ADMIN_PLATFORM_CATALOG)
+    resetPlatformCatalog()
   })
 
   it('waits for the first public-settings request before deciding payment access', async () => {
@@ -138,6 +147,40 @@ describe('feature route guard', () => {
     await navigation
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith()
+  })
+
+  it('loads full provider defaults before activating administrator forms', async () => {
+    authStore.isAdmin = true
+    const deferred = createDeferred<typeof ADMIN_PLATFORM_CATALOG>()
+    getPlatformCatalog.mockReturnValue(deferred.promise)
+    const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/groups')
+    await vi.waitFor(() => expect(getPlatformCatalog).toHaveBeenCalledOnce())
+    expect(next).not.toHaveBeenCalled()
+    deferred.resolve(ADMIN_PLATFORM_CATALOG)
+    await navigation
+    expect(listPlatformIds()).toContain('sharellm')
+    expect(next).toHaveBeenCalledWith()
+
+    await runGuard({}, '/dashboard').navigation
+    expect(listPlatformIds()).toContain('route_relay')
+    expect(listPlatformIds()).not.toContain('sharellm')
+  })
+
+  it('keeps forms closed if authenticated provider settings fail to load', async () => {
+    authStore.isAdmin = true
+    getPlatformCatalog.mockRejectedValue(new Error('offline'))
+    const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/accounts')
+    await navigation
+    expect(next).toHaveBeenCalledWith(false)
+    expect(appStore.showError).toHaveBeenCalledOnce()
+    expect(listPlatformIds()).not.toContain('sharellm')
+  })
+
+  it('rejects ordinary users before requesting the private catalog', async () => {
+    const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/accounts')
+    await navigation
+    expect(next).toHaveBeenCalledWith('/dashboard')
+    expect(getPlatformCatalog).not.toHaveBeenCalled()
   })
 
   it.each([
