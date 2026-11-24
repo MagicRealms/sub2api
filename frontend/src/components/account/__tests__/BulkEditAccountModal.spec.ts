@@ -127,14 +127,19 @@ describe('BulkEditAccountModal', () => {
 
   it('antigravity 白名单包含 Gemini 图片模型且过滤掉普通 GPT 模型', async () => {
     const wrapper = mountModal()
-    const selector = wrapper.findComponent(ModelWhitelistSelector)
-    expect(selector.exists()).toBe(true)
+    try {
+      const selector = wrapper.findComponent(ModelWhitelistSelector)
+      expect(selector.exists()).toBe(true)
 
-    await selector.find('div.cursor-pointer').trigger('click')
+      await selector.find('div.cursor-pointer').trigger('click')
 
-    expect(wrapper.text()).toContain('gemini-3.1-flash-image')
-    expect(wrapper.text()).toContain('gemini-2.5-flash-image')
-    expect(wrapper.text()).not.toContain('gpt-5.3-codex')
+      const dropdownText = document.body.textContent || ''
+      expect(dropdownText).toContain('gemini-3.1-flash-image')
+      expect(dropdownText).toContain('gemini-2.5-flash-image')
+      expect(dropdownText).not.toContain('gpt-5.3-codex')
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('antigravity 映射预设包含图片映射并过滤 OpenAI 预设', async () => {
