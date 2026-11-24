@@ -22,6 +22,12 @@ func (d inflightEstimateDeps) validateRequestPricing(ctx context.Context, key *A
 	if d.billing == nil {
 		return ErrModelPricingUnavailable
 	}
+	if isMiMoASRModel(req.Model) {
+		if _, ok := mimoASRHourlyPrice(ctx, d.resolver, key); !ok {
+			return ErrModelPricingUnavailable
+		}
+		return nil
+	}
 	primary, fallbacks, upstream := inflightBillingModelCandidates(ctx, d, key, req.Model)
 	priced := func(models []string) bool {
 		for _, model := range models {

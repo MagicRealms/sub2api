@@ -20,6 +20,10 @@ import (
 
 // Forward forwards request to OpenAI API
 func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*OpenAIForwardResult, error) {
+	if isMiMoASRModel(gjson.GetBytes(body, "model").String()) {
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", mimoASRProtocolError)
+		return nil, errors.New(mimoASRProtocolError)
+	}
 	beginUpstreamResponseModelObservation(c)
 	ClearActualOpenAIUpstreamEndpoint(c)
 	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {

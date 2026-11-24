@@ -84,6 +84,21 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletionsWithStartTime(
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	if isMiMoASRModel(originalModel) && !isMiMoASRModel(upstreamModel) {
+		const message = "ASR requests must map to mimo-v2.5-asr"
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", message)
+		return nil, errors.New(message)
+	}
+	if isMiMoASRModel(upstreamModel) {
+		if clientStream {
+			writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", mimoASRProtocolError)
+			return nil, errors.New(mimoASRProtocolError)
+		}
+		if _, ok := mimoASRHourlyPrice(ctx, s.resolver, getAPIKeyFromContext(c)); !ok {
+			writeChatCompletionsError(c, http.StatusServiceUnavailable, "model_pricing_unavailable", "Model pricing is unavailable. Please contact the administrator.")
+			return nil, ErrModelPricingUnavailable
+		}
+	}
 	if err := validateGPT61CompatRequest(body, upstreamModel); err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
@@ -534,6 +549,16 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		}
 		return nil, fmt.Errorf("read upstream body: %w", err)
 	}
+	var audioUsage *AudioUsage
+	if isMiMoASRModel(upstreamModel) {
+		audioUsage = mimoASRAudioUsage(respBody)
+		if audioUsage == nil {
+			const message = "MiMo ASR response is missing valid transcription usage"
+			setOpsUpstreamError(c, resp.StatusCode, message, "")
+			writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream transcription failed")
+			return nil, errors.New(message)
+		}
+	}
 	observer := upstreamResponseModelObserverFromContext(c)
 	if observer == nil {
 		observer = beginUpstreamResponseModelObservation(c)
@@ -567,6 +592,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		RequestID:                     requestID,
 		UpstreamHeaders:               resp.Header,
 		Usage:                         usage,
+		AudioUsage:                    audioUsage,
 		Model:                         originalModel,
 		BillingModel:                  billingModel,
 		UpstreamModel:                 upstreamModel,

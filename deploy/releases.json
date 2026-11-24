@@ -47,5 +47,12 @@
     "sequence": 3,
     "date": "2026-11-24",
     "description": "保留网关缺少密钥时的鉴权提示，并识别 DeepSeek Responses 桥接中的流内错误和提前断流"
+  },
+  {
+    "version": "v0.2.25-mr-261124w04",
+    "upstream": "0.2.25",
+    "sequence": 4,
+    "date": "2026-11-24",
+    "description": "适配 MiMo ASR 非流式 Chat Completions，保留音频请求格式并按上游报告的音频秒数和分组 STT 小时价计费"
   }
 ]

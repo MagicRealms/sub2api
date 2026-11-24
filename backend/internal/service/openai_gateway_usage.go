@@ -621,6 +621,13 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCostForGroup(
 			return s.calculateOpenAIVideoCost(ctx, billingModel, apiKey, result, videoMultiplier), nil
 		}
 	}
+	if result != nil && (isMiMoASRModel(result.UpstreamModel) || isMiMoASRModel(result.Model)) {
+		price, ok := mimoASRHourlyPrice(ctx, s.resolver, apiKey)
+		if !ok || result.AudioUsage == nil || result.AudioUsage.Mode != "stt" || !validCost(result.AudioUsage.DurationOrUnits) {
+			return nil, ErrModelPricingUnavailable
+		}
+		return s.billingService.CalculateAudioCost("stt", result.AudioUsage.DurationOrUnits, &audioPriceConfig{STTPerHour: &price}, webSearchMultiplier), nil
+	}
 	if result != nil && result.AudioUsage != nil {
 		if resolved := s.resolveOpenAIChannelPricing(ctx, billingModel, apiKey); resolved != nil &&
 			(resolved.Mode == BillingModePerRequest) {
