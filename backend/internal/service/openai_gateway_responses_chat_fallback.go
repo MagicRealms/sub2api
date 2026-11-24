@@ -140,7 +140,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	}
 
 	if clientStream {
-		return s.streamChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		return s.streamChatCompletionsAsResponses(c, resp, account, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
 	return s.bufferChatCompletionsAsResponses(c, resp, originalModel, customTools, functionTools, toolSearch, namespaceTools, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 }
@@ -192,6 +192,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
 func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	c *gin.Context,
 	resp *http.Response,
+	account *Account,
 	originalModel string,
 	customTools map[string]bool,
 	functionTools map[string]bool,
@@ -243,9 +244,15 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 		events := apicompat.ChatCompletionsChunkToResponsesEvents(chunk, state)
 		s.cacheReasoningItemsFromEvents(events)
 		writeEvents(events)
-	})
+	}, isDeepSeekCatalogModel(upstreamModel))
 
 	if scan.Err != nil {
+		if isDeepSeekCatalogModel(upstreamModel) && errors.Is(scan.Err, ErrOpenAIUpstreamStreamTruncated) {
+			if !c.Writer.Written() {
+				return nil, newOpenAIRawStreamTruncatedFailoverError(c, account, requestID, scan.Err)
+			}
+			recordOpenAIRawStreamTruncation(c, account, requestID, scan.Err, "http_error")
+		}
 		return &OpenAIForwardResult{
 			RequestID:                     requestID,
 			UpstreamHeaders:               resp.Header,

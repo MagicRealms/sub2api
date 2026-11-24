@@ -18,6 +18,19 @@ type privacyRawCapture struct {
 	body bytes.Buffer
 }
 
+func TestPublicErrorPrivacyPreservesAuthenticationError(t *testing.T) {
+	engine := gin.New()
+	engine.Use(PublicErrorPrivacy())
+	engine.GET("/", func(c *gin.Context) {
+		AbortWithError(c, http.StatusUnauthorized, "API_KEY_REQUIRED", "API key is required")
+	})
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusUnauthorized || !strings.Contains(rec.Body.String(), `"code":"API_KEY_REQUIRED"`) {
+		t.Fatalf("expected the public authentication error, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func (w *privacyRawCapture) Write(b []byte) (int, error) {
 	w.body.Write(b)
 	return w.ResponseWriter.Write(b)

@@ -288,6 +288,29 @@ func TestForwardResponses_DeepSeekReasoningOnlyStreamProducesVisibleText(t *test
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }
 
+func TestForwardResponses_DeepSeekTruncatedStreamDoesNotComplete(t *testing.T) {
+	body := []byte(`{"model":"deepseek-reasoner","input":"hello","stream":true}`)
+	for _, tail := range []string{"", "data: {\"error\":{\"message\":\"stream failed\"}}\n\n"} {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+		upstream := &httpUpstreamRecorder{resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(strings.NewReader(
+				`data: {"id":"chat_1","model":"deepseek-reasoner","choices":[{"index":0,"delta":{"content":"partial"},"finish_reason":null}]}` + "\n\n" + tail,
+			)),
+		}}
+		svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+		result, err := svc.Forward(context.Background(), c, forceChatResponsesFallbackAccount(), body)
+		require.ErrorIs(t, err, ErrOpenAIUpstreamStreamTruncated)
+		require.NotNil(t, result)
+		require.Contains(t, rec.Body.String(), "partial")
+		require.NotContains(t, rec.Body.String(), "event: response.completed")
+		require.NotContains(t, rec.Body.String(), "data: [DONE]")
+	}
+}
+
 func TestForwardResponses_AutoSupportedAccountStillUsesResponsesEndpoint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

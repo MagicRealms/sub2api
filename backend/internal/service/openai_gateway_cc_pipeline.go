@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -301,8 +302,10 @@ func (s *OpenAIGatewayService) scanCCStream(
 	requestID string,
 	startTime time.Time,
 	emit func(*apicompat.ChatCompletionsChunk),
+	requireTerminal bool,
 ) ccStreamScanState {
 	var st ccStreamScanState
+	var terminal openAIRawStreamTerminalState
 
 	scanner := s.newUpstreamSSEScanner(resp.Body)
 	for scanner.Scan() {
@@ -314,6 +317,14 @@ func (s *OpenAIGatewayService) scanCCStream(
 		payload = strings.TrimSpace(payload)
 		if payload == "" {
 			continue
+		}
+		if requireTerminal {
+			failure := gjson.Get(payload, "error")
+			if failure.Exists() && failure.Type != gjson.Null {
+				st.Err = ErrOpenAIUpstreamStreamTruncated
+				return st
+			}
+			terminal.ObserveDataLine(payload)
 		}
 		if payload == "[DONE]" {
 			st.SawDone = true
@@ -353,6 +364,9 @@ func (s *OpenAIGatewayService) scanCCStream(
 			)
 		}
 		st.Err = err
+	}
+	if requireTerminal && st.Err == nil && !terminal.Terminated() {
+		st.Err = ErrOpenAIUpstreamStreamTruncated
 	}
 	return st
 }

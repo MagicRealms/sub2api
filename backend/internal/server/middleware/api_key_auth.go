@@ -96,7 +96,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			} else {
 				MarkIngressRejected(c, IngressRejectAPIKeyRequired)
 			}
-			AbortWithError(c, 401, "API_KEY_REQUIRED", "API key is required in Authorization header (Bearer scheme), x-api-key header, or x-goog-api-key header")
+			AbortWithError(c, 401, "API_KEY_REQUIRED", "API key is required in the Authorization, x-api-key, or x-goog-api-key header")
 			return
 		}
 

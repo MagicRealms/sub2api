@@ -76,6 +76,12 @@ func NewErrorResponse(code, message string) ErrorResponse {
 
 // AbortWithError 中断请求并返回JSON错误
 func AbortWithError(c *gin.Context, statusCode int, code, message string) {
+	if _, protected := c.Request.Context().Value(publicErrorPrivacyKey{}).(*publicErrorPrivacyState); protected && statusCode == http.StatusUnauthorized {
+		c.AbortWithStatusJSON(statusCode, gin.H{"error": gin.H{
+			"type": "authentication_error", "code": code, "message": message,
+		}})
+		return
+	}
 	c.JSON(statusCode, NewErrorResponse(code, message))
 	c.Abort()
 }
