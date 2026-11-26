@@ -18,6 +18,7 @@ const isDesktopViewport = useMediaQuery('(min-width: 768px)')
 
 const props = withDefaults(defineProps<{
   platformFilter?: string
+  groupId?: number | null
   refreshToken?: number
 }>(), {
   platformFilter: '',
@@ -29,6 +30,7 @@ const logs = ref<OpsSystemLog[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
+let logsRequest = 0
 
 const health = ref<OpsSystemLogSinkHealth>({
   queue_depth: 0,
@@ -176,7 +178,8 @@ const buildQuery = () => {
   const query: Record<string, any> = {
     page: page.value,
     page_size: pageSize.value,
-    time_range: filters.time_range
+    time_range: filters.time_range,
+    group_id: props.groupId ?? undefined
   }
 
   if (filters.time_range === '30d') {
@@ -208,16 +211,19 @@ const buildQuery = () => {
 }
 
 const fetchLogs = async () => {
+  const request = ++logsRequest
   loading.value = true
   try {
     const res = await opsAPI.listSystemLogs(buildQuery())
+    if (request !== logsRequest) return
     logs.value = res.items || []
     total.value = res.total || 0
   } catch (err: any) {
+    if (request !== logsRequest) return
     console.error('[OpsSystemLogTable] Failed to fetch logs', err)
     appStore.showError(err?.response?.data?.detail || t('admin.ops.systemLogs.loadFailed'))
   } finally {
-    loading.value = false
+    if (request === logsRequest) loading.value = false
   }
 }
 
@@ -321,6 +327,7 @@ const cleanupCurrentFilter = async () => {
       user_id: filters.user_id.trim() ? Number.parseInt(filters.user_id.trim(), 10) : undefined,
       api_key_id: filters.api_key_id.trim() ? Number.parseInt(filters.api_key_id.trim(), 10) : undefined,
       account_id: filters.account_id.trim() ? Number.parseInt(filters.account_id.trim(), 10) : undefined,
+      group_id: props.groupId ?? undefined,
       platform: filters.platform.trim() || undefined,
       model: filters.model.trim() || undefined,
       q: filters.q.trim() || undefined
@@ -369,6 +376,13 @@ watch(() => props.platformFilter, (v) => {
 watch(() => props.refreshToken, () => {
   fetchLogs()
   fetchHealth()
+})
+
+watch(() => props.groupId, () => {
+  page.value = 1
+  logs.value = []
+  total.value = 0
+  void fetchLogs()
 })
 
 const onPageChange = (next: number) => {

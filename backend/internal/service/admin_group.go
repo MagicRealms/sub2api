@@ -1037,6 +1037,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.StrictPriorityEnabled != nil {
 		group.StrictPriorityEnabled = input.StrictPriorityEnabled
 	}
+	group.ExcludeFromOps = input.ExcludeFromOps
 	if input.DefaultMappedModel != nil {
 		group.DefaultMappedModel = *input.DefaultMappedModel
 	}

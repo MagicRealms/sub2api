@@ -449,7 +449,8 @@ SELECT
   COALESCE(COUNT(*), 0) AS success_count,
   COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS token_consumed
 FROM usage_logs
-WHERE created_at >= $1 AND created_at < $2`
+WHERE created_at >= $1 AND created_at < $2
+  AND ` + OpsIncludedGroupSQL("usage_logs.group_id")
 
 	var tokens sql.NullInt64
 	if err := c.db.QueryRowContext(ctx, q, start, end).Scan(&successCount, &tokens); err != nil {
@@ -473,7 +474,8 @@ SELECT
   MAX(duration_ms) AS max_ms
 FROM usage_logs
 WHERE created_at >= $1 AND created_at < $2
-  AND duration_ms IS NOT NULL`
+  AND duration_ms IS NOT NULL
+  AND ` + OpsIncludedGroupSQL("usage_logs.group_id")
 
 		var p50, p90, p95, p99 sql.NullFloat64
 		var avg sql.NullFloat64
@@ -506,7 +508,8 @@ SELECT
   MAX(first_token_ms) AS max_ms
 FROM usage_logs
 WHERE created_at >= $1 AND created_at < $2
-  AND first_token_ms IS NOT NULL`
+  AND first_token_ms IS NOT NULL
+  AND ` + OpsIncludedGroupSQL("usage_logs.group_id")
 
 		var p50, p90, p95, p99 sql.NullFloat64
 		var avg sql.NullFloat64
@@ -550,7 +553,8 @@ SELECT
   COALESCE(COUNT(*) FILTER (WHERE error_owner = 'provider' AND NOT is_business_limited AND COALESCE(upstream_status_code, status_code, 0) = 529), 0) AS upstream_529
 FROM ops_error_logs
 WHERE created_at >= $1 AND created_at < $2
-  AND is_count_tokens = FALSE`
+  AND is_count_tokens = FALSE
+  AND ` + OpsIncludedGroupSQL("ops_error_logs.group_id")
 
 	if err := c.db.QueryRowContext(ctx, q, start, end).Scan(
 		&errorTotal,
@@ -577,7 +581,8 @@ CROSS JOIN LATERAL jsonb_array_elements(
   COALESCE(NULLIF(o.upstream_errors, 'null'::jsonb), '[]'::jsonb)
 ) AS ev
 WHERE o.created_at >= $1 AND o.created_at < $2
-  AND o.is_count_tokens = FALSE`
+  AND o.is_count_tokens = FALSE
+  AND ` + OpsIncludedGroupSQL("o.group_id")
 
 	var count int64
 	if err := c.db.QueryRowContext(ctx, q, start, end).Scan(&count); err != nil {

@@ -22,7 +22,11 @@ func (s *OpsService) listAllAccountsForOps(ctx context.Context, platformFilter s
 		return []Account{}, nil
 	}
 	if repo, ok := s.accountRepo.(opsAccountStatsRepository); ok {
-		return repo.ListOpsAccountsForStats(ctx, platformFilter, groupIDFilter)
+		accounts, err := repo.ListOpsAccountsForStats(ctx, platformFilter, groupIDFilter)
+		if err != nil {
+			return nil, err
+		}
+		return scopeOpsAccounts(accounts, groupIDFilter), nil
 	}
 
 	out := make([]Account, 0, 128)
@@ -58,7 +62,33 @@ func (s *OpsService) listAllAccountsForOps(ctx context.Context, platformFilter s
 		}
 	}
 
-	return out, nil
+	return scopeOpsAccounts(out, groupIDFilter), nil
+}
+
+func scopeOpsAccounts(accounts []Account, groupID *int64) []Account {
+	explicitGroup := groupID != nil && *groupID > 0
+	scoped := make([]Account, 0, len(accounts))
+	for _, account := range accounts {
+		var groups []*Group
+		for _, group := range account.Groups {
+			if group == nil || group.ID <= 0 {
+				continue
+			}
+			if explicitGroup {
+				if group.ID == *groupID {
+					groups = append(groups, group)
+				}
+			} else if group.ExcludeFromOps == nil || !*group.ExcludeFromOps {
+				groups = append(groups, group)
+			}
+		}
+		if len(groups) == 0 && (explicitGroup || len(account.Groups) != 0) {
+			continue
+		}
+		account.Groups = groups
+		scoped = append(scoped, account)
+	}
+	return scoped
 }
 
 func (s *OpsService) getAccountsLoadMapBestEffort(ctx context.Context, accounts []Account) map[int64]*AccountLoadInfo {

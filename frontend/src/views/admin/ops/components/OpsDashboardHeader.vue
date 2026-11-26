@@ -148,7 +148,7 @@ watch(
 
 onMounted(async () => {
   try {
-    const list = await adminAPI.groups.getAll()
+    const list = await adminAPI.groups.getAllIncludingInactive()
     groups.value = list.map((g) => ({ id: g.id, name: g.name, platform: g.platform }))
   } catch (e) {
     console.error('[OpsDashboardHeader] Failed to load groups', e)

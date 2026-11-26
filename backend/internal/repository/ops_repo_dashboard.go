@@ -241,6 +241,19 @@ func (r *opsRepository) getDashboardOverviewPreaggregated(ctx context.Context, f
 		return r.getDashboardOverviewRaw(ctx, filter)
 	}
 
+	// The existing overall and platform buckets contain every group. Read
+	// the raw window while exclusions are active so toggles apply to history
+	// immediately. Per-group buckets are still valid for explicit drilldowns.
+	if filter.GroupID == nil || *filter.GroupID <= 0 {
+		key, err := r.OpsGroupExclusionKey(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if key != "" {
+			return r.getDashboardOverviewRaw(ctx, filter)
+		}
+	}
+
 	// 1) Pre-aggregated stable segment.
 	preaggRows, err := r.listHourlyMetricsRows(ctx, filter, aggFullStart, aggFullEnd)
 	if err != nil {
@@ -1044,6 +1057,8 @@ func buildUsageWhere(filter *service.OpsDashboardFilter, start, end time.Time, s
 		args = append(args, *groupID)
 		clauses = append(clauses, fmt.Sprintf("ul.group_id = $%d", idx))
 		idx++
+	} else {
+		clauses = append(clauses, service.OpsIncludedGroupSQL("ul.group_id"))
 	}
 	if platform != "" {
 		// Prefer group.platform when available; fall back to account.platform so we don't
@@ -1083,6 +1098,8 @@ func buildErrorWhere(filter *service.OpsDashboardFilter, start, end time.Time, s
 		args = append(args, *groupID)
 		clauses = append(clauses, fmt.Sprintf("group_id = $%d", idx))
 		idx++
+	} else {
+		clauses = append(clauses, service.OpsIncludedGroupSQL("ops_error_logs.group_id"))
 	}
 	if platform != "" {
 		args = append(args, platform)

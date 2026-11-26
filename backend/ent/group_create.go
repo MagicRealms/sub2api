@@ -182,6 +182,20 @@ func (_c *GroupCreate) SetNillableIsExclusive(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetExcludeFromOps sets the "exclude_from_ops" field.
+func (_c *GroupCreate) SetExcludeFromOps(v bool) *GroupCreate {
+	_c.mutation.SetExcludeFromOps(v)
+	return _c
+}
+
+// SetNillableExcludeFromOps sets the "exclude_from_ops" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableExcludeFromOps(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetExcludeFromOps(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *GroupCreate) SetStatus(v string) *GroupCreate {
 	_c.mutation.SetStatus(v)
@@ -1123,6 +1137,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultIsExclusive
 		_c.mutation.SetIsExclusive(v)
 	}
+	if _, ok := _c.mutation.ExcludeFromOps(); !ok {
+		v := group.DefaultExcludeFromOps
+		_c.mutation.SetExcludeFromOps(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := group.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -1320,6 +1338,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsExclusive(); !ok {
 		return &ValidationError{Name: "is_exclusive", err: errors.New(`ent: missing required field "Group.is_exclusive"`)}
+	}
+	if _, ok := _c.mutation.ExcludeFromOps(); !ok {
+		return &ValidationError{Name: "exclude_from_ops", err: errors.New(`ent: missing required field "Group.exclude_from_ops"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Group.status"`)}
@@ -1561,6 +1582,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
 		_node.IsExclusive = value
+	}
+	if value, ok := _c.mutation.ExcludeFromOps(); ok {
+		_spec.SetField(group.FieldExcludeFromOps, field.TypeBool, value)
+		_node.ExcludeFromOps = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(group.FieldStatus, field.TypeString, value)
@@ -2103,6 +2128,18 @@ func (u *GroupUpsert) SetIsExclusive(v bool) *GroupUpsert {
 // UpdateIsExclusive sets the "is_exclusive" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateIsExclusive() *GroupUpsert {
 	u.SetExcluded(group.FieldIsExclusive)
+	return u
+}
+
+// SetExcludeFromOps sets the "exclude_from_ops" field.
+func (u *GroupUpsert) SetExcludeFromOps(v bool) *GroupUpsert {
+	u.Set(group.FieldExcludeFromOps, v)
+	return u
+}
+
+// UpdateExcludeFromOps sets the "exclude_from_ops" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateExcludeFromOps() *GroupUpsert {
+	u.SetExcluded(group.FieldExcludeFromOps)
 	return u
 }
 
@@ -3287,6 +3324,20 @@ func (u *GroupUpsertOne) SetIsExclusive(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateIsExclusive() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateIsExclusive()
+	})
+}
+
+// SetExcludeFromOps sets the "exclude_from_ops" field.
+func (u *GroupUpsertOne) SetExcludeFromOps(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetExcludeFromOps(v)
+	})
+}
+
+// UpdateExcludeFromOps sets the "exclude_from_ops" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateExcludeFromOps() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateExcludeFromOps()
 	})
 }
 
@@ -4796,6 +4847,20 @@ func (u *GroupUpsertBulk) SetIsExclusive(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateIsExclusive() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateIsExclusive()
+	})
+}
+
+// SetExcludeFromOps sets the "exclude_from_ops" field.
+func (u *GroupUpsertBulk) SetExcludeFromOps(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetExcludeFromOps(v)
+	})
+}
+
+// UpdateExcludeFromOps sets the "exclude_from_ops" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateExcludeFromOps() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateExcludeFromOps()
 	})
 }
 

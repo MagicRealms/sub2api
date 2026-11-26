@@ -142,6 +142,7 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		ModelRouting:                    cloneGroupModelRouting(source.ModelRouting),
 		ModelRoutingEnabled:             source.ModelRoutingEnabled,
 		StrictPriorityEnabled:           cloneGroupValuePointer(source.StrictPriorityEnabled),
+		ExcludeFromOps:                  cloneGroupValuePointer(source.ExcludeFromOps),
 		MCPXMLInject:                    source.MCPXMLInject,
 		SupportedModelScopes:            append([]string(nil), source.SupportedModelScopes...),
 		SortOrder:                       source.SortOrder,

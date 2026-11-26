@@ -2386,6 +2386,22 @@
           <label class="input-label">{{ t("admin.groups.form.status") }}</label>
           <Select v-model="editForm.status" :options="editStatusOptions" />
         </div>
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <label for="edit-group-exclude-from-ops" class="input-label">
+              {{ t("admin.groups.form.excludeFromOps") }}
+            </label>
+            <p id="edit-group-exclude-from-ops-hint" class="input-hint">
+              {{ t("admin.groups.form.excludeFromOpsHint") }}
+            </p>
+          </div>
+          <Toggle
+            id="edit-group-exclude-from-ops"
+            v-model="editForm.exclude_from_ops"
+            :aria-label="t('admin.groups.form.excludeFromOps')"
+            aria-describedby="edit-group-exclude-from-ops-hint"
+          />
+        </div>
 
         <!-- Subscription Configuration -->
         <div class="mt-4 border-t pt-4">
@@ -5409,6 +5425,7 @@ const editForm = reactive({
   rate_multiplier: 1.0,
   is_exclusive: false,
   status: "active" as "active" | "inactive",
+  exclude_from_ops: false,
   subscription_type: "standard" as SubscriptionType,
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
@@ -6182,6 +6199,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.rate_multiplier = group.rate_multiplier;
   editForm.is_exclusive = group.is_exclusive;
   editForm.status = group.status;
+  editForm.exclude_from_ops = group.exclude_from_ops ?? false;
   editForm.subscription_type = group.subscription_type || "standard";
   editForm.daily_limit_usd = group.daily_limit_usd;
   editForm.weekly_limit_usd = group.weekly_limit_usd;
@@ -6383,6 +6401,9 @@ const handleUpdateGroup = async () => {
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
+      exclude_from_ops: editForm.exclude_from_ops !== (editingGroup.value.exclude_from_ops ?? false)
+        ? editForm.exclude_from_ops
+        : undefined,
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,

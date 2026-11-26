@@ -24,6 +24,7 @@ type opsSystemLogCleanupRequest struct {
 	UserID          *int64 `json:"user_id"`
 	APIKeyID        *int64 `json:"api_key_id"`
 	AccountID       *int64 `json:"account_id"`
+	GroupID         *int64 `json:"group_id"`
 	Platform        string `json:"platform"`
 	Model           string `json:"model"`
 	Query           string `json:"q"`
@@ -90,6 +91,11 @@ func (h *OpsHandler) ListSystemLogs(c *gin.Context) {
 		}
 		filter.AccountID = &id
 	}
+	filter.GroupID, err = parseOptionalPositiveID(c, "group_id")
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
 	result, err := h.opsService.ListSystemLogs(c.Request.Context(), filter)
 	if err != nil {
@@ -151,6 +157,10 @@ func (h *OpsHandler) CleanupSystemLogs(c *gin.Context) {
 		response.BadRequest(c, "Invalid api_key_id")
 		return
 	}
+	if req.GroupID != nil && *req.GroupID <= 0 {
+		response.BadRequest(c, "Invalid group_id")
+		return
+	}
 
 	filter := &service.OpsSystemLogCleanupFilter{
 		StartTime:       start,
@@ -163,6 +173,7 @@ func (h *OpsHandler) CleanupSystemLogs(c *gin.Context) {
 		UserID:          req.UserID,
 		APIKeyID:        req.APIKeyID,
 		AccountID:       req.AccountID,
+		GroupID:         req.GroupID,
 		Platform:        strings.TrimSpace(req.Platform),
 		Model:           strings.TrimSpace(req.Model),
 		Query:           strings.TrimSpace(req.Query),

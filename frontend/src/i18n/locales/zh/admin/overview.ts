@@ -947,6 +947,8 @@ export default {
         platform: '平台',
         rateMultiplier: '费率倍数',
         status: '状态',
+        excludeFromOps: '不计入运维管理',
+        excludeFromOpsHint: '开启后，本分组的请求和错误不参与运维汇总。可在运维管理中单独选择本分组查看。',
         exclusive: '专属分组',
         nameLabel: '分组名称',
         namePlaceholder: '请输入分组名称',

@@ -373,6 +373,7 @@ type UpdateGroupInput struct {
 	ModelRouting          map[string][]int64
 	ModelRoutingEnabled   *bool // 是否启用模型路由
 	StrictPriorityEnabled *bool
+	ExcludeFromOps        *bool
 	MCPXMLInject          *bool
 	// 支持的模型系列（仅 antigravity 平台使用）
 	SupportedModelScopes *[]string

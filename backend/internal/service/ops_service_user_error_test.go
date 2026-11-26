@@ -41,7 +41,7 @@ func TestListUserErrorRequests_ForcesScopeAndRedacts(t *testing.T) {
 	svc := &OpsService{opsRepo: stub}
 	uid := int64(42)
 	kid := int64(7)
-	in := &OpsErrorLogFilter{UserID: nil, View: "errors", Phase: "upstream", APIKeyID: &kid}
+	in := &OpsErrorLogFilter{UserID: nil, View: "errors", Phase: "upstream", APIKeyID: &kid, ApplyGroupExclusions: true}
 	out, err := svc.ListUserErrorRequests(context.Background(), uid, in)
 	if err != nil {
 		t.Fatal(err)
@@ -58,6 +58,9 @@ func TestListUserErrorRequests_ForcesScopeAndRedacts(t *testing.T) {
 	if !stub.gotFilter.ExcludeCountTokens {
 		t.Fatal("ExcludeCountTokens not forced")
 	}
+	if stub.gotFilter.ApplyGroupExclusions {
+		t.Fatal("Ops exclusions must not hide a customer's own error history")
+	}
 	// 强制清空 Phase（防止 "upstream" 绕过 status>=400 子句 + 与 ErrorPhasesAny 双重约束）
 	if stub.gotFilter.Phase != "" {
 		t.Fatalf("Phase not cleared: %q", stub.gotFilter.Phase)
@@ -73,6 +76,27 @@ func TestListUserErrorRequests_ForcesScopeAndRedacts(t *testing.T) {
 	// 脱敏：返回条目含 message 字段
 	if len(out.Items) != 1 || out.Items[0].Category != "rate_limit" || out.Items[0].Model != "rm" {
 		t.Fatalf("bad item: %+v", out.Items)
+	}
+}
+
+func TestOpsErrorListKeepsLinkedUpstreamDiagnostics(t *testing.T) {
+	stub := &stubOpsRepoForUserErr{}
+	svc := &OpsService{opsRepo: stub}
+	ctx := context.Background()
+	filter := &OpsErrorLogFilter{}
+	if _, err := svc.GetErrorLogs(ctx, filter); err != nil {
+		t.Fatal(err)
+	}
+	if !stub.gotFilter.ApplyGroupExclusions || filter.ApplyGroupExclusions {
+		t.Fatal("expected only the Ops list filter to apply group exclusions")
+	}
+	for _, filter := range []*OpsErrorLogFilter{{RequestID: "request"}, {ClientRequestID: "client-request"}} {
+		if _, err := svc.GetErrorLogs(ctx, filter); err != nil {
+			t.Fatal(err)
+		}
+		if stub.gotFilter.ApplyGroupExclusions {
+			t.Fatal("linked upstream errors must stay visible in request details")
+		}
 	}
 }
 

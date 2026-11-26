@@ -12,6 +12,7 @@ import { formatDateTime } from '../utils/opsFormatters'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const props = defineProps<{ groupId?: number | null }>()
 
 // 与 DataTable 一致：< 768px 切换为卡片视图，避免宽表在移动端被截断。
 const isDesktopViewport = useMediaQuery('(min-width: 768px)')
@@ -84,7 +85,8 @@ const emailSentOptions = computed(() => [
 function buildQuery(overrides: Partial<AlertEventsQuery> = {}): AlertEventsQuery {
   const q: AlertEventsQuery = {
     limit: PAGE_SIZE,
-    time_range: timeRange.value
+    time_range: timeRange.value,
+    group_id: props.groupId ?? undefined,
   }
   if (severity.value) q.severity = severity.value
   if (status.value) q.status = status.value
@@ -328,7 +330,7 @@ onMounted(() => {
   loadFirstPage()
 })
 
-watch([timeRange, severity, status, emailSent], () => {
+watch([timeRange, severity, status, emailSent, () => props.groupId], () => {
   events.value = []
   hasMore.value = true
   loadFirstPage()

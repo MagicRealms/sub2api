@@ -48,6 +48,8 @@ func TestOpsRepositoryGetOpenAITokenStats_PlatformScope(t *testing.T) {
 			if tt.groupID != nil {
 				where += " AND ul.group_id = $3"
 				args = append(args, *tt.groupID)
+			} else {
+				where += " AND COALESCE(ul.group_id, 0) NOT IN (SELECT id FROM groups WHERE exclude_from_ops)"
 			}
 			if tt.platform != "" {
 				placeholder := "$3"

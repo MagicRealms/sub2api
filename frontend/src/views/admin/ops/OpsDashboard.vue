@@ -93,12 +93,16 @@
       </div>
 
       <!-- Alert Events -->
-      <OpsAlertEventsCard v-if="opsEnabled && showAlertEvents && !(loading && !hasLoadedOnce)" />
+      <OpsAlertEventsCard
+        v-if="opsEnabled && showAlertEvents && !(loading && !hasLoadedOnce)"
+        :group-id="groupId"
+      />
 
       <!-- System Logs -->
       <OpsSystemLogTable
         v-if="opsEnabled && !(loading && !hasLoadedOnce)"
         :platform-filter="platform"
+        :group-id="groupId"
         :refresh-token="dashboardRefreshToken"
       />
 

@@ -190,6 +190,7 @@ type AdminGroup struct {
 	ModelRouting          map[string][]int64 `json:"model_routing"`
 	ModelRoutingEnabled   bool               `json:"model_routing_enabled"`
 	StrictPriorityEnabled bool               `json:"strict_priority_enabled"`
+	ExcludeFromOps        bool               `json:"exclude_from_ops"`
 
 	// MCP XML 协议注入（仅 antigravity 平台使用）
 	MCPXMLInject bool `json:"mcp_xml_inject"`

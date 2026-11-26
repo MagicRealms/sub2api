@@ -658,6 +658,7 @@ export interface AdminGroup extends Group {
   model_routing: Record<string, number[]> | null
   model_routing_enabled: boolean
   strict_priority_enabled: boolean
+  exclude_from_ops?: boolean
 
   // MCP XML 协议注入（仅 antigravity 平台使用）
   mcp_xml_inject: boolean
@@ -883,6 +884,7 @@ export interface CreateGroupRequest {
 }
 
 export interface UpdateGroupRequest {
+  exclude_from_ops?: boolean
   name?: string
   description?: string | null
   i18n?: GroupI18n

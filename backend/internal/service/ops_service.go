@@ -690,7 +690,13 @@ func (s *OpsService) GetErrorLogs(ctx context.Context, filter *OpsErrorLogFilter
 	if s.opsRepo == nil {
 		return &OpsErrorLogList{Errors: []*OpsErrorLog{}, Total: 0, Page: 1, PageSize: 20}, nil
 	}
-	result, err := s.opsRepo.ListErrorLogs(ctx, filter)
+	scoped := OpsErrorLogFilter{}
+	if filter != nil {
+		scoped = *filter
+	}
+	// Exact correlation keys are used by the linked upstream-error drilldown.
+	scoped.ApplyGroupExclusions = scoped.RequestID == "" && scoped.ClientRequestID == ""
+	result, err := s.opsRepo.ListErrorLogs(ctx, &scoped)
 	if err != nil {
 		log.Printf("[Ops] GetErrorLogs failed: %v", err)
 		return nil, err
@@ -724,6 +730,7 @@ func (s *OpsService) ListUserErrorRequests(ctx context.Context, userID int64, fi
 	//（error_phase='upstream' 但 status<400,最终成功返回）记录对用户不可见——符合预期。
 	filter.Phase = ""
 	filter.IncludeRecoveredUpstream = false
+	filter.ApplyGroupExclusions = false
 
 	list, err := s.opsRepo.ListErrorLogs(ctx, filter)
 	if err != nil {

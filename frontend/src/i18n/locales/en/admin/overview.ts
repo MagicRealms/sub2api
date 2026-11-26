@@ -971,6 +971,8 @@ export default {
         platform: 'Platform',
         rateMultiplier: 'Rate Multiplier',
         status: 'Status',
+        excludeFromOps: 'Exclude from operations totals',
+        excludeFromOpsHint: 'Omit this group’s requests and errors from operations totals. Select the group in Operations to view its records.',
         exclusive: 'Exclusive Group',
         nameLabel: 'Group Name',
         namePlaceholder: 'Enter group name',

@@ -90,6 +90,8 @@ type Group struct {
 	ModelRoutingEnabled bool
 	// StrictPriorityEnabled is nil for legacy groups that still use the global group-ID list.
 	StrictPriorityEnabled *bool
+	// ExcludeFromOps is nil when an update leaves the existing value in place.
+	ExcludeFromOps *bool
 
 	// MCP XML 协议注入开关（仅 antigravity 平台使用）
 	MCPXMLInject bool

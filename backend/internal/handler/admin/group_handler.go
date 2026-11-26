@@ -333,6 +333,7 @@ type UpdateGroupRequest struct {
 	ModelRouting          map[string][]int64 `json:"model_routing"`
 	ModelRoutingEnabled   *bool              `json:"model_routing_enabled"`
 	StrictPriorityEnabled *bool              `json:"strict_priority_enabled"`
+	ExcludeFromOps        *bool              `json:"exclude_from_ops"`
 	MCPXMLInject          *bool              `json:"mcp_xml_inject"`
 	// 支持的模型系列（仅 antigravity 平台使用）
 	SupportedModelScopes *[]string `json:"supported_model_scopes"`
@@ -850,6 +851,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
 		Status:                          req.Status,
+		ExcludeFromOps:                  req.ExcludeFromOps,
 		SubscriptionType:                req.SubscriptionType,
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),

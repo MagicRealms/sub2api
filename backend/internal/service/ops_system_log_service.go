@@ -107,6 +107,9 @@ func marshalSystemLogCleanupConditions(filter *OpsSystemLogCleanupFilter) string
 	if filter.AccountID != nil {
 		payload["account_id"] = *filter.AccountID
 	}
+	if filter.GroupID != nil {
+		payload["group_id"] = *filter.GroupID
+	}
 	if filter.StartTime != nil && !filter.StartTime.IsZero() {
 		payload["start_time"] = filter.StartTime.UTC().Format(time.RFC3339Nano)
 	}

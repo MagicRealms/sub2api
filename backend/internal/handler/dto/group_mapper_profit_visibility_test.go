@@ -86,3 +86,14 @@ func TestGroupStrictPrioritySettingIsAdminOnly(t *testing.T) {
 		t.Fatal("strict_priority_enabled must not be exposed on the user-facing group DTO")
 	}
 }
+
+func TestGroupOpsExclusionSettingIsAdminOnly(t *testing.T) {
+	enabled := true
+	group := &service.Group{ID: 7, ExcludeFromOps: &enabled}
+	if !GroupFromServiceAdmin(group).ExcludeFromOps {
+		t.Fatal("administrator DTO should include the group Ops setting")
+	}
+	if _, ok := marshalToMap(t, GroupFromService(group))["exclude_from_ops"]; ok {
+		t.Fatal("the Ops setting must stay out of the user group DTO")
+	}
+}

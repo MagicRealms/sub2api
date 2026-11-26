@@ -110,6 +110,11 @@ func IsExclusive(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldIsExclusive, v))
 }
 
+// ExcludeFromOps applies equality check predicate on the "exclude_from_ops" field. It's identical to ExcludeFromOpsEQ.
+func ExcludeFromOps(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldExcludeFromOps, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldStatus, v))
@@ -858,6 +863,16 @@ func IsExclusiveEQ(v bool) predicate.Group {
 // IsExclusiveNEQ applies the NEQ predicate on the "is_exclusive" field.
 func IsExclusiveNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldIsExclusive, v))
+}
+
+// ExcludeFromOpsEQ applies the EQ predicate on the "exclude_from_ops" field.
+func ExcludeFromOpsEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldExcludeFromOps, v))
+}
+
+// ExcludeFromOpsNEQ applies the NEQ predicate on the "exclude_from_ops" field.
+func ExcludeFromOpsNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldExcludeFromOps, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

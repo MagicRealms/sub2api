@@ -329,4 +329,31 @@ describe("GroupsView Codex manifest binding", () => {
     );
     wrapper.unmount();
   });
+
+  it.each([false, true])("loads and toggles the Ops exclusion when it is %s", async (excluded) => {
+    listGroups.mockResolvedValueOnce({
+      items: [{ ...sourceGroup, exclude_from_ops: excluded }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    });
+    const wrapper = mountView();
+    await flushPromises();
+
+    const editButton = wrapper.findAll("button").find((button) => button.text().includes("common.edit"));
+    await editButton!.trigger("click");
+    await flushPromises();
+    const toggle = wrapper.get("#edit-group-exclude-from-ops");
+    expect(toggle.attributes("aria-checked")).toBe(String(excluded));
+    await toggle.trigger("click");
+    await wrapper.get("#edit-group-form").trigger("submit");
+    await flushPromises();
+
+    expect(updateGroup).toHaveBeenCalledWith(
+      sourceGroup.id,
+      expect.objectContaining({ exclude_from_ops: !excluded }),
+    );
+    wrapper.unmount();
+  });
 });

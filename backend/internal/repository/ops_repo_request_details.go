@@ -79,10 +79,10 @@ func (r *opsRepository) ListRequestDetails(ctx context.Context, filter *service.
 		}
 	}
 
-	where := ""
-	if len(conditions) > 0 {
-		where = "WHERE " + strings.Join(conditions, " AND ")
+	if filter == nil || filter.GroupID == nil || *filter.GroupID <= 0 {
+		addCondition(service.OpsIncludedGroupSQL("combined.group_id"))
 	}
+	where := "WHERE " + strings.Join(conditions, " AND ")
 
 	cte := `
 WITH combined AS (

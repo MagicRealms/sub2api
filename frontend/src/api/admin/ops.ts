@@ -861,6 +861,7 @@ export interface OpsSystemLog {
 export type OpsSystemLogListResponse = PaginatedResponse<OpsSystemLog>
 
 export interface OpsSystemLogQuery {
+  group_id?: number
   page?: number
   page_size?: number
   time_range?: '5m' | '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
@@ -880,6 +881,7 @@ export interface OpsSystemLogQuery {
 }
 
 export interface OpsSystemLogCleanupRequest {
+  group_id?: number
   start_time?: string
   end_time?: string
   host?: string

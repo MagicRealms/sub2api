@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +63,19 @@ INSERT INTO ops_error_logs (
 
 func NewOpsRepository(db *sql.DB) service.OpsRepository {
 	return &opsRepository{db: db}
+}
+
+func (r *opsRepository) OpsGroupExclusionKey(ctx context.Context) (string, error) {
+	const query = "SELECT COALESCE(string_agg(id::text, ',' ORDER BY id), '') FROM groups WHERE exclude_from_ops"
+	var key string
+	err := r.db.QueryRowContext(ctx, query).Scan(&key)
+	return key, err
+}
+
+// JSON dimensions may be absent or contain legacy values. Compare their text
+// to actual group IDs without casting untrusted JSON to a number.
+func opsIncludedTaggedGroupSQL(groupIDExpression string) string {
+	return "COALESCE(" + groupIDExpression + ", '') NOT IN (SELECT id::text FROM groups WHERE exclude_from_ops)"
 }
 
 func (r *opsRepository) InsertErrorLog(ctx context.Context, input *service.OpsInsertErrorLogInput) (int64, error) {
@@ -934,6 +948,8 @@ func buildOpsErrorLogsWhere(filter *service.OpsErrorLogFilter) (string, []any) {
 	if filter.GroupID != nil && *filter.GroupID > 0 {
 		args = append(args, *filter.GroupID)
 		clauses = append(clauses, "e.group_id = $"+itoa(len(args)))
+	} else if filter.ApplyGroupExclusions {
+		clauses = append(clauses, service.OpsIncludedGroupSQL("e.group_id"))
 	}
 	if filter.AccountID != nil && *filter.AccountID > 0 {
 		args = append(args, *filter.AccountID)
@@ -1121,6 +1137,13 @@ func buildOpsSystemLogsWhere(filter *service.OpsSystemLogFilter) (string, []any,
 			clauses = append(clauses, "l.account_id = $"+itoa(len(args)))
 			hasConstraint = true
 		}
+		if filter.GroupID != nil && *filter.GroupID > 0 {
+			args = append(args, strconv.FormatInt(*filter.GroupID, 10))
+			clauses = append(clauses, "(l.extra->>'group_id') = $"+itoa(len(args)))
+			hasConstraint = true
+		} else {
+			clauses = append(clauses, opsIncludedTaggedGroupSQL("l.extra->>'group_id'"))
+		}
 		if v := strings.TrimSpace(filter.Platform); v != "" {
 			args = append(args, v)
 			clauses = append(clauses, "COALESCE(l.platform,'') = $"+itoa(len(args)))
@@ -1158,6 +1181,7 @@ func buildOpsSystemLogsCleanupWhere(filter *service.OpsSystemLogCleanupFilter) (
 		UserID:          filter.UserID,
 		APIKeyID:        filter.APIKeyID,
 		AccountID:       filter.AccountID,
+		GroupID:         filter.GroupID,
 		Platform:        filter.Platform,
 		Model:           filter.Model,
 		Query:           filter.Query,

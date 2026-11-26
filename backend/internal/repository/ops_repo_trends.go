@@ -194,6 +194,7 @@ WITH usage_totals AS (
   LEFT JOIN groups g ON g.id = ul.group_id
   LEFT JOIN accounts a ON a.id = ul.account_id
   WHERE ul.created_at >= $1 AND ul.created_at < $2
+    AND ` + service.OpsIncludedGroupSQL("ul.group_id") + `
   GROUP BY 1
 ),
 error_totals AS (
@@ -201,6 +202,7 @@ error_totals AS (
          COUNT(*) AS error_count
   FROM ops_error_logs
   WHERE created_at >= $1 AND created_at < $2
+    AND ` + service.OpsIncludedGroupSQL("ops_error_logs.group_id") + `
     AND COALESCE(status_code, 0) >= 400
     AND is_count_tokens = FALSE  -- 排除 count_tokens 请求的错误
   GROUP BY 1
@@ -266,6 +268,7 @@ WITH usage_totals AS (
   JOIN groups g ON g.id = ul.group_id
   WHERE ul.created_at >= $1 AND ul.created_at < $2
     AND g.platform = $3
+    AND NOT g.exclude_from_ops
   GROUP BY 1, 2
 ),
 error_totals AS (
@@ -275,6 +278,7 @@ error_totals AS (
   WHERE created_at >= $1 AND created_at < $2
     AND platform = $3
     AND group_id IS NOT NULL
+    AND ` + service.OpsIncludedGroupSQL("ops_error_logs.group_id") + `
     AND COALESCE(status_code, 0) >= 400
     AND is_count_tokens = FALSE  -- 排除 count_tokens 请求的错误
   GROUP BY 1

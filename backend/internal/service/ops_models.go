@@ -108,6 +108,9 @@ type OpsErrorLogFilter struct {
 	Platform  string
 	GroupID   *int64
 	AccountID *int64
+	// ApplyGroupExclusions is for Ops-wide lists. User history and linked
+	// request details keep their own scope.
+	ApplyGroupExclusions bool
 
 	StatusCodes      []int
 	StatusCodesOther bool

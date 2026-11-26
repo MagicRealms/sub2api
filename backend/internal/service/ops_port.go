@@ -17,6 +17,7 @@ type OpsRepository interface {
 	InsertSystemLogCleanupAudit(ctx context.Context, input *OpsSystemLogCleanupAudit) error
 
 	UpdateErrorResolution(ctx context.Context, errorID int64, resolved bool, resolvedByUserID *int64, resolvedAt *time.Time) error
+	OpsGroupExclusionKey(ctx context.Context) (string, error)
 
 	// Lightweight window stats (for realtime WS / quick sampling).
 	GetWindowStats(ctx context.Context, filter *OpsDashboardFilter) (*OpsWindowStats, error)
@@ -208,6 +209,7 @@ type OpsSystemLogFilter struct {
 	UserID          *int64
 	APIKeyID        *int64
 	AccountID       *int64
+	GroupID         *int64
 	Platform        string
 	Model           string
 	Query           string
@@ -229,6 +231,7 @@ type OpsSystemLogCleanupFilter struct {
 	UserID          *int64
 	APIKeyID        *int64
 	AccountID       *int64
+	GroupID         *int64
 	Platform        string
 	Model           string
 	Query           string
