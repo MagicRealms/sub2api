@@ -75,5 +75,12 @@
     "sequence": 7,
     "date": "2026-11-26",
     "description": "补齐 Gemini 4 Neon 的美元价卡和内置兜底，按官方标准、Priority 与 Flex 档计量输入、输出和隐式缓存命中"
+  },
+  {
+    "version": "v0.2.25-mr-261126w08",
+    "upstream": "0.2.25",
+    "sequence": 8,
+    "date": "2026-11-26",
+    "description": "渠道状态 V2 默认查看最近 7 天，支持按链接指定的时间范围打开"
   }
 ]
