@@ -113,3 +113,41 @@ func TestMiMoTTSUsesDedicatedAccountAndExplicitFreePrice(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, cost.ActualCost)
 }
+
+func TestMiMoDomesticPricingOverridesRemoteUSD(t *testing.T) {
+	catalog := &PricingService{pricingData: map[string]*LiteLLMModelPricing{
+		"mimo-v2.6-flash": {PricingCurrency: "USD", InputCostPerToken: 0.14e-6, OutputCostPerToken: 0.28e-6, CacheReadInputTokenCost: 0.0028e-6},
+		"mimo-v2.6-pro":   {PricingCurrency: "USD", InputCostPerToken: 0.435e-6, OutputCostPerToken: 0.87e-6, CacheReadInputTokenCost: 0.0036e-6},
+	}}
+	billing := NewBillingService(nil, catalog)
+	ctx := context.Background()
+	plaza := &ModelPlazaService{billingService: billing}
+	memo := make(map[string]*PlazaOfficialPricing)
+	for _, tc := range []struct {
+		model string
+		want  float64
+	}{
+		{model: "self-dploy/MiMo-V2.6-Flash", want: 0.00302},
+		{model: "mimo-v2.6-pro", want: 0.009025},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			cost, err := billing.CalculateCost(tc.model, UsageTokens{InputTokens: 1000, OutputTokens: 1000, CacheReadTokens: 1000}, 0.15)
+			require.NoError(t, err)
+			require.InDelta(t, tc.want, cost.TotalCost, 1e-12)
+			require.InDelta(t, tc.want*0.15, cost.ActualCost, 1e-12)
+			require.Equal(t, "CNY", plaza.lookupOfficialPricing(ctx, tc.model, memo).Currency)
+		})
+	}
+	for _, tc := range []struct {
+		model, unit string
+		price       float64
+	}{
+		{model: mimoASRModel, unit: "hour", price: 0.50},
+		{model: mimoTTSModel, unit: "request", price: 0},
+	} {
+		p := plaza.lookupOfficialPricing(ctx, tc.model, memo)
+		require.Equal(t, "CNY", p.Currency)
+		require.Equal(t, tc.unit, p.Unit)
+		require.Equal(t, tc.price, *p.UnitPrice)
+	}
+}

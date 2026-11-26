@@ -809,6 +809,8 @@ export default {
       unitPerMillionCny: 'RMB / 1M tokens',
       unitPerMillionMixed: '/ 1M tokens (currency shown per model)',
       perUnitRequest: '/ request',
+      perUnitHour: '/ hour',
+      perHour: 'Per hour',
       perUnitImage: '/ image',
       perRequest: 'Per request',
       perImage: 'Per image'

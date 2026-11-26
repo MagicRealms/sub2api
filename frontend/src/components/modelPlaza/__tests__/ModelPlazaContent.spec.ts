@@ -47,7 +47,8 @@ describe('Model Plaza cards and filters', () => {
     const nativeModels = [
       { name: 'deepseek-v4.1-flash-1017', platform: 'deepseek', input: 1e-6, output: 4e-6, cache: 2e-8 },
       { name: 'kimi-k3', platform: 'kimi', input: 20e-6, output: 100e-6, cache: 2e-6 },
-      { name: 'glm-5.3', platform: 'zhipu', input: 8e-6, output: 28e-6, cache: 2e-6 }
+      { name: 'glm-5.3', platform: 'zhipu', input: 8e-6, output: 28e-6, cache: 2e-6 },
+      { name: 'mimo-v2.6-flash', platform: 'mimo', input: 1e-6, output: 2e-6, cache: 0.02e-6 }
     ].map(item => ({
       ...model(item.name, { input_price: item.input, output_price: item.output, cache_read_price: item.cache }),
       platform: item.platform,

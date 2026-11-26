@@ -41,7 +41,7 @@
         <div><dt class="text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.table.output') }}</dt><dd class="mt-1 break-all font-mono text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-output-price">{{ tokenPrice(tokenPrices?.output_price) }}</dd></div>
         <div v-if="tokenPrices?.cache_read_price != null"><dt class="text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.cards.cachedInput') }}</dt><dd class="mt-1 break-all font-mono text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-cache-price">{{ tokenPrice(tokenPrices.cache_read_price) }}</dd></div>
       </dl>
-      <div v-else class="font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-request-price">{{ requestPrice }}<span class="ml-1 font-sans text-[10px] font-normal text-gray-500 dark:text-dark-400">{{ t(mode === BILLING_MODE_IMAGE ? 'modelPlaza.table.perUnitImage' : 'modelPlaza.table.perUnitRequest') }}</span></div>
+      <div v-else class="font-mono text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100" data-test="model-request-price">{{ requestPrice }}<span class="ml-1 font-sans text-[10px] font-normal text-gray-500 dark:text-dark-400">{{ t(modelPriceUnitKey(variant.model)) }}</span></div>
       <p v-if="!variant.model.pricing" class="mt-1 text-[10px] text-gray-500 dark:text-dark-400">{{ t('modelPlaza.detail.noPricing') }}</p>
     </div>
     <div class="mt-2 flex items-center gap-1.5 text-[9px] text-gray-400 dark:text-dark-500">
@@ -64,7 +64,7 @@ import { BILLING_MODE_IMAGE, BILLING_MODE_TOKEN } from '@/constants/channel'
 import { formatScaled } from '@/utils/pricing'
 import { platformAccentColor } from '@/utils/platformColors'
 import type { GroupPlatform } from '@/types'
-import { baseTokenPrices, modelKind, modelPlazaPlatformLabel, modelPricingCurrency, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
+import { baseTokenPrices, modelKind, modelPlazaPlatformLabel, modelPriceUnitKey, modelPricingCurrency, modelRate, type PlazaModelEntry, type PlazaModelVariant } from './modelCards'
 
 const props = defineProps<{ entry: PlazaModelEntry }>()
 const emit = defineEmits<{ open: [variant: PlazaModelVariant] }>()
@@ -77,11 +77,19 @@ const currency = computed(() => modelPricingCurrency(variant.value.model))
 const rate = computed(() => modelRate(variant.value))
 const mode = computed(() => variant.value.model.pricing?.billing_mode ?? BILLING_MODE_TOKEN)
 const tokenBilling = computed(() => mode.value === BILLING_MODE_TOKEN)
-const modeLabel = computed(() => tokenBilling.value ? t('modelPlaza.cards.perToken') : t(mode.value === BILLING_MODE_IMAGE ? 'modelPlaza.table.perImage' : 'modelPlaza.table.perRequest'))
+const modeLabel = computed(() => {
+  if (tokenBilling.value) return t('modelPlaza.cards.perToken')
+  if (variant.value.model.official_pricing?.unit === 'hour') return t('modelPlaza.table.perHour')
+  return t(mode.value === BILLING_MODE_IMAGE ? 'modelPlaza.table.perImage' : 'modelPlaza.table.perRequest')
+})
 const tokenPrices = computed(() => baseTokenPrices(variant.value.model))
 const variablePricing = computed(() => (variant.value.model.pricing?.intervals.length ?? 0) > 1 || !!variant.value.model.time_pricing?.periods.length || variant.value.group.peak_rate_enabled || Object.keys(variant.value.model.pricing?.reasoning_effort_multipliers ?? {}).length > 0)
 const requestPrice = computed(() => {
   const pricing = variant.value.model.pricing
+  if (variant.value.model.official_pricing?.unit === 'hour') {
+    const hourly = pricing?.intervals.find(iv => iv.tier_label === 'stt')?.per_request_price
+    return hourly == null ? '-' : formatScaled(hourly * rate.value, 1, 2, currency.value)
+  }
   const values = pricing?.intervals.flatMap(iv => iv.per_request_price == null ? [] : [iv.per_request_price]) ?? []
   if (!values.length && pricing?.per_request_price != null) values.push(pricing.per_request_price)
   if (!values.length) return '-'

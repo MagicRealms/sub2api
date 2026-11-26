@@ -61,5 +61,12 @@
     "sequence": 5,
     "date": "2026-11-25",
     "description": "新增 MiMo 独立 API Key 平台和分组，支持非流式 TTS 音频透传与按分组价卡计费"
+  },
+  {
+    "version": "v0.2.25-mr-261126w06",
+    "upstream": "0.2.25",
+    "sequence": 6,
+    "date": "2026-11-26",
+    "description": "按小米国内实时价修正 MiMo Flash 和 Pro 的人民币数值计费，统一模型广场与管理端语音价卡的币种和单位"
   }
 ]

@@ -220,7 +220,7 @@
                   }}<span class="font-sans text-gray-400 dark:text-dark-500">{{ perUnitSuffix(m) }}</span>
                 </span>
               </div>
-              <template v-else-if="m.pricing?.per_request_price != null">
+              <template v-else-if="m.official_pricing?.unit !== 'hour' && m.pricing?.per_request_price != null">
                 <span class="font-mono font-semibold text-gray-900 dark:text-gray-50">
                   {{ paidRequestPrice(m, m.pricing.per_request_price) }}
                 </span>
@@ -232,9 +232,14 @@
 
           <!-- 官方价格(参考价,不乘倍率;官方有阶梯时每档一行) -->
           <td
+            :colspan="m.official_pricing?.unit_price != null ? 3 : undefined"
             class="border-l border-gray-100 px-3 py-2.5 align-middle font-mono text-xs text-gray-500 dark:border-dark-700/60 dark:text-dark-400"
           >
-            <template v-if="officialIntervals(m).length">
+            <template v-if="m.official_pricing?.unit_price != null">
+              {{ formatScaled(m.official_pricing.unit_price, 1, MIN_DECIMALS, currency) }}
+              <span class="font-sans">{{ perUnitSuffix(m) }}</span>
+            </template>
+            <template v-else-if="officialIntervals(m).length">
               <div
                 v-for="(iv, idx) in officialIntervals(m)"
                 :key="idx"
@@ -246,7 +251,7 @@
             </template>
             <template v-else>{{ official(m.official_pricing?.input_price, currency) }}</template>
           </td>
-          <td class="px-3 py-2.5 align-middle font-mono text-xs text-gray-500 dark:text-dark-400">
+          <td v-if="m.official_pricing?.unit_price == null" class="px-3 py-2.5 align-middle font-mono text-xs text-gray-500 dark:text-dark-400">
             <template v-if="officialIntervals(m).length">
               <div
                 v-for="(iv, idx) in officialIntervals(m)"
@@ -259,7 +264,7 @@
             </template>
             <template v-else>{{ official(m.official_pricing?.output_price, currency) }}</template>
           </td>
-          <td class="px-3 py-2.5 align-middle">
+          <td v-if="m.official_pricing?.unit_price == null" class="px-3 py-2.5 align-middle">
             <template v-if="hasTierCachePricing(officialIntervals(m))">
               <div
                 v-for="(iv, idx) in officialIntervals(m)"
@@ -349,7 +354,7 @@ import {
 } from '@/constants/channel'
 import type { PlazaModel, PlazaTimePricingPeriod } from '@/api/modelPlaza'
 import type { UserPricingInterval } from '@/api/channels'
-import { modelPricingCurrency } from './modelCards'
+import { modelPriceUnitKey, modelPricingCurrency } from './modelCards'
 
 function reasoningEffortMultipliers(model: PlazaModel): [string, number][] {
   const multipliers = model.pricing?.reasoning_effort_multipliers
@@ -428,6 +433,7 @@ function billingMode(m: PlazaModel): BillingMode {
 }
 
 function billingModeLabel(m: PlazaModel): string {
+  if (m.official_pricing?.unit === 'hour') return t('modelPlaza.table.perHour')
   return billingMode(m) === BILLING_MODE_IMAGE
     ? t('modelPlaza.table.perImage')
     : t('modelPlaza.table.perRequest')
@@ -497,11 +503,8 @@ function official(value: number | null | undefined, currency: PricingCurrency = 
   return formatScaled(value, PER_MILLION, MIN_DECIMALS, currency)
 }
 
-/** 非 token 计费的单位后缀:按图片 → “/ 张”,按次 → “/ 次”。 */
 function perUnitSuffix(m: PlazaModel): string {
-  return billingMode(m) === BILLING_MODE_IMAGE
-    ? t('modelPlaza.table.perUnitImage')
-    : t('modelPlaza.table.perUnitRequest')
+  return t(modelPriceUnitKey(m))
 }
 
 function hasCachePricing(m: PlazaModel): boolean {
@@ -574,7 +577,9 @@ function tierHint(m: PlazaModel): string {
 
 /** 按次/按图模式的阶梯定价(仅保留配了按次价的档位)。 */
 function requestIntervals(m: PlazaModel): UserPricingInterval[] {
-  return (m.pricing?.intervals ?? []).filter((iv) => iv.per_request_price != null)
+  return (m.pricing?.intervals ?? []).filter((iv) =>
+    iv.per_request_price != null && (m.official_pricing?.unit !== 'hour' || iv.tier_label === 'stt')
+  )
 }
 
 /**

@@ -24,11 +24,17 @@ export function modelPricingCurrency(model: PlazaModel): PricingCurrency {
   return model.official_pricing?.currency === 'CNY' ? 'CNY' : 'USD'
 }
 
+export function modelPriceUnitKey(model: PlazaModel) {
+  if (model.official_pricing?.unit === 'hour') return 'modelPlaza.table.perUnitHour'
+  if (model.pricing?.billing_mode === BILLING_MODE_IMAGE) return 'modelPlaza.table.perUnitImage'
+  return 'modelPlaza.table.perUnitRequest'
+}
+
 /** Model capability is independent of billing: image models may bill by token. */
 export function modelKind(model: Pick<PlazaModel, 'name' | 'pricing'>): 'chat' | 'image' | 'audio' | 'video' {
   if (model.pricing?.billing_mode === BILLING_MODE_VIDEO || /(?:^|[-_/])(video|sora|veo|kling|wan)(?:[-_/.]|$)/i.test(model.name)) return 'video'
   if (model.pricing?.billing_mode === BILLING_MODE_IMAGE || /image|dall-e|imagine|imagen|flux/i.test(model.name)) return 'image'
-  if (/audio|realtime|whisper|(?:^|[-_/])(tts|stt)(?:[-_/.]|$)/i.test(model.name)) return 'audio'
+  if (/audio|realtime|whisper|(?:^|[-_/])(tts|stt|asr)(?:[-_/.]|$)/i.test(model.name)) return 'audio'
   return 'chat'
 }
 

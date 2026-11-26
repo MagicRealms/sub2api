@@ -9,10 +9,12 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
-// PlazaOfficialPricing 模型广场展示用的参考价（per token），与计费同源：
-// LiteLLM → 内置兜底价卡 → 模型策略。字段为 nil 表示该项缺失（0 视为未配置）。
+// PlazaOfficialPricing 表示模型广场的 token 或音频官方参考价。
+// nil 表示该项缺失，音频单价可显式为 0。
 type PlazaOfficialPricing struct {
 	Currency           string // USD（默认）或 CNY；仅显示，不换算价格。
+	UnitPrice          *float64
+	Unit               string // hour 或 request；按 token 模型留空。
 	InputPrice         *float64
 	OutputPrice        *float64
 	CacheWritePrice    *float64 // 5m 缓存写入（= LiteLLM cache_creation）
@@ -445,6 +447,15 @@ func (s *ModelPlazaService) lookupOfficialPricing(ctx context.Context, modelName
 	}
 	if cached, ok := memo[modelName]; ok {
 		return cached
+	}
+	if isMiMoVoiceModel(modelName) {
+		price, unit := 0.0, "request"
+		if isMiMoASRModel(modelName) {
+			price, unit = mimoASROfficialHourlyPrice, "hour"
+		}
+		result := &PlazaOfficialPricing{Currency: "CNY", UnitPrice: &price, Unit: unit}
+		memo[modelName] = result
+		return result
 	}
 	var result *PlazaOfficialPricing
 	if mp, err := s.billingService.GetModelPricing(modelName); err == nil && mp != nil {

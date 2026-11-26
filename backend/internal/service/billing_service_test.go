@@ -139,7 +139,9 @@ func TestShareLLMVerifiedCatalogModelsHaveExplicitPricing(t *testing.T) {
 	}{
 		{"qwen3.8-flash", "CNY", 0.80e-6, 2.70e-6, 0.10e-6},
 		{"Qwen3.8-Flash", "CNY", 0.80e-6, 2.70e-6, 0.10e-6},
-		{"mimo-v2.6-flash", "", 0.14e-6, 0.28e-6, 0.0028e-6},
+		{"mimo-v2.6-flash", "CNY", 1e-6, 2e-6, 0.02e-6},
+		{"self-dploy/MiMo-V2.6-Flash", "CNY", 1e-6, 2e-6, 0.02e-6},
+		{"mimo-v2.6-pro", "CNY", 3e-6, 6e-6, 0.025e-6},
 		{"step-3.7-flash", "", 0.20e-6, 1.15e-6, 0.04e-6},
 		// Versioned DeepSeek aliases and MiniMax M2.5 already have explicit
 		// provider fallback rules; keep them covered in the aggregator catalogue.

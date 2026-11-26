@@ -66,6 +66,29 @@ function mountTable(
 }
 
 describe('PlazaModelPricingTable', () => {
+  it('shows MiMo ASR in RMB per audio hour and preserves the zero TTS price', () => {
+    const official = { currency: 'CNY' as const, input_price: null, output_price: null, cache_write_price: null, cache_read_price: null }
+    const asr = tokenModel({ name: 'mimo-v2.5-asr', platform: 'mimo', official_pricing: { ...official, unit: 'hour', unit_price: 0.50 } })
+    Object.assign(asr.pricing!, { billing_mode: 'per_request', intervals: [{ tier_label: 'stt', per_request_price: 0.50 }] })
+    const tts = tokenModel({ name: 'mimo-v2.5-tts', platform: 'mimo', official_pricing: { ...official, unit: 'request', unit_price: 0 } })
+    Object.assign(tts.pricing!, { billing_mode: 'per_request', per_request_price: 0 })
+    const wrapper = mountTable([asr, tts], 0.15)
+    try {
+      const rows = wrapper.findAll('tbody tr')
+      const asrRow = rows.find(row => row.text().includes(asr.name))!
+      expect(asrRow.text()).toContain('¥0.075')
+      expect(asrRow.text()).toContain('¥0.50')
+      expect(asrRow.text()).toContain('modelPlaza.table.perUnitHour')
+      expect(asrRow.text()).not.toContain('modelPlaza.table.perUnitRequest')
+      const ttsRow = rows.find(row => row.text().includes(tts.name))!
+      expect(ttsRow.text()).toContain('¥0.00')
+      expect(ttsRow.text()).toContain('modelPlaza.table.perUnitRequest')
+      expect(wrapper.text()).not.toContain('$')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it.each([null, 0.1])('shows CNY official and discounted prices without converting amounts (user rate=%s)', (userRate) => {
     const model = tokenModel({ name: 'deepseek-v4.1-flash-1017', platform: 'deepseek' })
     Object.assign(model.pricing!, { input_price: 1e-6, output_price: 4e-6, cache_write_price: null, cache_read_price: 2e-8 })

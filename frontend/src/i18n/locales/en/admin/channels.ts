@@ -186,6 +186,7 @@ export default {
         noTiersYet: 'No tiers yet. Click add to configure per-request pricing.',
         noPricingRules: 'No pricing rules yet. Click "Add" to create one.',
         perRequestPrice: 'Price per Request',
+        perHourPrice: 'Price per Hour',
         perRequestPriceRequired: 'Per-request price or billing tiers required for per-request/image billing mode',
         tierLabel: 'Tier',
         resolution: 'Resolution',

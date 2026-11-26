@@ -36,9 +36,11 @@ func NewModelPlazaHandler(
 	}
 }
 
-// modelPlazaOfficialPricing 参考价及显示币种（per token，与计费目录同源）。
+// modelPlazaOfficialPricing 给出官方参考价、显示币种和非 token 计费单位。
 type modelPlazaOfficialPricing struct {
 	Currency           string   `json:"currency,omitempty"`
+	UnitPrice          *float64 `json:"unit_price,omitempty"`
+	Unit               string   `json:"unit,omitempty"`
 	InputPrice         *float64 `json:"input_price"`
 	OutputPrice        *float64 `json:"output_price"`
 	CacheWritePrice    *float64 `json:"cache_write_price"`
@@ -260,6 +262,8 @@ func toModelPlazaOfficialPricing(p *service.PlazaOfficialPricing) *modelPlazaOff
 	}
 	return &modelPlazaOfficialPricing{
 		Currency:           p.Currency,
+		UnitPrice:          p.UnitPrice,
+		Unit:               p.Unit,
 		InputPrice:         p.InputPrice,
 		OutputPrice:        p.OutputPrice,
 		CacheWritePrice:    p.CacheWritePrice,

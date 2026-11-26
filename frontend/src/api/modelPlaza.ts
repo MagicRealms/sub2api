@@ -11,6 +11,8 @@ import type { UserPricingInterval, UserSupportedModelPricing } from './channels'
 export interface PlazaOfficialPricing {
   /** 价卡显示币种，缺省为 USD；CNY 价卡按人民币数值计价，不换算汇率。 */
   currency?: 'USD' | 'CNY'
+  unit_price?: number
+  unit?: 'hour' | 'request'
   input_price: number | null
   output_price: number | null
   /** 5m 缓存写入（= LiteLLM cache_creation）。 */

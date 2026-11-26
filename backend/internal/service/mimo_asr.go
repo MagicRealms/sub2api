@@ -9,7 +9,17 @@ import (
 
 const mimoASRModel = "mimo-v2.5-asr"
 const mimoTTSModel = "mimo-v2.5-tts"
+const mimoASROfficialHourlyPrice = 0.50
 const mimoVoiceProtocolError = "MiMo voice models require non-streaming Chat Completions"
+
+// MiMo catalogue names are also reported with a provider prefix by relays.
+func mimoChatPriceKey(model string) string {
+	switch name := lastSegment(model); name {
+	case "mimo-v2.6-flash", "mimo-v2.6-pro":
+		return name
+	}
+	return ""
+}
 
 func isMiMoASRModel(model string) bool {
 	return strings.EqualFold(strings.TrimSpace(model), mimoASRModel)

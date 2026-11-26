@@ -1,4 +1,22 @@
 {
+  "mimo-v2.6-flash": {
+    "input_cost_per_token": 0.000001,
+    "output_cost_per_token": 0.000002,
+    "cache_read_input_token_cost": 0.00000002,
+    "litellm_provider": "mimo",
+    "mode": "chat",
+    "pricing_currency": "CNY",
+    "source": "https://mimo.mi.com/docs/zh-CN/price/pay-as-you-go"
+  },
+  "mimo-v2.6-pro": {
+    "input_cost_per_token": 0.000003,
+    "output_cost_per_token": 0.000006,
+    "cache_read_input_token_cost": 0.000000025,
+    "litellm_provider": "mimo",
+    "mode": "chat",
+    "pricing_currency": "CNY",
+    "source": "https://mimo.mi.com/docs/zh-CN/price/pay-as-you-go"
+  },
   "deepseek-flash": {
     "input_cost_per_token": 0.000001,
     "output_cost_per_token": 0.000004,

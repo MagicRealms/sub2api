@@ -89,7 +89,7 @@
           type="number" min="0" class="input mt-0.5 text-xs" :placeholder="'∞'" />
       </div>
       <div class="flex-1">
-        <label class="text-xs text-gray-400">{{ t('admin.channels.form.perRequestPrice') }} <span v-if="isEmpty" class="text-red-500">*</span> <span class="text-gray-300">$</span></label>
+        <label class="text-xs text-gray-400">{{ t(isMiMoHourlyPrice ? 'admin.channels.form.perHourPrice' : 'admin.channels.form.perRequestPrice') }} <span v-if="isEmpty" class="text-red-500">*</span> <span class="text-gray-300">{{ props.platform === 'mimo' ? '¥' : '$' }}</span></label>
         <input :value="interval.per_request_price" @input="emitField('per_request_price', ($event.target as HTMLInputElement).value)"
           type="number" step="any" min="0" class="input mt-0.5 text-xs" />
       </div>
@@ -116,6 +116,7 @@ const props = defineProps<{
   platform?: string
   enableMultipliers?: boolean
 }>()
+const isMiMoHourlyPrice = computed(() => props.platform === 'mimo' && props.interval.tier_label === 'stt')
 
 const emit = defineEmits<{
   update: [interval: IntervalFormEntry]

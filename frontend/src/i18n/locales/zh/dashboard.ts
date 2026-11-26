@@ -813,6 +813,8 @@ export default {
       unitPerMillionCny: 'RMB / 1M token',
       unitPerMillionMixed: '/ 1M token（币种见各模型）',
       perUnitRequest: '/ 次',
+      perUnitHour: '/ 小时',
+      perHour: '按小时计费',
       perUnitImage: '/ 张',
       perRequest: '按次计费',
       perImage: '按图片计费'

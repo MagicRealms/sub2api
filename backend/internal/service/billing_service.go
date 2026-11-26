@@ -1005,11 +1005,19 @@ func (s *BillingService) initFallbackPricing() {
 		OutputPricePerToken:    2.70e-6,
 		CacheReadPricePerToken: 0.10e-6,
 	}
-	// Source: https://mimo.mi.com/docs/en-US/pricing (2026-10-08; global API rates).
+	// MiMo domestic real-time rates, stored as nominal RMB per token.
+	// Source: https://mimo.mi.com/docs/zh-CN/price/pay-as-you-go.
 	s.fallbackPrices["mimo-v2.6-flash"] = &ModelPricing{
-		InputPricePerToken:     0.14e-6,
-		OutputPricePerToken:    0.28e-6,
-		CacheReadPricePerToken: 0.0028e-6,
+		PricingCurrency:        "CNY",
+		InputPricePerToken:     1e-6,
+		OutputPricePerToken:    2e-6,
+		CacheReadPricePerToken: 0.02e-6,
+	}
+	s.fallbackPrices["mimo-v2.6-pro"] = &ModelPricing{
+		PricingCurrency:        "CNY",
+		InputPricePerToken:     3e-6,
+		OutputPricePerToken:    6e-6,
+		CacheReadPricePerToken: 0.025e-6,
 	}
 	// Source: https://platform.stepfun.ai/docs/en/guides/pricing/details (2026-11-17).
 	s.fallbackPrices["step-3.7-flash"] = &ModelPricing{
@@ -1404,8 +1412,8 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	if modelLower == "qwen3.8-flash" || strings.HasSuffix(modelLower, "/qwen3.8-flash") {
 		return s.fallbackPrices["qwen3.8-flash"]
 	}
-	if modelLower == "mimo-v2.6-flash" || strings.HasSuffix(modelLower, "/mimo-v2.6-flash") {
-		return s.fallbackPrices["mimo-v2.6-flash"]
+	if priceKey := mimoChatPriceKey(modelLower); priceKey != "" {
+		return s.fallbackPrices[priceKey]
 	}
 	if modelLower == "step-3.7-flash" || strings.HasSuffix(modelLower, "/step-3.7-flash") {
 		return s.fallbackPrices["step-3.7-flash"]
@@ -1602,6 +1610,14 @@ func (s *BillingService) getModelPricingAt(model string, pricingAt time.Time) (*
 	// 1. 优先从动态价格服务获取
 	if s.pricingService != nil {
 		litellmPricing := s.pricingService.GetModelPricing(model)
+		// A remote USD catalogue entry must not replace the nominal RMB MiMo card.
+		if priceKey := mimoChatPriceKey(model); priceKey != "" &&
+			(litellmPricing == nil || !strings.EqualFold(strings.TrimSpace(litellmPricing.PricingCurrency), "CNY")) {
+			litellmPricing = s.pricingService.GetIdentifiedModelPricing(priceKey)
+			if litellmPricing != nil && !strings.EqualFold(strings.TrimSpace(litellmPricing.PricingCurrency), "CNY") {
+				litellmPricing = nil
+			}
+		}
 		// 仅有图片价、无 token 价的条目（如 LiteLLM 的 imagen 类模型）不能用于
 		// token 计费：直接返回会把 token 流量按 $0 计费。跳过后走 fallback，
 		// 无 fallback 则 fail-closed（ErrModelPricingUnavailable）。
