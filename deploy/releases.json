@@ -68,5 +68,12 @@
     "sequence": 6,
     "date": "2026-11-26",
     "description": "按小米国内实时价修正 MiMo Flash 和 Pro 的人民币数值计费，统一模型广场与管理端语音价卡的币种和单位"
+  },
+  {
+    "version": "v0.2.25-mr-261126w07",
+    "upstream": "0.2.25",
+    "sequence": 7,
+    "date": "2026-11-26",
+    "description": "补齐 Gemini 4 Neon 的美元价卡和内置兜底，按官方标准、Priority 与 Flex 档计量输入、输出和隐式缓存命中"
   }
 ]

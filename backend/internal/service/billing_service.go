@@ -579,6 +579,15 @@ func (s *BillingService) initFallbackPricing() {
 		SupportsCacheBreakdown: false,
 	}, 1.8)
 
+	// Google AI Studio lists one rate across context lengths and implicit caching only.
+	// https://aistudio.google.com/docs/pricing#gemini-4-neon
+	s.fallbackPrices["gemini-4-neon"] = pricingWithPriorityMultiplier(&ModelPricing{
+		PricingCurrency:        "USD",
+		InputPricePerToken:     3e-6,
+		OutputPricePerToken:    15e-6,
+		CacheReadPricePerToken: 0.15e-6,
+	}, 1.8)
+
 	// OpenAI GPT-5.4（业务指定价格）
 	s.fallbackPrices["gpt-5.4"] = &ModelPricing{
 		InputPricePerToken:             2.5e-6,  // $2.5 per MTok
@@ -1275,8 +1284,9 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	if strings.Contains(modelLower, "gemini-3.8-flash") || strings.Contains(modelLower, "gemini-3-8-flash") {
 		return s.fallbackPrices["gemini-3.8-flash"]
 	}
-	if normalizeGeminiThinkingTierAlias(lastSegment(strings.TrimSpace(modelLower))) == "gemini-4-carbon" {
-		return s.fallbackPrices["gemini-4-carbon"]
+	switch modelName := normalizeGeminiThinkingTierAlias(lastSegment(strings.TrimSpace(modelLower))); modelName {
+	case "gemini-4-carbon", "gemini-4-neon":
+		return s.fallbackPrices[modelName]
 	}
 	// Cyber 变体不享受 Gemini 4 Argon 的优惠价，必须先于 "gemini-4-argon" 判。
 	if strings.Contains(modelLower, "gemini-4-argon-cyber") {
