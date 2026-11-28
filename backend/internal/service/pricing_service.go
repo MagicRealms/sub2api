@@ -1054,6 +1054,15 @@ func (s *PricingService) loadPricingOverrideEntries() map[string]json.RawMessage
 		logger.LegacyPrintf("service.pricing", "[Pricing] Warning: override merge skipped: %v", err)
 		return nil
 	}
+	// The Coding Plan aliases share the site's Kimi reference pricing when an
+	// operator has configured it. An explicit alias override takes precedence.
+	for _, alias := range []string{"k3.1-pro", "k3.1-pro-highspeed"} {
+		if _, exists := entries[alias]; !exists {
+			if price, ok := entries["kimi-"+alias]; ok {
+				entries[alias] = price
+			}
+		}
+	}
 	return entries
 }
 

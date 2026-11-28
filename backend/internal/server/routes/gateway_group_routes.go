@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -127,6 +128,19 @@ func orderedKeyGroupRoutingWithSupport(engine *gin.Engine, keys *service.APIKeyS
 		}
 		if model == "" {
 			model = c.Query("model")
+		}
+		// Apply the same image permission as the handler before discovering model
+		// support or fixing the billing floor. Codex's passive image_gen namespace
+		// does not make a text request eligible for this filter.
+		if service.IsImageGenerationEndpoint(path) ||
+			(strings.HasSuffix(path, "/responses") && service.IsExplicitImageGenerationIntent(path, model, body)) {
+			groups = slices.DeleteFunc(groups, func(group *service.Group) bool {
+				return !service.GroupAllowsImageGeneration(group)
+			})
+			if len(groups) == 0 {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": gin.H{"type": "permission_error", "message": service.ImageGenerationPermissionMessage()}})
+				return
+			}
 		}
 		c.Request = c.Request.WithContext(service.WithAPIKeyGroupRoutePricingAt(c.Request.Context(), time.Now()))
 		replay := orderedRouteCanReplay(path)

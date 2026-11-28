@@ -80,6 +80,60 @@ func TestOpenAIGatewayServiceForward_DisabledGroupAllowsTextOnlyResponses(t *tes
 	require.NotNil(t, upstream.lastReq)
 }
 
+func TestOpenAIGatewayServiceForward_ShareLLMNativeImageResponses(t *testing.T) {
+	const model = "gpt-image-2.6"
+	for _, tc := range []struct {
+		name        string
+		baseURL     string
+		body        string
+		allowImages bool
+		native      bool
+	}{
+		{"native input", DefaultShareLLMBaseURL, `{"model":"gpt-image-2.6","input":"Draw a circle","size":"1024x1024","quality":"low"}`, true, true},
+		{"prompt alias", DefaultShareLLMBaseURL, `{"model":"gpt-image-2.6","prompt":"Draw a circle","size":"1024x1024","quality":"low"}`, true, true},
+		{"group permission", DefaultShareLLMBaseURL, `{"model":"gpt-image-2.6","input":"Draw a circle"}`, false, true},
+		{"other upstream", "https://sharellm.net.example.test/v1", `{"model":"gpt-image-2.6","input":"Draw a circle","size":"1024x1024","quality":"low"}`, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(`{"id":"resp_image","output":[{"type":"image_generation_call","result":"image"}],"usage":{"input_tokens":7,"output_tokens":3,"output_tokens_details":{"image_tokens":3}}}`)),
+			}}
+			svc := newOpenAIImageGenerationControlTestService(upstream)
+			c, recorder := newOpenAIImageGenerationControlTestContext(tc.allowImages, "unit-test-agent/1.0")
+			account := newOpenAIImageGenerationControlTestAccount()
+			account.Credentials["base_url"] = tc.baseURL
+
+			result, err := svc.Forward(c.Request.Context(), c, account, []byte(tc.body))
+			if !tc.allowImages {
+				require.Error(t, err)
+				require.Equal(t, http.StatusForbidden, recorder.Code)
+				require.Nil(t, upstream.lastReq)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, recorder.Code)
+			require.Equal(t, 1, result.ImageCount)
+			require.Equal(t, model, result.BillingModel)
+			require.Equal(t, tc.baseURL+"/responses", upstream.lastReq.URL.String())
+			body := gjson.ParseBytes(upstream.lastBody)
+			require.Equal(t, "Draw a circle", body.Get("input").String())
+			require.False(t, body.Get("prompt").Exists())
+			if tc.native {
+				require.Equal(t, model, body.Get("model").String())
+				require.Equal(t, "1024x1024", body.Get("size").String())
+				require.Equal(t, "low", body.Get("quality").String())
+				require.False(t, body.Get("tools").Exists())
+			} else {
+				require.Equal(t, openAIImagesResponsesMainModelValue(), body.Get("model").String())
+				require.Equal(t, model, body.Get("tools.0.model").String())
+			}
+		})
+	}
+}
+
 func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

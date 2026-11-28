@@ -503,7 +503,7 @@ func TestOrderedGroupImagesUseLaterCapableGroup(t *testing.T) {
 	engine := orderedTestEngine(t, groups, handler, func(_ context.Context, group *service.Group, model, path string) (bool, error) {
 		require.Equal(t, "gpt-image-2", model)
 		require.Equal(t, "/v1/images/generations", path)
-		return group.AllowImageGeneration, nil
+		return true, nil
 	})
 	request := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-2","prompt":"a small sun"}`))
 	request.Header.Set("Authorization", "Bearer sk-ordered-route-test-key")
@@ -512,4 +512,74 @@ func TestOrderedGroupImagesUseLaterCapableGroup(t *testing.T) {
 	engine.ServeHTTP(response, request)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	require.Equal(t, []int64{2}, reached)
+}
+
+func TestOrderedGroupResponsesImagePermission(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		body         string
+		allowImage   bool
+		wantGroup    int64
+		wantResponse int
+	}{
+		{"image model", `{"model":"gpt-image-2.6-flare","input":"a small sun"}`, true, 2, http.StatusOK},
+		{"hosted image tool", `{"model":"gpt-6.1-sol","input":"a small sun","tools":[{"type":"image_generation"}]}`, true, 2, http.StatusOK},
+		{"passive Codex namespace", `{"model":"gpt-6.1-sol","input":"hello","tools":[{"type":"namespace","name":"image_gen"}]}`, true, 1, http.StatusOK},
+		{"no authorized image group", `{"model":"gpt-image-2","input":"a small sun"}`, false, 0, http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			groups := orderedTestGroups()
+			groups[1].AllowImageGeneration = tc.allowImage
+			var catalogGroups, reached []int64
+			engine := orderedTestEngine(t, groups, func(c *gin.Context) {
+				key, ok := middleware.GetAPIKeyFromContext(c)
+				require.True(t, ok)
+				reached = append(reached, key.Group.ID)
+				require.Equal(t, tc.wantGroup, key.RoutingBillingFloor.ID)
+				c.JSON(http.StatusOK, gin.H{"id": "resp_test"})
+			}, func(_ context.Context, group *service.Group, _, _ string) (bool, error) {
+				catalogGroups = append(catalogGroups, group.ID)
+				return true, nil
+			})
+			request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(tc.body))
+			request.Header.Set("Authorization", "Bearer sk-ordered-route-test-key")
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			engine.ServeHTTP(response, request)
+			require.Equal(t, tc.wantResponse, response.Code, response.Body.String())
+			if tc.wantGroup == 0 {
+				require.Empty(t, reached)
+				require.Empty(t, catalogGroups)
+				require.Contains(t, response.Body.String(), service.ImageGenerationPermissionMessage())
+				return
+			}
+			require.Equal(t, []int64{tc.wantGroup}, catalogGroups)
+			require.Equal(t, []int64{tc.wantGroup}, reached)
+		})
+	}
+}
+
+func TestOrderedGroupImageFallbackKeepsFirstCapableBillingFloor(t *testing.T) {
+	groups := orderedTestGroups()
+	groups[1].AllowImageGeneration = true
+	groups = append(groups, &service.Group{ID: 3, Platform: service.PlatformOpenAI, Status: service.StatusActive, AllowImageGeneration: true, RateMultiplier: 0.1})
+	var reached []int64
+	engine := orderedTestEngine(t, groups, func(c *gin.Context) {
+		key, ok := middleware.GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		reached = append(reached, key.Group.ID)
+		require.Equal(t, int64(2), key.RoutingBillingFloor.ID)
+		if key.Group.ID == 2 {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"type": "api_error", "message": "Temporarily unavailable"}})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": []any{}})
+	})
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"gpt-image-2.6-flare","input":"a small sun"}`))
+	request.Header.Set("Authorization", "Bearer sk-ordered-route-test-key")
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Equal(t, []int64{2, 3}, reached)
 }

@@ -26,6 +26,7 @@ const triggerRef = useTemplateRef<HTMLElement>('trigger')
 const tooltipRef = useTemplateRef<HTMLElement>('tooltip')
 const tooltipStyle = ref<CSSProperties>({ top: '0px', left: '0px' })
 const tooltipBelow = ref(false)
+const arrowLeft = ref('50%')
 const tooltipId = `help-${useId()}`
 let pointerType = ''
 let touchWasOpen = false
@@ -132,6 +133,8 @@ function updatePosition() {
   tooltipBelow.value = above < bounds.height && below > above
   const room = tooltipBelow.value ? below : above
   const center = Math.max(viewport.left + width / 2, Math.min(rect.left + rect.width / 2, viewport.right - width / 2))
+  const arrowOffset = width / 2 + rect.left + rect.width / 2 - center
+  arrowLeft.value = width > 0 ? `${Math.max(4, Math.min(arrowOffset, width - 4))}px` : '50%'
   // Fixed tooltips use viewport coordinates, never document scroll offsets.
   tooltipStyle.value = {
     top: `${tooltipBelow.value ? rect.bottom + padding : rect.top - padding}px`,
@@ -264,7 +267,7 @@ function onTriggerKeydown(event: KeyboardEvent) {
           </svg>
         </button>
         <slot>{{ content }}</slot>
-        <div class="absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45" :class="[tooltipBelow ? '-top-1' : '-bottom-1', variant === 'surface' ? 'bg-white dark:bg-dark-800' : 'bg-gray-900 dark:bg-gray-800']"></div>
+        <div class="absolute h-2 w-2 -translate-x-1/2 rotate-45" :class="[tooltipBelow ? '-top-1' : '-bottom-1', variant === 'surface' ? 'bg-white dark:bg-dark-800' : 'bg-gray-900 dark:bg-gray-800']" :style="{ left: arrowLeft }"></div>
       </div>
     </Teleport>
   </span>

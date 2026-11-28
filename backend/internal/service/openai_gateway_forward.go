@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -460,9 +461,16 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, errors.New("image generation disabled for group")
 	}
 
-	// /responses/compact 是会话压缩请求：上游不接受 tool_choice（400 unknown_parameter），
-	// 注入 image_generation 工具也没有意义，整块豁免。
-	if imageGenerationAllowed && !isCompactRequest && (codexImageGenerationBridgeEnabled || isOpenAIImageGenerationModel(requestView.Model) || openAIRequestBodyImageGenerationToolNeedsNormalization(body) || isOpenAIImageGenerationModel(upstreamModel)) {
+	// The relay accepts the image model directly on Responses. Preserve its
+	// top-level image parameters and the legacy prompt alias for this route.
+	if !isCompactRequest && usesShareLLMNativeImageResponses(account, upstreamModel) {
+		if prompt := gjson.GetBytes(body, "prompt"); prompt.Type == gjson.String && strings.TrimSpace(prompt.String()) != "" {
+			if !gjson.GetBytes(body, "input").Exists() {
+				markPatchSet("input", prompt.String())
+			}
+			markPatchDelete("prompt")
+		}
+	} else if imageGenerationAllowed && !isCompactRequest && (codexImageGenerationBridgeEnabled || isOpenAIImageGenerationModel(requestView.Model) || openAIRequestBodyImageGenerationToolNeedsNormalization(body) || isOpenAIImageGenerationModel(upstreamModel)) {
 		decoded, decodeErr := ensureReqBody()
 		if decodeErr != nil {
 			return nil, decodeErr
@@ -1405,6 +1413,21 @@ func shouldForwardOpenAIResponsesViaRawChatCompletions(account *Account) bool {
 	return !openai_compat.ShouldUseResponsesAPI(account.Extra)
 }
 
+func openAIResponsesAPIKeyBaseURL(account *Account) string {
+	if account.UsesNativeCNResponses() && account.IsAdaptiveAPIProtocol() {
+		return account.GetCNProtocolBaseURL(APIProtocolResponses)
+	}
+	return account.GetOpenAIBaseURL()
+}
+
+func usesShareLLMNativeImageResponses(account *Account, model string) bool {
+	if account.Type != AccountTypeAPIKey || !IsGPTImageGenerationModel(model) {
+		return false
+	}
+	base, err := url.Parse(openAIResponsesAPIKeyBaseURL(account))
+	return err == nil && base.Scheme == "https" && strings.EqualFold(base.Hostname(), "sharellm.net")
+}
+
 func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token string, isStream bool, promptCacheKey string, isCodexCLI bool) (*http.Request, error) {
 	// Determine target URL based on account type
 	var targetURL string
@@ -1420,10 +1443,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 		}
 	case AccountTypeAPIKey:
 		// API Key accounts use Platform API or custom base URL
-		baseURL := account.GetOpenAIBaseURL()
-		if account.UsesNativeCNResponses() && account.IsAdaptiveAPIProtocol() {
-			baseURL = account.GetCNProtocolBaseURL(APIProtocolResponses)
-		}
+		baseURL := openAIResponsesAPIKeyBaseURL(account)
 		if baseURL == "" {
 			targetURL = openaiPlatformAPIURL
 		} else {

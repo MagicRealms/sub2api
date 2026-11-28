@@ -26,7 +26,7 @@ func TestTesterEndpointsRejectNonTesterRolesBeforeStorage(t *testing.T) {
 					c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
 					c.Set(string(middleware.ContextKeyUserRole), role)
 				}
-				h := NewUsageHandler(nil, nil, nil, nil)
+				h := NewUsageHandler(nil, nil, nil, nil, nil)
 				if endpoint == "monitor" {
 					h.TesterMonitoring(c)
 				} else {
@@ -55,7 +55,7 @@ func TestUsageHistoryIgnoresTesterMonitoringReset(t *testing.T) {
 			c.Request = httptest.NewRequest(http.MethodGet, "/usage?test_session=true&start_time=2026-11-01T00:00:00Z&end_time=2026-11-02T00:00:00Z", nil)
 			c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 7})
 			c.Set(string(middleware.ContextKeyUserRole), role)
-			h := NewUsageHandler(nil, nil, nil, nil)
+			h := NewUsageHandler(nil, nil, nil, nil, nil)
 			parsed, ok := h.parseUserUsageFilters(c, requireRange)
 			require.True(t, ok)
 			require.Equal(t, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), *parsed.Filters.StartTime)
