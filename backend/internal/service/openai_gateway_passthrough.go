@@ -536,6 +536,8 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	}
 	if imageCount > 0 {
 		forwardResult.ImageCount = imageCount
+		forwardResult.imageCountOnlyUsage = !openAIUsageHasTokens(usage) &&
+			!isOpenAIResponsesCompactPath(c) && usesShareLLMNativeImageResponses(account, upstreamPassthroughModel)
 		forwardResult.ImageSize = imageSizeTier
 		forwardResult.ImageInputSize = imageInputSize
 		forwardResult.ImageOutputSizes = imageOutputSizes

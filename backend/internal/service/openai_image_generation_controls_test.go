@@ -134,6 +134,55 @@ func TestOpenAIGatewayServiceForward_ShareLLMNativeImageResponses(t *testing.T) 
 	}
 }
 
+func TestOpenAIGatewayServiceForward_ShareLLMNativeImageResponsesWithoutTokenUsage(t *testing.T) {
+	const model = "gpt-image-2.6"
+	for _, tc := range []struct {
+		name     string
+		response string
+		want     bool
+	}{
+		{"image output", `{"id":"resp_image","object":"response","status":"completed","output":[{"id":"ig_result","type":"image_generation_call","status":"completed","result":"aW1hZ2U=","size":"1024x1024"}],"usage":null}`, true},
+		{"empty output", `{"id":"resp_image","object":"response","status":"completed","output":[],"usage":null}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(tc.response)),
+			}}
+			svc := newOpenAIImageGenerationControlTestService(upstream)
+			c, recorder := newOpenAIImageGenerationControlTestContext(true, "unit-test-agent/1.0")
+			account := newOpenAIImageGenerationControlTestAccount()
+			account.Credentials["base_url"] = DefaultShareLLMBaseURL
+			result, err := svc.Forward(c.Request.Context(), c, account, []byte(`{"model":"gpt-image-2.6","input":"Draw a circle","stream":false}`))
+			if !tc.want {
+				require.Error(t, err)
+				require.Nil(t, result)
+				require.Empty(t, recorder.Body.String())
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, recorder.Code)
+			require.Equal(t, "aW1hZ2U=", gjson.GetBytes(recorder.Body.Bytes(), "output.0.result").String())
+			require.Equal(t, 1, result.ImageCount)
+			require.True(t, result.imageCountOnlyUsage)
+			require.Equal(t, model, result.BillingModel)
+
+			usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
+			billing := newOpenAIRecordUsageServiceForTest(usageRepo, &openAIRecordUsageUserRepoStub{}, &openAIRecordUsageSubRepoStub{}, nil)
+			key := getAPIKeyFromContext(c)
+			key.Group.ImagePrice1K = f64p(0.25)
+			billing.resolver = newOpenAITokenImageChannelPricingResolverForTest(t, key.Group.ID, model)
+			require.NoError(t, billing.RecordUsage(c.Request.Context(), &OpenAIRecordUsageInput{
+				Result: result, APIKey: key, User: &User{ID: 1}, Account: account,
+			}))
+			require.Equal(t, 1, usageRepo.lastLog.ImageCount)
+			require.Equal(t, string(BillingModeImage), *usageRepo.lastLog.BillingMode)
+			require.InDelta(t, 0.25, usageRepo.lastLog.ActualCost, 1e-12)
+		})
+	}
+}
+
 func TestOpenAIGatewayServiceForward_CodexImageInjectionRespectsGroupCapability(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

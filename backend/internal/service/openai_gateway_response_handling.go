@@ -1764,12 +1764,18 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		openAIStreamClientOutputStarted(c, false), mappedModel); err != nil {
 		return nil, err
 	}
+	images := newOpenAIImageOutputCounter()
+	images.AddJSONResponse(body)
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
 	if !usageOK {
 		if bodyLooksLikeSSE {
 			return s.handleSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 		}
-		return nil, fmt.Errorf("parse response: invalid json response")
+		// This image model can return completed images without token usage.
+		// Require actual outputs so empty or malformed responses still fail.
+		if images.Count() == 0 || isOpenAIResponsesCompactPath(c) || !usesShareLLMNativeImageResponses(account, mappedModel) {
+			return nil, fmt.Errorf("parse response: invalid json response")
+		}
 	}
 	usage := &usageValue
 	logOpenAISuccessMissingUsage(ctx, c, account, resp, usage, "json", false)
@@ -1813,8 +1819,8 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		OpenAIUsage:      usage,
 		usage:            usage,
 		responseID:       extractOpenAIResponseIDFromJSONBytes(body),
-		imageCount:       countOpenAIResponseImageOutputsFromJSONBytes(body),
-		imageOutputSizes: collectOpenAIResponseImageOutputSizesFromJSONBytes(body),
+		imageCount:       images.Count(),
+		imageOutputSizes: images.Sizes(),
 		searchCount:      countGrokNativeSearchCallsFromJSONBytes(body),
 	}, nil
 }

@@ -463,7 +463,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 
 	// The relay accepts the image model directly on Responses. Preserve its
 	// top-level image parameters and the legacy prompt alias for this route.
-	if !isCompactRequest && usesShareLLMNativeImageResponses(account, upstreamModel) {
+	nativeImageResponses := !isCompactRequest && usesShareLLMNativeImageResponses(account, upstreamModel)
+	if nativeImageResponses {
 		if prompt := gjson.GetBytes(body, "prompt"); prompt.Type == gjson.String && strings.TrimSpace(prompt.String()) != "" {
 			if !gjson.GetBytes(body, "input").Exists() {
 				markPatchSet("input", prompt.String())
@@ -1372,6 +1373,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 		if imageCount > 0 {
 			forwardResult.ImageCount = imageCount
+			forwardResult.imageCountOnlyUsage = nativeImageResponses && !openAIUsageHasTokens(usage)
 			forwardResult.ImageSize = imageSizeTier
 			forwardResult.ImageInputSize = imageInputSize
 			forwardResult.ImageOutputSizes = imageOutputSizes
@@ -1421,7 +1423,7 @@ func openAIResponsesAPIKeyBaseURL(account *Account) string {
 }
 
 func usesShareLLMNativeImageResponses(account *Account, model string) bool {
-	if account.Type != AccountTypeAPIKey || !IsGPTImageGenerationModel(model) {
+	if account == nil || account.Type != AccountTypeAPIKey || !IsGPTImageGenerationModel(model) {
 		return false
 	}
 	base, err := url.Parse(openAIResponsesAPIKeyBaseURL(account))

@@ -284,6 +284,9 @@ type OpenAIForwardResult struct {
 	FirstTokenMs          *int
 	ClientDisconnect      bool
 	ImageCount            int
+	// imageCountOnlyUsage marks a native image response whose only reported
+	// billing unit is the count of completed images.
+	imageCountOnlyUsage bool
 	// ImageEndpoint 标记请求来自专用图片端点；分组 image_count_billing 开关
 	// 只对这类请求生效，混合 Responses/Chat/WS 请求仍按 token 计费。
 	ImageEndpoint      bool
